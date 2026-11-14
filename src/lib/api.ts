@@ -1,16 +1,66 @@
 import { auth } from './firebase';
 
+const TOKEN_STORAGE_KEY = 'gridpips_auth_token';
+let memorySessionToken: string | null = null;
+
+export function setSessionToken(token?: string | null): void {
+  const clean = typeof token === 'string' && token.trim() ? token.trim() : null;
+  memorySessionToken = clean;
+  try {
+    if (clean) {
+      sessionStorage.setItem(TOKEN_STORAGE_KEY, clean);
+    } else {
+      sessionStorage.removeItem(TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // ignore storage errors in restricted contexts
+  }
+}
+
+export function getSessionToken(): string | null {
+  if (memorySessionToken) return memorySessionToken;
+  try {
+    const stored = sessionStorage.getItem(TOKEN_STORAGE_KEY);
+    if (stored) {
+      memorySessionToken = stored;
+      return stored;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return null;
+}
+
+export function clearSessionToken(): void {
+  setSessionToken(null);
+}
+
 export async function apiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const extraHeaders = (options.headers as Record<string, string> | undefined) || {};
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...extraHeaders,
+  };
+
+  if (!headers.Authorization && !headers.authorization) {
+    const token = getSessionToken();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+  }
+
   const res = await fetch(url, {
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
     ...options,
+    credentials: 'include',
+    headers,
   });
 
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && url !== '/api/auth/login' && url !== '/api/auth/register') {
+    if (!extraHeaders.Authorization && !extraHeaders.authorization) {
+      clearSessionToken();
+    }
+  }
   if (!res.ok) {
     throw new Error((data as { error?: string }).error || `Request failed (${res.status})`);
   }
@@ -27,7 +77,7 @@ export async function firebaseApiFetch<T>(url: string, options: RequestInit = {}
     ...options,
     headers: {
       Authorization: `Bearer ${token}`,
-      ...(options.headers || {}),
+      ...((options.headers as Record<string, string> | undefined) || {}),
     },
   });
 }

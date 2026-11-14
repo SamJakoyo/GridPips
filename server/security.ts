@@ -1,12 +1,28 @@
 import crypto from 'node:crypto';
 import type { Request } from 'express';
 
-const EPHEMERAL_FALLBACK_SECRET = crypto.randomBytes(32).toString('hex');
+const DETERMINISTIC_DEV_FALLBACK = crypto
+  .createHash('sha256')
+  .update(`gridpips-session:${process.env.APP_URL || process.env.VERCEL_URL || 'local-workspace-v1'}`)
+  .digest('hex');
 
 function getSessionSecret(): string {
-  return process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16
-    ? process.env.SESSION_SECRET
-    : EPHEMERAL_FALLBACK_SECRET;
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 16) {
+    return process.env.SESSION_SECRET;
+  }
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY.length >= 16) {
+    return process.env.SUPABASE_SERVICE_ROLE_KEY;
+  }
+  return DETERMINISTIC_DEV_FALLBACK;
+}
+
+export function extractBearerToken(req: Request): string | null {
+  const authHeader = req.headers.authorization;
+  if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.slice(7).trim();
+  return token || null;
 }
 
 export function hashPassword(password: string): string {

@@ -31,6 +31,9 @@ export interface PublicConfig {
   mpesaTillNumber: string;
   mpesaMerchantName: string;
   commissionPct: number;
+  supabaseConfigured?: boolean;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
   cryptoAddresses: {
     USDT_TRC20: string;
     USDT_ERC20: string;

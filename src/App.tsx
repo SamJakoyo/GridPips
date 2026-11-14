@@ -24,8 +24,9 @@ import {
   Box,
 } from 'lucide-react';
 import { signOut } from 'firebase/auth';
-import { apiFetch, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
+import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { auth } from './lib/firebase';
+import { getSupabaseClient } from './lib/supabase';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
 import { LandingPage } from './components/LandingPage';
 import { AuthView } from './components/AuthView';
@@ -147,16 +148,44 @@ export default function App() {
       }).catch(() => {});
     }
 
-    Promise.all([loadConfig(), apiFetch<{ user: User | null }>('/api/auth/me')])
-      .then(([, meRes]) => {
+    Promise.all([
+      apiFetch<PublicConfig>('/api/config/public').catch(() => DEFAULT_CONFIG),
+      apiFetch<{ user: User | null }>('/api/auth/me').catch(() => ({ user: null })),
+    ])
+      .then(async ([cfg, meRes]) => {
+        setConfig(cfg);
         if (meRes.user) {
           setUser(meRes.user);
           setScreen('workspace');
           loadUserWorkspaceData();
+          return;
+        }
+        const sb = getSupabaseClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+        if (sb) {
+          const { data } = await sb.auth.getSession();
+          const token = data.session?.access_token;
+          if (token) {
+            const res = await fetch('/api/auth/supabase-session', {
+              method: 'POST',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({}),
+            });
+            const sbSessionData = await res.json().catch(() => ({}));
+            if (res.ok && sbSessionData.user) {
+              if (sbSessionData.sessionToken) setSessionToken(sbSessionData.sessionToken);
+              setUser(sbSessionData.user);
+              setScreen('workspace');
+              loadUserWorkspaceData();
+            }
+          }
         }
       })
       .finally(() => setBooting(false));
-  }, [loadConfig, loadUserWorkspaceData]);
+  }, [loadUserWorkspaceData]);
 
   // Smooth market quote tick
   useEffect(() => {
@@ -174,8 +203,13 @@ export default function App() {
   }, []);
 
   async function handleLogout() {
-    await apiFetch('/api/auth/logout', { method: 'POST' });
+    clearSessionToken();
+    await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     await signOut(auth).catch(() => {});
+    const sb = getSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
+    if (sb) {
+      await sb.auth.signOut().catch(() => {});
+    }
     setUser(null);
     setOrders([]);
     setJournal([]);

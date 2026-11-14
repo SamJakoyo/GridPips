@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { signInWithPopup } from 'firebase/auth';
 import { ArrowUpRight, Shield, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, setSessionToken } from '../lib/api';
 import { auth, googleProvider } from '../lib/firebase';
 import { syncFirestoreTraderProfile } from '../lib/firestoreStore';
+import { getSupabaseClient } from '../lib/supabase';
 import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 
@@ -13,6 +14,28 @@ interface AuthViewProps {
   initialReferralCode: string;
   onSuccess: (user: User) => void;
   onBackLanding: () => void;
+}
+
+interface PendingOAuthUser {
+  provider: 'firebase' | 'supabase';
+  uid: string;
+  email: string;
+  name: string;
+  accessToken: string;
+}
+
+function formatAuthError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : 'Authentication failed.';
+  if (msg.includes('auth/popup-blocked')) {
+    return 'Popup was blocked by your browser. Allow popups for this site or sign in with email credentials below.';
+  }
+  if (msg.includes('auth/popup-closed-by-user')) {
+    return 'Sign-in window was closed before completion. Please try again.';
+  }
+  if (msg.includes('auth/unauthorized-domain')) {
+    return 'This preview domain is not authorized in Firebase Auth settings. Use email credentials or Supabase Auth below.';
+  }
+  return msg;
 }
 
 export const AuthView: React.FC<AuthViewProps> = ({
@@ -32,13 +55,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [openedExness, setOpenedExness] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [infoNotice, setInfoNotice] = useState('');
 
-  const [pendingGoogle, setPendingGoogle] = useState<{
-    uid: string;
-    email: string;
-    name: string;
-    idToken: string;
-  } | null>(null);
+  const [pendingOAuth, setPendingOAuth] = useState<PendingOAuthUser | null>(null);
+  const supabase = getSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
 
   async function completeFirebaseSession(params: {
     uid: string;
@@ -62,11 +82,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     const data = await res.json().catch(() => ({}));
     if (res.status === 409 && data.needsExnessOnboarding) {
-      setPendingGoogle({
+      setPendingOAuth({
+        provider: 'firebase',
         uid: params.uid,
         email: data.email || '',
         name: data.name || 'Trader',
-        idToken: params.idToken,
+        accessToken: params.idToken,
       });
       setMode('register');
       return;
@@ -74,6 +95,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
 
     if (!res.ok) {
       throw new Error(data.error || 'Google Sign-In failed.');
+    }
+
+    if (data.sessionToken) {
+      setSessionToken(data.sessionToken);
     }
 
     const signedUser = data.user as User;
@@ -87,8 +112,55 @@ export const AuthView: React.FC<AuthViewProps> = ({
     onSuccess(signedUser);
   }
 
+  async function completeSupabaseSession(params: {
+    uid: string;
+    accessToken: string;
+    userName?: string;
+    exnessId?: string;
+    confirmed?: boolean;
+  }) {
+    const res = await fetch('/api/auth/supabase-session', {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${params.accessToken}`,
+      },
+      body: JSON.stringify({
+        name: params.userName || name,
+        exnessAccountId: params.exnessId,
+        exnessConfirmed: params.confirmed,
+        referralCode,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.needsExnessOnboarding) {
+      setPendingOAuth({
+        provider: 'supabase',
+        uid: params.uid,
+        email: data.email || email,
+        name: data.name || name || 'Trader',
+        accessToken: params.accessToken,
+      });
+      setMode('register');
+      return;
+    }
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Supabase authentication failed.');
+    }
+
+    if (data.sessionToken) {
+      setSessionToken(data.sessionToken);
+    }
+
+    onSuccess(data.user as User);
+  }
+
   async function handleGoogleSignIn() {
     setError('');
+    setInfoNotice('');
     setLoading(true);
     try {
       const cred = await signInWithPopup(auth, googleProvider);
@@ -100,7 +172,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
         confirmed: exnessConfirmed,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google Sign-In failed.');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -109,20 +181,90 @@ export const AuthView: React.FC<AuthViewProps> = ({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+    setInfoNotice('');
+
+    if ((mode === 'register' || pendingOAuth) && (!exnessConfirmed || exnessAccountId.trim().length < 4)) {
+      setError('Please enter your Exness Account ID (at least 4 characters) and check the Exness IB confirmation box.');
+      return;
+    }
+
     setLoading(true);
     try {
-      if (pendingGoogle) {
-        await completeFirebaseSession({
-          uid: pendingGoogle.uid,
-          idToken: pendingGoogle.idToken,
-          exnessId: exnessAccountId,
-          confirmed: exnessConfirmed,
-        });
+      if (pendingOAuth) {
+        if (pendingOAuth.provider === 'supabase') {
+          await completeSupabaseSession({
+            uid: pendingOAuth.uid,
+            accessToken: pendingOAuth.accessToken,
+            userName: pendingOAuth.name,
+            exnessId: exnessAccountId,
+            confirmed: exnessConfirmed,
+          });
+        } else {
+          await completeFirebaseSession({
+            uid: pendingOAuth.uid,
+            idToken: pendingOAuth.accessToken,
+            exnessId: exnessAccountId,
+            confirmed: exnessConfirmed,
+          });
+        }
         return;
       }
 
+      // If Supabase is configured, authenticate directly against Supabase Auth first and bridge into Grid Pips
+      if (supabase) {
+        if (mode === 'register') {
+          const { data, error: sbErr } = await supabase.auth.signUp({
+            email: email.trim().toLowerCase(),
+            password,
+            options: {
+              data: {
+                full_name: name.trim(),
+                exness_account_id: exnessAccountId.trim().toUpperCase(),
+              },
+            },
+          });
+          if (sbErr) throw new Error(sbErr.message);
+
+          if (data.session?.access_token && data.user) {
+            await completeSupabaseSession({
+              uid: data.user.id,
+              accessToken: data.session.access_token,
+              userName: name.trim(),
+              exnessId: exnessAccountId,
+              confirmed: exnessConfirmed,
+            });
+            return;
+          }
+
+          // Supabase email confirmation enabled: still activate local workspace or prompt confirmation
+          setInfoNotice(
+            'Account created in Supabase! Check your email inbox to confirm your address, then sign in.'
+          );
+          setMode('login');
+          return;
+        } else {
+          const { data, error: sbErr } = await supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+          });
+          if (!sbErr && data.session?.access_token && data.user) {
+            await completeSupabaseSession({
+              uid: data.user.id,
+              accessToken: data.session.access_token,
+              exnessId: exnessAccountId,
+              confirmed: exnessConfirmed,
+            });
+            return;
+          }
+          // Fall back to server scrypt check for existing pre-Supabase accounts (e.g. admin)
+          if (sbErr && !sbErr.message.toLowerCase().includes('invalid login credentials')) {
+            throw new Error(sbErr.message);
+          }
+        }
+      }
+
       if (mode === 'register') {
-        const res = await apiFetch<{ user: User }>('/api/auth/register', {
+        const res = await apiFetch<{ user: User; sessionToken?: string }>('/api/auth/register', {
           method: 'POST',
           body: JSON.stringify({
             name,
@@ -133,16 +275,18 @@ export const AuthView: React.FC<AuthViewProps> = ({
             referralCode,
           }),
         });
+        if (res.sessionToken) setSessionToken(res.sessionToken);
         onSuccess(res.user);
       } else {
-        const res = await apiFetch<{ user: User }>('/api/auth/login', {
+        const res = await apiFetch<{ user: User; sessionToken?: string }>('/api/auth/login', {
           method: 'POST',
           body: JSON.stringify({ email, password }),
         });
+        if (res.sessionToken) setSessionToken(res.sessionToken);
         onSuccess(res.user);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed');
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -160,21 +304,26 @@ export const AuthView: React.FC<AuthViewProps> = ({
         </button>
 
         <div className="bg-white border border-slate-200 rounded-xl p-8">
-          <div className="mb-5 pb-4 border-b border-slate-100">
+          <div className="mb-5 pb-4 border-b border-slate-100 flex items-center justify-between">
             <BrandLogo variant="dark" size="sm" />
+            {supabase && (
+              <span className="text-[11px] font-medium text-emerald-700">
+                Supabase Connected
+              </span>
+            )}
           </div>
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-2xl font-bold text-slate-950">
-                {pendingGoogle
+                {pendingOAuth
                   ? 'Finish Exness IB Linking'
                   : mode === 'register'
                   ? 'Exness Account Onboarding'
                   : 'Sign in to Grid Pips'}
               </h1>
               <p className="text-sm text-slate-500 mt-1">
-                {pendingGoogle
-                  ? `Signed in with Google (${pendingGoogle.email}). Link your Exness Partner Account ID to enter.`
+                {pendingOAuth
+                  ? `Signed in (${pendingOAuth.email}). Link your Exness Partner Account ID to enter.`
                   : mode === 'register'
                   ? 'Link your Exness IB account to unlock free tools and paid modules.'
                   : 'Access your trading workspace, ICT analyzer, and EA bots.'}
@@ -183,7 +332,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             <Shield className="w-6 h-6 text-blue-600 shrink-0" />
           </div>
 
-          {!pendingGoogle && (
+          {!pendingOAuth && (
             <>
               <button
                 type="button"
@@ -227,6 +376,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onClick={() => {
                     setMode('register');
                     setError('');
+                    setInfoNotice('');
                   }}
                   className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                     mode === 'register' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
@@ -239,6 +389,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   onClick={() => {
                     setMode('login');
                     setError('');
+                    setInfoNotice('');
                   }}
                   className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                     mode === 'login' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
@@ -250,7 +401,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </>
           )}
 
-          {(mode === 'register' || pendingGoogle) && (
+          {(mode === 'register' || pendingOAuth) && (
             <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
               <div className="text-xs font-semibold text-slate-900 mb-1.5">
                 Step 1. Open your Exness brokerage account
@@ -277,6 +428,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </div>
           )}
 
+          {infoNotice && (
+            <div className="mb-5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg">
+              {infoNotice}
+            </div>
+          )}
+
           {error && (
             <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg">
               {error}
@@ -284,7 +441,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {(mode === 'register' || pendingGoogle) && (
+            {(mode === 'register' || pendingOAuth) && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Exness Account ID / Trading Login
@@ -300,7 +457,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               </div>
             )}
 
-            {!pendingGoogle && mode === 'register' && (
+            {!pendingOAuth && mode === 'register' && (
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Full Name
@@ -316,7 +473,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               </div>
             )}
 
-            {!pendingGoogle && (
+            {!pendingOAuth && (
               <>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -349,7 +506,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               </>
             )}
 
-            {(mode === 'register' || pendingGoogle) && (
+            {(mode === 'register' || pendingOAuth) && (
               <>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -385,7 +542,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             >
               {loading
                 ? 'Authenticating...'
-                : pendingGoogle
+                : pendingOAuth
                 ? 'Link Exness & Enter Workspace'
                 : mode === 'register'
                 ? 'Complete Exness Verification & Enter'
@@ -396,7 +553,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="inline-flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5" />
-              Scrypt &amp; Firebase Auth protected
+              {supabase ? 'Supabase + Session Token Protected' : 'Encrypted Session Protected'}
             </span>
             <a
               href={config.telegramUrl}

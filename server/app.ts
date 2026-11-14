@@ -10,10 +10,12 @@ import {
   verifyPassword,
   signSessionToken,
   verifySessionToken,
+  extractBearerToken,
   sanitizeText,
   getClientIp,
   generateSecureToken,
 } from './security.ts';
+import { getSupabaseEnvConfig, verifySupabaseAccessToken } from './supabaseAuth.ts';
 import { sendAutomatedEmail } from './email.ts';
 import {
   ICT_SILVER_BULLET_MQ5,
@@ -45,9 +47,12 @@ const LEGACY_COOKIE_NAME = 'pipgrid_session';
 
 app.set('trust proxy', 1);
 
-// Security HTTP headers (configured to allow TradingView widgets, YouTube embeds, and Google Fonts)
+// Security HTTP headers (configured to allow AI Studio iframe preview, OAuth popups, TradingView, YouTube, and Supabase)
 app.use(
   helmet({
+    frameguard: false,
+    crossOriginOpenerPolicy: false,
+    crossOriginEmbedderPolicy: false,
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -65,17 +70,18 @@ app.use(
         mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
         frameSrc: [
           "'self'",
-          'https://s.tradingview.com',
+          'https://s3.tradingview.com',
           'https://www.tradingview.com',
           'https://www.youtube.com',
           'https://www.youtube-nocookie.com',
           'https://accounts.google.com',
           'https://*.firebaseapp.com',
+          'https://*.supabase.co',
         ],
+        frameAncestors: ["'self'", 'https://aistudio.google.com', 'https://*.google.com', 'https://*.run.app', 'https://*.vercel.app'],
         connectSrc: ["'self'", 'https:', 'wss:'],
       },
     },
-    crossOriginEmbedderPolicy: false,
   })
 );
 
@@ -153,8 +159,28 @@ function serializeUser(u: DbUser) {
   };
 }
 
+function isHttpsRequest(req: Request): boolean {
+  return (
+    req.secure ||
+    req.headers['x-forwarded-proto'] === 'https' ||
+    process.env.NODE_ENV === 'production'
+  );
+}
+
+function extractSessionToken(req: Request): string | undefined {
+  const cookieToken = req.cookies?.[COOKIE_NAME] || req.cookies?.[LEGACY_COOKIE_NAME];
+  if (cookieToken && verifySessionToken(cookieToken)) {
+    return cookieToken;
+  }
+  const bearer = extractBearerToken(req);
+  if (bearer && verifySessionToken(bearer)) {
+    return bearer;
+  }
+  return undefined;
+}
+
 function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): void {
-  const token = req.cookies?.[COOKIE_NAME] || req.cookies?.[LEGACY_COOKIE_NAME];
+  const token = extractSessionToken(req);
   const payload = verifySessionToken(token);
   if (!payload) {
     res.status(401).json({ error: 'Authentication required. Please log in.' });
@@ -190,15 +216,17 @@ function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction): vo
   });
 }
 
-function setSessionCookie(res: Response, user: DbUser): void {
+function setSessionCookie(req: Request, res: Response, user: DbUser): string {
   const token = signSessionToken({ uid: user.id, email: user.email, role: user.role });
+  const https = isHttpsRequest(req);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    sameSite: https ? 'none' : 'lax',
+    secure: https,
     maxAge: 7 * 24 * 60 * 60 * 1000,
     path: '/',
   });
+  return token;
 }
 
 // ---------------- Public & Config ----------------
@@ -211,6 +239,7 @@ app.get('/api/config/public', (_req, res) => {
   const analyzerPriceUsd = Number(s.analyzer_price_usd || 5.25);
   const eaBotsPriceUsd = Number(s.ea_bots_price_usd || 5.25);
   const usdKesRate = Number(s.usd_kes_rate || 130);
+  const sb = getSupabaseEnvConfig();
   res.json({
     exnessIbUrl: s.exness_ib_url,
     telegramUrl: s.telegram_url,
@@ -223,6 +252,9 @@ app.get('/api/config/public', (_req, res) => {
     mpesaTillNumber: s.mpesa_till_number || '5984120',
     mpesaMerchantName: s.mpesa_merchant_name || 'GRIDPIPs Trading',
     commissionPct: Number(s.influencer_commission_pct || 20),
+    supabaseConfigured: sb.configured,
+    supabaseUrl: sb.url,
+    supabaseAnonKey: sb.anonKey,
     cryptoAddresses: {
       USDT_TRC20: s.usdt_trc20_address,
       USDT_ERC20: s.usdt_erc20_address,
@@ -290,23 +322,23 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     );
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
-    setSessionCookie(res, user);
+    const sessionToken = setSessionCookie(req, res, user);
 
     logSecurityEvent('USER_REGISTERED', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
 
     const settings = getSettingsMap();
     await sendAutomatedEmail({
       to: email,
-      subject: 'Welcome to GRIDPIPs — Exness Workspace Activated',
+      subject: 'Welcome to Grid Pips — Exness Workspace Activated',
       category: 'welcome',
       textPreview: `Welcome ${name}! Your Exness ID (${exnessAccountId}) is linked. Access free tools, ICT/SMC education, and join ${settings.telegram_url}.`,
-      html: `<h2>Welcome to GRIDPIPs, ${name}</h2>
+      html: `<h2>Welcome to Grid Pips, ${name}</h2>
         <p>Your free trading workspace is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
         <p>Your Referral Code: <strong>${uniqueRefCode}</strong></p>
         <p>Join our live trading desk on Telegram: <a href="${settings.telegram_url}">${settings.telegram_url}</a></p>`,
     });
 
-    res.status(201).json({ user: serializeUser(user) });
+    res.status(201).json({ user: serializeUser(user), sessionToken });
   } catch (err) {
     console.error('Register error:', err);
     res.status(500).json({ error: 'Registration failed. Please try again.' });
@@ -332,19 +364,19 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     }
 
     db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
-    setSessionCookie(res, user);
+    const sessionToken = setSessionCookie(req, res, user);
     logSecurityEvent('LOGIN_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
 
     await sendAutomatedEmail({
       to: email,
-      subject: 'GRIDPIPs Security Notice — New Sign-In Detected',
+      subject: 'Grid Pips Security Notice — New Sign-In Detected',
       category: 'security_alert',
-      textPreview: `A new sign-in to your GRIDPIPs workspace occurred from IP ${ip}. If this was not you, reset your password immediately.`,
-      html: `<p>Hello ${user.name},</p><p>A new sign-in to your GRIDPIPs account was recorded from IP <code>${ip}</code>.</p>`,
+      textPreview: `A new sign-in to your Grid Pips workspace occurred from IP ${ip}. If this was not you, reset your password immediately.`,
+      html: `<p>Hello ${user.name},</p><p>A new sign-in to your Grid Pips account was recorded from IP <code>${ip}</code>.</p>`,
     });
 
     const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
-    res.json({ user: serializeUser(refreshed) });
+    res.json({ user: serializeUser(refreshed), sessionToken });
   } catch (err) {
     console.error('Login error:', err);
     res.status(500).json({ error: 'Login failed.' });
@@ -352,13 +384,14 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
 });
 
 app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie(COOKIE_NAME, { path: '/' });
-  res.clearCookie(LEGACY_COOKIE_NAME, { path: '/' });
+  const https = isHttpsRequest(req);
+  res.clearCookie(COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
+  res.clearCookie(LEGACY_COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
   res.json({ ok: true });
 });
 
 app.get('/api/auth/me', (req: AuthedRequest, res) => {
-  const token = req.cookies?.[COOKIE_NAME] || req.cookies?.[LEGACY_COOKIE_NAME];
+  const token = extractSessionToken(req);
   const payload = verifySessionToken(token);
   if (!payload) {
     res.json({ user: null });
@@ -366,8 +399,9 @@ app.get('/api/auth/me', (req: AuthedRequest, res) => {
   }
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid) as DbUser | undefined;
   if (!user || user.is_suspended) {
-    res.clearCookie(COOKIE_NAME, { path: '/' });
-    res.clearCookie(LEGACY_COOKIE_NAME, { path: '/' });
+    const https = isHttpsRequest(req);
+    res.clearCookie(COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
+    res.clearCookie(LEGACY_COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
     res.json({ user: null });
     return;
   }
@@ -462,7 +496,7 @@ app.post('/api/auth/firebase-session', authLimiter, requireFirebaseAuth, async (
       logSecurityEvent('LOGIN_FIREBASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
     }
 
-    setSessionCookie(res, user);
+    const sessionToken = setSessionCookie(req, res, user);
 
     try {
       await getOrCreateSqlUser(fbUser.uid, email, user.name, user.exness_account_id);
@@ -471,10 +505,126 @@ app.post('/api/auth/firebase-session', authLimiter, requireFirebaseAuth, async (
     }
 
     const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
-    res.json({ user: serializeUser(refreshed) });
+    res.json({ user: serializeUser(refreshed), sessionToken });
   } catch (err) {
     console.error('Firebase session error:', err);
     res.status(500).json({ error: 'Failed to establish Firebase session.' });
+  }
+});
+
+app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
+  try {
+    const sbConfig = getSupabaseEnvConfig();
+    if (!sbConfig.configured) {
+      res.status(503).json({
+        error: 'Supabase is not configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY to connect.',
+      });
+      return;
+    }
+
+    const accessToken = extractBearerToken(req);
+    if (!accessToken) {
+      res.status(401).json({ error: 'Unauthorized: Missing Supabase access token.' });
+      return;
+    }
+
+    const sbUser = await verifySupabaseAccessToken(accessToken);
+    if (!sbUser || !sbUser.email) {
+      res.status(401).json({ error: 'Invalid or expired Supabase session token.' });
+      return;
+    }
+
+    const email = sanitizeText(sbUser.email, 120).toLowerCase();
+    const metaName =
+      (typeof sbUser.user_metadata?.full_name === 'string' && sbUser.user_metadata.full_name) ||
+      (typeof sbUser.user_metadata?.name === 'string' && sbUser.user_metadata.name) ||
+      email.split('@')[0] ||
+      'Trader';
+    const displayName = sanitizeText(req.body?.name || metaName, 80);
+    const ip = getClientIp(req);
+
+    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
+
+    if (!user) {
+      const exnessAccountId = sanitizeText(req.body?.exnessAccountId, 40).toUpperCase();
+      const exnessConfirmed = Boolean(req.body?.exnessConfirmed);
+      const referralCodeUsed = sanitizeText(req.body?.referralCode, 30).toUpperCase();
+
+      if (!exnessConfirmed || exnessAccountId.length < 4) {
+        res.status(409).json({
+          needsExnessOnboarding: true,
+          email,
+          name: displayName,
+          error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
+        });
+        return;
+      }
+
+      let referredById: number | null = null;
+      if (referralCodeUsed) {
+        const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
+          | { id: number }
+          | undefined;
+        if (refUser) referredById = refUser.id;
+      }
+
+      const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
+      const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
+      const bridgeToken = generateSecureToken(16);
+      const randomPassword = generateSecureToken(24);
+      const role = email === 'samjakoyo26@gmail.com' ? 'admin' : 'user';
+
+      const info = db
+        .prepare(
+          `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
+           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
+        )
+        .run(
+          displayName,
+          email,
+          hashPassword(randomPassword),
+          role,
+          exnessAccountId,
+          email,
+          uniqueRefCode,
+          referredById,
+          bridgeToken
+        );
+
+      const userId = Number(info.lastInsertRowid);
+      db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
+      db.prepare('INSERT INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
+        userId,
+        JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
+      );
+      user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
+
+      logSecurityEvent('USER_REGISTERED_SUPABASE', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
+
+      const settings = getSettingsMap();
+      await sendAutomatedEmail({
+        to: email,
+        subject: 'Welcome to Grid Pips — Supabase & Exness Workspace Activated',
+        category: 'welcome',
+        textPreview: `Welcome ${displayName}! Your Supabase Auth account and Exness ID (${exnessAccountId}) are linked. Join ${settings.telegram_url}.`,
+        html: `<h2>Welcome to Grid Pips, ${displayName}</h2><p>Your Exness Account ID <strong>${exnessAccountId}</strong> and Supabase Auth account are active.</p>`,
+      });
+    } else {
+      if (user.is_suspended) {
+        logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
+        res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+        return;
+      }
+      db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
+      logSecurityEvent('LOGIN_SUPABASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
+    }
+
+    const sessionToken = setSessionCookie(req, res, user);
+    const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+    res.json({ user: serializeUser(refreshed), sessionToken });
+  } catch (err) {
+    console.error('Supabase session error:', err);
+    res.status(500).json({ error: 'Failed to establish Supabase session.' });
   }
 });
 
