@@ -39,7 +39,7 @@ const HERO_FRAMES = [
   },
   {
     src: LANDING_IMAGES.automatorEa3d,
-    alt: '3D algorithmic engineer developing MQL5 automated trading bots',
+    alt: '3D Black institutional forex trader executing trades across multi-monitor candlestick and order depth screens',
     caption: 'MQL5 Automation · MetaTrader 5 Bridge',
   },
 ];
@@ -654,8 +654,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="h-64 sm:h-72 overflow-hidden bg-slate-950 border-b border-slate-800">
                 <ImageWithFallback
                   src={LANDING_IMAGES.automatorEa3d}
-                  alt="3D algorithmic engineer coding MQL5 Expert Advisors"
-                  className="w-full h-full object-cover"
+                  alt="3D Black institutional trader operating multi-monitor MetaTrader 5 execution desk"
+                  className="w-full h-full object-cover object-top"
                 />
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
