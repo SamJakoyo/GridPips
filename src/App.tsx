@@ -23,13 +23,13 @@ import {
   Film,
   Box,
 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
+import { getRedirectResult, signOut } from 'firebase/auth';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { auth } from './lib/firebase';
 import { getSupabaseClient } from './lib/supabase';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
 import { LandingPage } from './components/LandingPage';
-import { AuthView } from './components/AuthView';
+import { AuthView, type PendingOAuthUser } from './components/AuthView';
 import { CheckoutModal } from './components/CheckoutModal';
 import { IctAnalyzerView } from './components/IctAnalyzerView';
 import { EaBotsView } from './components/EaBotsView';
@@ -111,6 +111,7 @@ export default function App() {
     existingOrder?: Order | null;
   } | null>(null);
   const [capturedRefCode, setCapturedRefCode] = useState('');
+  const [pendingGoogleOAuth, setPendingGoogleOAuth] = useState<PendingOAuthUser | null>(null);
 
   const loadConfig = useCallback(async () => {
     try {
@@ -159,6 +160,39 @@ export default function App() {
           setScreen('workspace');
           loadUserWorkspaceData();
           return;
+        }
+        const redirectCred = await getRedirectResult(auth).catch(() => null);
+        if (redirectCred?.user) {
+          const idToken = await redirectCred.user.getIdToken();
+          const fbRes = await fetch('/api/auth/firebase-session', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ referralCode: ref ? ref.trim().toUpperCase() : '' }),
+          });
+          const fbData = await fbRes.json().catch(() => ({}));
+          if (fbRes.ok && fbData.user) {
+            if (fbData.sessionToken) setSessionToken(fbData.sessionToken);
+            setUser(fbData.user);
+            setScreen('workspace');
+            loadUserWorkspaceData();
+            return;
+          }
+          if (fbRes.status === 409 && fbData.needsExnessOnboarding) {
+            setPendingGoogleOAuth({
+              provider: 'firebase',
+              uid: redirectCred.user.uid,
+              email: fbData.email || redirectCred.user.email || '',
+              name: fbData.name || redirectCred.user.displayName || 'Trader',
+              accessToken: idToken,
+            });
+            setAuthMode('register');
+            setScreen('auth');
+            return;
+          }
         }
         const sb = getSupabaseClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
         if (sb) {
@@ -272,8 +306,15 @@ export default function App() {
         initialMode={authMode}
         config={config}
         initialReferralCode={capturedRefCode}
-        onSuccess={handleAuthSuccess}
-        onBackLanding={() => setScreen('landing')}
+        initialPendingOAuth={pendingGoogleOAuth}
+        onSuccess={(loggedInUser) => {
+          setPendingGoogleOAuth(null);
+          handleAuthSuccess(loggedInUser);
+        }}
+        onBackLanding={() => {
+          setPendingGoogleOAuth(null);
+          setScreen('landing');
+        }}
       />
     );
   }

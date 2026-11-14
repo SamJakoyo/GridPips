@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
+import React, { useEffect, useState } from 'react';
+import { signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { ArrowUpRight, Shield, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { apiFetch, setSessionToken } from '../lib/api';
 import { auth, googleProvider } from '../lib/firebase';
@@ -8,15 +8,7 @@ import { getSupabaseClient } from '../lib/supabase';
 import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 
-interface AuthViewProps {
-  initialMode: 'login' | 'register';
-  config: PublicConfig;
-  initialReferralCode: string;
-  onSuccess: (user: User) => void;
-  onBackLanding: () => void;
-}
-
-interface PendingOAuthUser {
+export interface PendingOAuthUser {
   provider: 'firebase' | 'supabase';
   uid: string;
   email: string;
@@ -24,16 +16,65 @@ interface PendingOAuthUser {
   accessToken: string;
 }
 
+interface AuthViewProps {
+  initialMode: 'login' | 'register';
+  config: PublicConfig;
+  initialReferralCode: string;
+  initialPendingOAuth?: PendingOAuthUser | null;
+  onSuccess: (user: User) => void;
+  onBackLanding: () => void;
+}
+
+function getAuthErrorCode(err: unknown): string {
+  if (err && typeof err === 'object' && 'code' in err && typeof (err as { code?: unknown }).code === 'string') {
+    return (err as { code: string }).code;
+  }
+  const msg = err instanceof Error ? err.message : '';
+  const match = msg.match(/\b(auth\/[a-z0-9-]+)\b/i);
+  return match ? match[1] : '';
+}
+
+function isIframeEnvironment(): boolean {
+  try {
+    return typeof window !== 'undefined' && window.self !== window.top;
+  } catch {
+    return true;
+  }
+}
+
 function formatAuthError(err: unknown): string {
+  const code = getAuthErrorCode(err);
   const msg = err instanceof Error ? err.message : 'Authentication failed.';
-  if (msg.includes('auth/popup-blocked')) {
-    return 'Popup was blocked by your browser. Allow popups for this site or sign in with email credentials below.';
+  const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
+
+  if (code === 'auth/popup-blocked' || msg.includes('auth/popup-blocked')) {
+    return 'Google Sign-In popup was blocked by your browser or preview frame. Allow popups for this site, open Grid Pips in a new browser tab, or sign in with email below.';
   }
-  if (msg.includes('auth/popup-closed-by-user')) {
-    return 'Sign-in window was closed before completion. Please try again.';
+  if (code === 'auth/popup-closed-by-user' || msg.includes('auth/popup-closed-by-user')) {
+    return 'Google sign-in window was closed before completing. Please click Continue with Google again.';
   }
-  if (msg.includes('auth/unauthorized-domain')) {
-    return 'This preview domain is not authorized in Firebase Auth settings. Use email credentials or Supabase Auth below.';
+  if (code === 'auth/cancelled-popup-request' || msg.includes('auth/cancelled-popup-request')) {
+    return 'Another Google sign-in window is already open. Please finish or close it and try again.';
+  }
+  if (code === 'auth/unauthorized-domain' || msg.includes('auth/unauthorized-domain')) {
+    return `Domain "${host}" is not listed under Firebase Console -> Authentication -> Settings -> Authorized domains. Add "${host}" there or sign in with email credentials below.`;
+  }
+  if (code === 'auth/operation-not-allowed' || msg.includes('auth/operation-not-allowed')) {
+    return 'Google Sign-In provider is disabled in Firebase Console -> Authentication -> Sign-in method.';
+  }
+  if (
+    code === 'auth/operation-not-supported-in-this-environment' ||
+    code === 'auth/web-storage-unsupported' ||
+    msg.includes('auth/operation-not-supported-in-this-environment') ||
+    msg.includes('auth/web-storage-unsupported')
+  ) {
+    return 'Your browser blocked third-party storage or popups inside this embedded frame. Open Grid Pips in a new tab or enable cookies/storage.';
+  }
+  if (code === 'auth/network-request-failed' || msg.includes('auth/network-request-failed')) {
+    return 'Network request to Google authentication failed. Check your connection and try again.';
+  }
+  if (code === 'auth/internal-error' || msg.includes('auth/internal-error')) {
+    return 'Google Sign-In encountered a browser frame or CSP interruption. Try opening Grid Pips in a new tab or refreshing.';
   }
   return msg;
 }
@@ -42,10 +83,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
   initialMode,
   config,
   initialReferralCode,
+  initialPendingOAuth = null,
   onSuccess,
   onBackLanding,
 }) => {
-  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  const [mode, setMode] = useState<'login' | 'register'>(initialPendingOAuth ? 'register' : initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,10 +97,25 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [openedExness, setOpenedExness] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [infoNotice, setInfoNotice] = useState('');
+  const [showNewTabHint, setShowNewTabHint] = useState(false);
+  const [infoNotice, setInfoNotice] = useState(
+    initialPendingOAuth
+      ? `Google account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
+      : ''
+  );
 
-  const [pendingOAuth, setPendingOAuth] = useState<PendingOAuthUser | null>(null);
+  const [pendingOAuth, setPendingOAuth] = useState<PendingOAuthUser | null>(initialPendingOAuth);
   const supabase = getSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
+
+  useEffect(() => {
+    if (initialPendingOAuth) {
+      setPendingOAuth(initialPendingOAuth);
+      setMode('register');
+      setInfoNotice(
+        `Google account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
+      );
+    }
+  }, [initialPendingOAuth]);
 
   async function completeFirebaseSession(params: {
     uid: string;
@@ -90,6 +147,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
         accessToken: params.idToken,
       });
       setMode('register');
+      setInfoNotice(
+        `Google account verified (${data.email || 'Trader'}). Complete Step 1 and enter your Exness Account ID below to enter.`
+      );
       return;
     }
 
@@ -102,7 +162,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     }
 
     const signedUser = data.user as User;
-    await syncFirestoreTraderProfile({
+    void syncFirestoreTraderProfile({
       uid: params.uid,
       displayName: signedUser.name,
       email: signedUser.email,
@@ -144,6 +204,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
         accessToken: params.accessToken,
       });
       setMode('register');
+      setInfoNotice(
+        `Google account verified (${data.email || email}). Complete Step 1 and enter your Exness Account ID below to enter.`
+      );
       return;
     }
 
@@ -161,7 +224,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
   async function handleGoogleSignIn() {
     setError('');
     setInfoNotice('');
+    setShowNewTabHint(false);
     setLoading(true);
+    const inIframe = isIframeEnvironment();
+
     try {
       const cred = await signInWithPopup(auth, googleProvider);
       const idToken = await cred.user.getIdToken();
@@ -172,18 +238,37 @@ export const AuthView: React.FC<AuthViewProps> = ({
         confirmed: exnessConfirmed,
       });
     } catch (err) {
-      const code = err instanceof Error ? err.message : '';
-      if (supabase && (code.includes('auth/unauthorized-domain') || code.includes('auth/popup-blocked'))) {
-        const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: { redirectTo: window.location.origin },
-        });
-        if (oauthErr) {
-          setError(oauthErr.message);
+      const code = getAuthErrorCode(err);
+      const msg = err instanceof Error ? err.message : '';
+      const isPopupOrEnvIssue =
+        code === 'auth/popup-blocked' ||
+        code === 'auth/operation-not-supported-in-this-environment' ||
+        code === 'auth/web-storage-unsupported' ||
+        code === 'auth/internal-error' ||
+        msg.includes('auth/popup-blocked') ||
+        msg.includes('auth/operation-not-supported-in-this-environment');
+
+      if (!inIframe && isPopupOrEnvIssue) {
+        if (supabase) {
+          const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.origin },
+          });
+          if (!oauthErr) return;
         }
-      } else {
-        setError(formatAuthError(err));
+        try {
+          await signInWithRedirect(auth, googleProvider);
+          return;
+        } catch (redirectErr) {
+          setError(formatAuthError(redirectErr));
+          return;
+        }
       }
+
+      if (inIframe && (isPopupOrEnvIssue || code === 'auth/unauthorized-domain')) {
+        setShowNewTabHint(true);
+      }
+      setError(formatAuthError(err));
     } finally {
       setLoading(false);
     }
@@ -193,6 +278,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     e.preventDefault();
     setError('');
     setInfoNotice('');
+    setShowNewTabHint(false);
 
     if ((mode === 'register' || pendingOAuth) && (!exnessConfirmed || exnessAccountId.trim().length < 4)) {
       setError('Please enter your Exness Account ID (at least 4 characters) and check the Exness IB confirmation box.');
@@ -222,9 +308,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
             confirmed: exnessConfirmed,
           });
         } else {
+          const freshToken = auth.currentUser
+            ? await auth.currentUser.getIdToken(true)
+            : pendingOAuth.accessToken;
           await completeFirebaseSession({
             uid: pendingOAuth.uid,
-            idToken: pendingOAuth.accessToken,
+            idToken: freshToken,
             exnessId: exnessAccountId,
             confirmed: exnessConfirmed,
           });
@@ -451,14 +540,39 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           {infoNotice && (
-            <div className="mb-5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg">
-              {infoNotice}
+            <div className="mb-5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg flex items-center justify-between gap-3">
+              <span>{infoNotice}</span>
+              {pendingOAuth && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPendingOAuth(null);
+                    setInfoNotice('');
+                    setError('');
+                    void signOut(auth).catch(() => {});
+                  }}
+                  className="shrink-0 underline font-semibold text-emerald-900 hover:text-emerald-700 cursor-pointer"
+                >
+                  Switch account
+                </button>
+              )}
             </div>
           )}
 
           {error && (
-            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg">
-              {error}
+            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg space-y-2">
+              <div>{error}</div>
+              {showNewTabHint && typeof window !== 'undefined' && (
+                <a
+                  href={window.location.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 text-white rounded-md font-semibold hover:bg-slate-800 transition-colors"
+                >
+                  Open Grid Pips in New Tab
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
+              )}
             </div>
           )}
 
