@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
   ShieldCheck,
-  Send,
   CheckCircle2,
   X,
   Pause,
@@ -12,7 +11,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { LANDING_IMAGES } from '../assets/landingImages';
-import { BrandLogo, type BrandAccent } from './BrandLogo';
+import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 import type { MarketSymbolQuote } from '../lib/api';
 
@@ -26,119 +25,6 @@ interface LandingPageProps {
 }
 
 type LegalDocKey = 'risk' | 'affiliate' | 'terms' | 'privacy';
-type ThemeKey = 'gold' | 'navy' | 'crimson' | 'emerald' | 'mono';
-
-interface ThemeTokens {
-  id: ThemeKey;
-  label: string;
-  swatch: string;
-  logoAccent: BrandAccent;
-  pageBg: string;
-  bandBg: string;
-  cardBg: string;
-  headerBg: string;
-  borderDark: string;
-  accentText: string;
-  accentHeadlineGradient: string;
-  ctaBtn: string;
-  cardHighlightBorder: string;
-  secondaryBtnDark: string;
-  ambientGlow: string;
-  candleColor: string;
-}
-
-const THEME_PRESETS: Record<ThemeKey, ThemeTokens> = {
-  gold: {
-    id: 'gold',
-    label: 'Black & Gold',
-    swatch: '#fbbf24',
-    logoAccent: 'gold',
-    pageBg: 'bg-[#050505]',
-    bandBg: 'bg-[#0b0a07]',
-    cardBg: 'bg-[#0e0d0a]',
-    headerBg: 'bg-[#050505]/95',
-    borderDark: 'border-amber-500/20',
-    accentText: 'text-amber-400',
-    accentHeadlineGradient: 'from-amber-200 via-amber-400 to-amber-500',
-    ctaBtn: 'bg-amber-400 hover:bg-amber-300 text-black',
-    cardHighlightBorder: 'border-2 border-amber-400',
-    secondaryBtnDark: 'bg-neutral-900/90 border border-amber-500/30 hover:border-amber-400 text-white',
-    ambientGlow: 'rgba(245, 158, 11, 0.20)',
-    candleColor: '#f59e0b',
-  },
-  navy: {
-    id: 'navy',
-    label: 'Institutional Navy',
-    swatch: '#2563eb',
-    logoAccent: 'blue',
-    pageBg: 'bg-slate-950',
-    bandBg: 'bg-slate-900',
-    cardBg: 'bg-slate-900/80',
-    headerBg: 'bg-slate-950/95',
-    borderDark: 'border-slate-800',
-    accentText: 'text-blue-400',
-    accentHeadlineGradient: 'from-sky-200 via-blue-400 to-blue-500',
-    ctaBtn: 'bg-blue-600 hover:bg-blue-500 text-white',
-    cardHighlightBorder: 'border-2 border-blue-500',
-    secondaryBtnDark: 'bg-slate-900 border border-slate-700 hover:border-blue-400 text-white',
-    ambientGlow: 'rgba(37, 99, 235, 0.20)',
-    candleColor: '#3b82f6',
-  },
-  crimson: {
-    id: 'crimson',
-    label: 'Crimson Black',
-    swatch: '#dc2626',
-    logoAccent: 'red',
-    pageBg: 'bg-black',
-    bandBg: 'bg-neutral-950',
-    cardBg: 'bg-neutral-950',
-    headerBg: 'bg-black/95',
-    borderDark: 'border-neutral-800',
-    accentText: 'text-red-500',
-    accentHeadlineGradient: 'from-rose-200 via-red-400 to-red-600',
-    ctaBtn: 'bg-red-600 hover:bg-red-500 text-white',
-    cardHighlightBorder: 'border-2 border-red-600',
-    secondaryBtnDark: 'bg-neutral-900 border border-neutral-700 hover:border-red-500 text-white',
-    ambientGlow: 'rgba(220, 38, 38, 0.20)',
-    candleColor: '#ef4444',
-  },
-  emerald: {
-    id: 'emerald',
-    label: 'Emerald Carbon',
-    swatch: '#059669',
-    logoAccent: 'emerald',
-    pageBg: 'bg-zinc-950',
-    bandBg: 'bg-neutral-950',
-    cardBg: 'bg-zinc-900/80',
-    headerBg: 'bg-zinc-950/95',
-    borderDark: 'border-zinc-800',
-    accentText: 'text-emerald-400',
-    accentHeadlineGradient: 'from-emerald-200 via-emerald-400 to-emerald-500',
-    ctaBtn: 'bg-emerald-500 hover:bg-emerald-400 text-black',
-    cardHighlightBorder: 'border-2 border-emerald-500',
-    secondaryBtnDark: 'bg-zinc-900 border border-zinc-700 hover:border-emerald-400 text-white',
-    ambientGlow: 'rgba(16, 185, 129, 0.18)',
-    candleColor: '#10b981',
-  },
-  mono: {
-    id: 'mono',
-    label: 'Swiss Mono',
-    swatch: '#ffffff',
-    logoAccent: 'mono',
-    pageBg: 'bg-black',
-    bandBg: 'bg-neutral-950',
-    cardBg: 'bg-neutral-950',
-    headerBg: 'bg-black/95',
-    borderDark: 'border-neutral-800',
-    accentText: 'text-neutral-300',
-    accentHeadlineGradient: 'from-white via-neutral-200 to-neutral-400',
-    ctaBtn: 'bg-white hover:bg-neutral-200 text-black',
-    cardHighlightBorder: 'border-2 border-white',
-    secondaryBtnDark: 'bg-neutral-900 border border-neutral-700 hover:border-white text-white',
-    ambientGlow: 'rgba(255, 255, 255, 0.10)',
-    candleColor: '#d4d4d8',
-  },
-};
 
 const HERO_FRAMES = [
   {
@@ -277,7 +163,7 @@ function ImageWithFallback({
   const [failed, setFailed] = React.useState(false);
   if (failed) {
     return (
-      <div className={`bg-gradient-to-br from-neutral-950 to-black flex items-center justify-center p-6 text-neutral-300 text-sm ${className || ''}`}>
+      <div className={`bg-gradient-to-br from-slate-900 to-slate-950 flex items-center justify-center p-6 text-slate-300 text-sm ${className || ''}`}>
         <span>{alt}</span>
       </div>
     );
@@ -311,14 +197,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onGoWorkspace,
   onSelectProduct,
 }) => {
-  const [themeKey, setThemeKey] = useState<ThemeKey>(() => {
-    try {
-      const saved = localStorage.getItem('gridpips_landing_theme_v4') as ThemeKey | null;
-      return saved && THEME_PRESETS[saved] ? saved : 'gold';
-    } catch {
-      return 'gold';
-    }
-  });
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
   const [demoOpen, setDemoOpen] = useState(false);
   const [heroMotionActive, setHeroMotionActive] = useState(true);
@@ -326,17 +204,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [phoneTf, setPhoneTf] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1D');
   const [phoneSymIndex, setPhoneSymIndex] = useState(0);
   const [nyClock, setNyClock] = useState(() => getNyClock());
-
-  const theme = THEME_PRESETS[themeKey];
-
-  function handleSelectTheme(next: ThemeKey) {
-    setThemeKey(next);
-    try {
-      localStorage.setItem('gridpips_landing_theme_v4', next);
-    } catch {
-      // ignore storage failure
-    }
-  }
 
   useEffect(() => {
     const clockId = setInterval(() => {
@@ -355,27 +222,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
   const featuredQuotes = useMemo(() => {
     const targetSyms = ['XAUUSD', 'EURUSD', 'BTCUSD', 'NAS100', 'GBPUSD'];
-    return targetSyms.map(
-      (s, i) => quotes.find((q) => q.sym === s) || quotes[i % quotes.length]
-    ).filter(Boolean);
+    return targetSyms
+      .map((s, i) => quotes.find((q) => q.sym === s) || quotes[i % quotes.length])
+      .filter(Boolean);
   }, [quotes]);
 
   const phoneQuote = featuredQuotes[phoneSymIndex % Math.max(1, featuredQuotes.length)] || quotes[0];
   const phoneCandles = PHONE_CANDLES_BY_TF[phoneTf] || PHONE_CANDLES_BY_TF['1D'];
 
   return (
-    <div className={`min-h-screen ${theme.pageBg} text-white`}>
+    <div className="min-h-screen bg-slate-950 text-white">
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className={`sticky top-0 z-40 ${theme.headerBg} backdrop-blur-md border-b ${theme.borderDark}`}>
+      <header className="sticky top-0 z-40 bg-slate-950/95 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
           <a href="#top" className="shrink-0">
-            <BrandLogo variant="light" accent={theme.logoAccent} size="md" showTagline />
+            <BrandLogo variant="light" size="md" />
           </a>
 
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-neutral-300">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-300">
             <a
               href="#top"
-              className="text-white hover:text-white transition-colors whitespace-nowrap shrink-0 border-b-2 border-amber-400 pb-0.5"
+              className="text-white hover:text-white transition-colors whitespace-nowrap shrink-0 border-b-2 border-blue-500 pb-0.5"
             >
               Home
             </a>
@@ -410,7 +277,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-              className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors whitespace-nowrap shrink-0 cursor-pointer ${theme.ctaBtn}`}
+              className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {user ? 'Open Workspace →' : 'Get Started →'}
             </button>
@@ -418,30 +285,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* Hero Section (Black & Gold Atmospheric Composition matching Reference Screenshot) */}
+      {/* Hero Section — Institutional Blue Palette */}
       <section
         id="top"
-        className={`relative overflow-hidden ${theme.pageBg} text-white border-b ${theme.borderDark}`}
+        className="relative overflow-hidden bg-slate-950 text-white border-b border-slate-800"
         style={{
-          backgroundImage: `radial-gradient(circle at 65% 42%, ${theme.ambientGlow}, transparent 58%)`,
+          backgroundImage: 'radial-gradient(circle at 65% 42%, rgba(37, 99, 235, 0.24), transparent 58%)',
         }}
       >
-        {/* Subtle Rising Diagonal Candlestick Backdrop */}
+        {/* Subtle Wireframe Globe & Rising Candlesticks Backdrop */}
         <svg
           aria-hidden="true"
           viewBox="0 0 1440 620"
           className="pointer-events-none absolute inset-0 w-full h-full opacity-25"
           preserveAspectRatio="xMidYMid slice"
         >
-          {/* Glowing Globe Meridians behind right side */}
-          <g stroke={theme.candleColor} strokeOpacity="0.35" fill="none" strokeWidth="1">
+          <g stroke="#3b82f6" strokeOpacity="0.35" fill="none" strokeWidth="1">
             <circle cx="980" cy="250" r="190" />
             <ellipse cx="980" cy="250" rx="190" ry="70" />
             <ellipse cx="980" cy="250" rx="115" ry="190" />
             <ellipse cx="980" cy="250" rx="50" ry="190" />
             <line x1="790" y1="250" x2="1170" y2="250" />
           </g>
-          {/* Ascending Background Candlesticks */}
           {[
             { x: 180, y: 470, h: 45 },
             { x: 225, y: 455, h: 52 },
@@ -464,7 +329,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 y1={c.y - 18}
                 x2={c.x + 6}
                 y2={c.y + c.h + 18}
-                stroke={theme.candleColor}
+                stroke="#3b82f6"
                 strokeWidth="1.5"
                 strokeOpacity="0.45"
               />
@@ -474,8 +339,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 width="12"
                 height={c.h}
                 rx="2"
-                fill={theme.candleColor}
-                fillOpacity={idx % 3 === 0 ? '0.35' : '0.65'}
+                fill="#3b82f6"
+                fillOpacity={idx % 3 === 0 ? '0.32' : '0.62'}
               />
             </g>
           ))}
@@ -485,9 +350,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             {/* Left Copy Column */}
             <div className="lg:col-span-6 flex flex-col justify-center">
-              <div className="inline-flex items-center gap-2 self-start px-3.5 py-1.5 rounded-full border border-amber-500/35 bg-neutral-950/80 text-xs font-medium text-neutral-200 mb-6">
-                <Zap className={`w-3.5 h-3.5 ${theme.accentText}`} />
-                <span>Trade the Global Markets · Grid Pips</span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-blue-400 mb-5">
+                <Zap className="w-3.5 h-3.5 text-blue-400" />
+                <span>Trade the Global Markets</span>
+                <span aria-hidden="true">·</span>
+                <span className="text-slate-300">Grid Pips</span>
               </div>
 
               <h1
@@ -495,56 +362,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 style={{ fontSize: 'clamp(2.35rem, 4.3vw, 3.85rem)', lineHeight: 1.06, textWrap: 'balance' }}
               >
                 <span className="block text-white">Smarter Trading.</span>
-                <span
-                  className={`block bg-gradient-to-r ${theme.accentHeadlineGradient} bg-clip-text text-transparent`}
-                >
+                <span className="block bg-gradient-to-r from-sky-200 via-blue-400 to-blue-500 bg-clip-text text-transparent">
                   Greater Possibilities.
                 </span>
               </h1>
 
-              <p className="text-[15px] lg:text-base font-normal text-neutral-300 leading-relaxed mb-8 max-w-lg">
+              <p className="text-[15px] lg:text-base font-normal text-slate-300 leading-relaxed mb-8 max-w-lg">
                 Join Grid Pips — an institutional ICT market analyzer and MQL5 automation workspace built for Exness traders, analysts, and automators worldwide.
               </p>
 
               <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                  className={`px-6 py-3.5 text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer ${theme.ctaBtn}`}
+                  className="px-6 py-3.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
                 >
                   {user ? 'Open Workspace →' : 'Start Trading Now →'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDemoOpen(true)}
-                  className="px-5 py-3.5 text-sm font-semibold text-white rounded-full border border-neutral-700 hover:border-amber-400/60 bg-black/50 inline-flex items-center gap-2.5 whitespace-nowrap transition-colors cursor-pointer"
+                  className="px-5 py-3.5 text-sm font-semibold text-white rounded-full border border-slate-700 hover:border-blue-400 bg-slate-900/80 inline-flex items-center gap-2.5 whitespace-nowrap transition-colors cursor-pointer"
                 >
-                  <Play className={`w-4 h-4 ${theme.accentText}`} />
+                  <Play className="w-4 h-4 text-blue-400" />
                   Watch Demo
                 </button>
               </div>
 
-              {/* 3-Metric Bottom Row mirroring reference screenshot */}
-              <div className="mt-10 pt-7 border-t border-neutral-800/80 grid grid-cols-3 gap-6 max-w-lg">
-                <div className="pr-4 border-r border-neutral-800">
-                  <div className={`flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums ${theme.accentText}`}>
+              {/* 3-Metric Bottom Row */}
+              <div className="mt-10 pt-7 border-t border-slate-800/80 grid grid-cols-3 gap-6 max-w-lg">
+                <div className="pr-4 border-r border-slate-800">
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-blue-400">
                     <TrendingUp className="w-4 h-4 shrink-0" />
                     <span>${config.analyzerPriceUsd.toFixed(2)}</span>
                   </div>
-                  <div className="text-xs text-neutral-400 mt-1">ICT &amp; MQL5 Modules</div>
+                  <div className="text-xs text-slate-400 mt-1">ICT &amp; MQL5 Modules</div>
                 </div>
-                <div className="pr-4 border-r border-neutral-800">
-                  <div className={`flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums ${theme.accentText}`}>
+                <div className="pr-4 border-r border-slate-800">
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-blue-400">
                     <ShieldCheck className="w-4 h-4 shrink-0" />
                     <span>Free</span>
                   </div>
-                  <div className="text-xs text-neutral-400 mt-1">Exness Desk</div>
+                  <div className="text-xs text-slate-400 mt-1">Exness Desk</div>
                 </div>
                 <div>
-                  <div className={`flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums ${theme.accentText}`}>
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-blue-400">
                     <Zap className="w-4 h-4 shrink-0" />
                     <span>{config.commissionPct}%</span>
                   </div>
-                  <div className="text-xs text-neutral-400 mt-1">Referral Payout</div>
+                  <div className="text-xs text-slate-400 mt-1">Referral Payout</div>
                 </div>
               </div>
             </div>
@@ -552,7 +417,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Right Column: Landscape Live Animated 3D Picture + Tilted Interactive Grid Pips Smartphone Terminal */}
             <div className="lg:col-span-6 relative">
               {/* Landscape 16:9 Live Animated Picture Backdrop */}
-              <div className={`relative w-full aspect-video rounded-xl overflow-hidden border ${theme.borderDark} bg-black`}>
+              <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
                 {HERO_FRAMES.map((frame, idx) => {
                   const isActive = idx === frameIndex;
                   return (
@@ -571,12 +436,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     />
                   );
                 })}
-                {/* Warm Gold Rim Scrim */}
+                {/* Institutional Blue Atmospheric Scrim */}
                 <div
                   className="absolute inset-0 pointer-events-none"
                   style={{
                     background:
-                      'linear-gradient(120deg, rgba(5,5,5,0.45) 0%, rgba(245,158,11,0.12) 50%, rgba(5,5,5,0.85) 100%)',
+                      'linear-gradient(120deg, rgba(2,6,23,0.45) 0%, rgba(37,99,235,0.16) 50%, rgba(2,6,23,0.88) 100%)',
                   }}
                 />
 
@@ -585,12 +450,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => setHeroMotionActive((m) => !m)}
-                    className="px-2.5 py-1 bg-black/75 border border-neutral-700 hover:border-amber-400/70 text-white text-[11px] font-medium rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1 bg-slate-950/85 border border-slate-700 hover:border-blue-400 text-white text-[11px] font-medium rounded-lg inline-flex items-center gap-1 cursor-pointer"
                   >
                     {heroMotionActive ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                     {heroMotionActive ? 'Pause' : 'Play'}
                   </button>
-                  <div className="flex items-center gap-0.5 bg-black/75 border border-neutral-700 rounded-lg p-0.5">
+                  <div className="flex items-center gap-0.5 bg-slate-950/85 border border-slate-700 rounded-lg p-0.5">
                     {HERO_FRAMES.map((_, idx) => (
                       <button
                         key={idx}
@@ -598,7 +463,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         onClick={() => setFrameIndex(idx)}
                         aria-label={`Switch live hero scene ${idx + 1}`}
                         className={`px-1.5 py-0.5 text-[10px] font-mono rounded cursor-pointer ${
-                          idx === frameIndex ? 'bg-amber-400 text-black font-semibold' : 'text-neutral-300'
+                          idx === frameIndex ? 'bg-blue-600 text-white font-semibold' : 'text-slate-300'
                         }`}
                       >
                         0{idx + 1}
@@ -608,20 +473,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
 
                 {/* Bottom Caption */}
-                <div className="absolute bottom-3 left-3 right-36 text-[11px] font-mono tabular-nums text-neutral-300 truncate pointer-events-none">
+                <div className="absolute bottom-3 left-3 right-36 text-[11px] font-mono tabular-nums text-slate-200 truncate pointer-events-none">
                   {HERO_FRAMES[frameIndex].caption} · NY {nyClock}
                 </div>
               </div>
 
-              {/* Tilted Live Interactive Grid Pips Smartphone Terminal (matching reference picture) */}
+              {/* Tilted Live Interactive Grid Pips Smartphone Terminal */}
               {phoneQuote && (
-                <div className="mt-5 sm:mt-0 sm:w-64 sm:ml-auto lg:absolute lg:-bottom-6 lg:right-2 lg:w-60 bg-[#0b0b0d] border-2 border-amber-400/50 rounded-3xl p-4 shadow-2xl lg:-rotate-3 transition-transform duration-300 hover:rotate-0">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800">
-                    <BrandLogo variant="light" accent={theme.logoAccent} size="sm" />
+                <div className="mt-5 sm:mt-0 sm:w-64 sm:ml-auto lg:absolute lg:-bottom-6 lg:right-2 lg:w-60 bg-slate-900 border-2 border-blue-500/50 rounded-3xl p-4 shadow-2xl lg:-rotate-3 transition-transform duration-300 hover:rotate-0">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
+                    <BrandLogo variant="light" size="sm" />
                     <button
                       type="button"
                       onClick={() => setPhoneSymIndex((i) => i + 1)}
-                      className="text-[10px] font-mono text-amber-400 hover:text-amber-300 cursor-pointer"
+                      className="text-[10px] font-mono text-blue-400 hover:text-blue-300 cursor-pointer"
                     >
                       Switch Pair ↻
                     </button>
@@ -629,12 +494,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
                   <div className="pt-3 pb-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-neutral-300 font-mono">
+                      <span className="text-xs font-semibold text-slate-300 font-mono">
                         {phoneQuote.sym}
                       </span>
-                      <span className="text-[10px] text-neutral-500 font-mono">LIVE FEED</span>
+                      <span className="text-[10px] text-slate-400 font-mono">LIVE FEED</span>
                     </div>
-                    <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-0.5">
+                    <div
+                      className={`text-2xl font-bold font-mono tabular-nums mt-0.5 ${
+                        phoneQuote.chgPct >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
                       {phoneQuote.price.toFixed(phoneQuote.digits)}
                     </div>
                     <div
@@ -648,12 +517,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </div>
 
                   {/* Miniature Candlestick Chart */}
-                  <div className="my-2 bg-black/70 border border-neutral-800/80 rounded-xl p-2">
+                  <div className="my-2 bg-slate-950/90 border border-slate-800 rounded-xl p-2">
                     <svg viewBox="0 0 180 72" className="w-full h-16">
                       {phoneCandles.map((c, idx) => {
                         const x = 8 + idx * 14;
                         const bull = c.c >= c.o;
-                        const col = bull ? '#22c55e' : '#f59e0b';
+                        const col = bull ? '#22c55e' : '#3b82f6';
                         const yHigh = 70 - c.h * 0.68;
                         const yLow = 70 - c.l * 0.68;
                         const yTop = 70 - Math.max(c.o, c.c) * 0.68;
@@ -674,7 +543,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                           type="button"
                           onClick={() => setPhoneTf(tf)}
                           className={`flex-1 py-0.5 text-[10px] font-mono rounded cursor-pointer ${
-                            phoneTf === tf ? 'bg-amber-400 text-black font-semibold' : 'text-neutral-400 hover:text-white'
+                            phoneTf === tf ? 'bg-blue-600 text-white font-semibold' : 'text-slate-400 hover:text-white'
                           }`}
                         >
                           {tf}
@@ -704,17 +573,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Bottom 5-Item Market Quote Strip (mirroring reference footer bar) */}
-          <div className={`mt-12 pt-4 pb-3 border-t border-b ${theme.borderDark} grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4`}>
+          {/* Bottom 5-Item Market Quote Strip */}
+          <div className="mt-12 pt-4 pb-3 border-t border-b border-slate-800 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {featuredQuotes.map((q) => {
               const up = q.chgPct >= 0;
               return (
                 <div
                   key={q.sym}
-                  className="flex items-center justify-between lg:justify-center gap-2.5 text-xs font-mono tabular-nums lg:border-r lg:last:border-r-0 border-neutral-800/80 pr-2"
+                  className="flex items-center justify-between lg:justify-center gap-2.5 text-xs font-mono tabular-nums lg:border-r lg:last:border-r-0 border-slate-800 pr-2"
                 >
                   <span className="font-semibold text-white">{q.sym}</span>
-                  <span className="text-neutral-300">{q.price.toFixed(q.digits)}</span>
+                  <span className="text-slate-300">{q.price.toFixed(q.digits)}</span>
                   <span className={up ? 'text-emerald-400' : 'text-rose-400'}>
                     {up ? '▲ +' : '▼ '}
                     {q.chgPct.toFixed(2)}%
@@ -727,7 +596,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="mt-4 flex justify-center">
             <a
               href="#capabilities"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-white transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white transition-colors"
             >
               <ChevronDown className="w-3.5 h-3.5" />
               Scroll to explore
@@ -736,47 +605,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Capabilities Asymmetric Bento with 3D Human Visuals + Theme Selector */}
-      <section id="capabilities" className={`${theme.bandBg} text-white py-16 lg:py-20 border-b ${theme.borderDark}`}>
+      {/* Capabilities Asymmetric Bento with 3D Human Visuals */}
+      <section id="capabilities" className="bg-slate-900 text-white py-16 lg:py-20 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="flex flex-wrap items-end justify-between gap-6 mb-10">
-            <div className="max-w-2xl">
-              <p className={`text-xs font-semibold mb-2 ${theme.accentText}`}>Core Architecture</p>
-              <h2 className="text-3xl font-bold tracking-tight text-white" style={{ textWrap: 'balance' }}>
-                Built for Inner Circle Trader precision and automated MT5 execution.
-              </h2>
-            </div>
-
-            {/* Clean Theme Selector */}
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Choose page theme">
-              {(Object.values(THEME_PRESETS) as ThemeTokens[]).map((preset) => {
-                const active = preset.id === themeKey;
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => handleSelectTheme(preset.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer border ${
-                      active
-                        ? 'bg-white text-black border-white'
-                        : 'bg-black/60 text-neutral-300 border-neutral-800 hover:border-neutral-600 hover:text-white'
-                    }`}
-                  >
-                    <span
-                      className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
-                      style={{ backgroundColor: preset.swatch }}
-                    />
-                    <span>{preset.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="max-w-2xl mb-10">
+            <p className="text-xs font-semibold mb-2 text-blue-400">Core Architecture</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white" style={{ textWrap: 'balance' }}>
+              Built for Inner Circle Trader precision and automated MT5 execution.
+            </h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Card 1: ICT Analyzer */}
-            <div className={`lg:col-span-7 ${theme.cardBg} border ${theme.borderDark} rounded-xl overflow-hidden flex flex-col`}>
-              <div className="h-64 sm:h-72 overflow-hidden bg-black border-b border-neutral-800">
+            <div className="lg:col-span-7 bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+              <div className="h-64 sm:h-72 overflow-hidden bg-slate-950 border-b border-slate-800">
                 <ImageWithFallback
                   src={LANDING_IMAGES.analystIct3d}
                   alt="3D female market strategist reviewing ICT smart money charts"
@@ -785,21 +627,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className={`text-xs font-semibold mb-2 ${theme.accentText}`}>
+                  <div className="text-xs font-semibold mb-2 text-blue-400">
                     01. Market Intelligence · ${config.analyzerPriceUsd.toFixed(2)} One-Time License
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">
                     ICT Strategy Market Analyzer
                   </h3>
-                  <p className="text-sm text-neutral-300 leading-relaxed mb-5">
+                  <p className="text-sm text-slate-300 leading-relaxed mb-5">
                     Engineered around the Inner Circle Trader methodology (YouTube channel {config.ictYoutubeChannelId}). Automatically maps Buy-Side and Sell-Side Liquidity pools, Displacement Fair Value Gaps, Order Blocks, Optimal Trade Entry (0.618–0.786), and active London/New York Killzones.
                   </p>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
-                  <span className="text-xs font-mono text-neutral-400">EURUSD · XAUUSD · NAS100 · BTCUSD</span>
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                  <span className="text-xs font-mono text-slate-400">EURUSD · XAUUSD · NAS100 · BTCUSD</span>
                   <button
                     onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                    className={`text-sm font-semibold cursor-pointer ${theme.accentText}`}
+                    className="text-sm font-semibold cursor-pointer text-blue-400 hover:text-blue-300"
                   >
                     Get ICT Analyzer →
                   </button>
@@ -808,8 +650,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 2: MQL5 EA Bots */}
-            <div className={`lg:col-span-5 ${theme.cardBg} border ${theme.borderDark} rounded-xl overflow-hidden flex flex-col`}>
-              <div className="h-64 sm:h-72 overflow-hidden bg-black border-b border-neutral-800">
+            <div className="lg:col-span-5 bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
+              <div className="h-64 sm:h-72 overflow-hidden bg-slate-950 border-b border-slate-800">
                 <ImageWithFallback
                   src={LANDING_IMAGES.automatorEa3d}
                   alt="3D algorithmic engineer coding MQL5 Expert Advisors"
@@ -818,21 +660,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className={`text-xs font-semibold mb-2 ${theme.accentText}`}>
+                  <div className="text-xs font-semibold mb-2 text-blue-400">
                     02. Execution Bots · ${config.eaBotsPriceUsd.toFixed(2)} Source &amp; Docs
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">
                     MQL5 Expert Advisors &amp; MT5 Bridge
                   </h3>
-                  <p className="text-sm text-neutral-300 leading-relaxed mb-5">
+                  <p className="text-sm text-slate-300 leading-relaxed mb-5">
                     Receive two clean, compilable MQL5 (.mq5) bots (ICT Silver Bullet FVG &amp; SMC Liquidity Sweep), complete step-by-step MetaTrader 5 installation documentation, and direct MT5 WebRequest bridge telemetry inside your Grid Pips dashboard.
                   </p>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-neutral-800">
-                  <span className="text-xs font-mono text-neutral-400">.mq5 Source + Setup Guide</span>
+                <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+                  <span className="text-xs font-mono text-slate-400">.mq5 Source + Setup Guide</span>
                   <button
                     onClick={() => (user ? onSelectProduct('ea_bots') : onGoAuth('register'))}
-                    className={`text-sm font-semibold cursor-pointer ${theme.accentText}`}
+                    className="text-sm font-semibold cursor-pointer text-blue-400 hover:text-blue-300"
                   >
                     Get MQL5 Bots →
                   </button>
@@ -841,8 +683,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 3: Education + Community */}
-            <div id="education-preview" className={`lg:col-span-12 ${theme.cardBg} border ${theme.borderDark} rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12`}>
-              <div className="lg:col-span-5 h-64 lg:h-auto bg-black">
+            <div id="education-preview" className="lg:col-span-12 bg-slate-950/80 border border-slate-800 rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+              <div className="lg:col-span-5 h-64 lg:h-auto bg-slate-950">
                 <ImageWithFallback
                   src={LANDING_IMAGES.mentorCommunity3d}
                   alt="3D trading mentor presenting Smart Money Concepts liquidity structure"
@@ -850,37 +692,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 />
               </div>
               <div className="lg:col-span-7 p-8 flex flex-col justify-center">
-                <div className={`text-xs font-semibold mb-2 ${theme.accentText}`}>
+                <div className="text-xs font-semibold mb-2 text-blue-400">
                   03. Free Curriculum &amp; Live Community · Included with Exness Registration
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3">
                   ICT Mentorship Curriculum, Smart Money Concepts &amp; JakoyoFX Telegram
                 </h3>
-                <p className="text-sm text-neutral-300 leading-relaxed mb-6">
+                <p className="text-sm text-slate-300 leading-relaxed mb-6">
                   Study directly from the official ICT YouTube library alongside structured Smart Money Concepts (SMC) breakdowns covering BOS, CHoCH, Inducement, and Mitigation Blocks. Connect with active traders inside our Telegram channel for daily bias discussions.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-neutral-200">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-slate-200">
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentText}`} />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
                     <span>Unlimited Trading Journal with screenshot uploads &amp; analytics</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentText}`} />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
                     <span>$10,000 Paper Trading Simulator &amp; 8 Risk Calculators</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentText}`} />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
                     <span>Official TradingView Advanced Charts &amp; Economic Calendar</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentText}`} />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-blue-400" />
                     <span>Automated email confirmations &amp; encrypted session security</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                    className={`px-5 py-2.5 text-sm font-semibold rounded-full transition-colors cursor-pointer ${theme.ctaBtn}`}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full transition-colors cursor-pointer"
                   >
                     Start Free with Exness
                   </button>
@@ -888,7 +730,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     href={config.telegramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`px-5 py-2.5 text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 ${theme.secondaryBtnDark}`}
+                    className="px-5 py-2.5 bg-slate-900 border border-slate-700 hover:border-blue-400 text-white text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2"
                   >
                     Open t.me/JakoyoFx
                     <ArrowUpRight className="w-4 h-4" />
@@ -901,25 +743,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Transparent Pricing */}
-      <section id="pricing" className={`py-16 ${theme.pageBg} text-white border-b ${theme.borderDark}`}>
+      <section id="pricing" className="py-16 bg-slate-950 text-white border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mb-10">
-            <p className={`text-xs font-semibold mb-2 ${theme.accentText}`}>Transparent Access</p>
+            <p className="text-xs font-semibold mb-2 text-blue-400">Transparent Access</p>
             <h2 className="text-3xl font-bold tracking-tight text-white">
               Free workspace for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)} pro modules.
             </h2>
-            <p className="text-sm text-neutral-400 mt-2">
+            <p className="text-sm text-slate-400 mt-2">
               Pay seamlessly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile money checkout inside your workspace.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className={`border ${theme.borderDark} rounded-xl p-7 flex flex-col justify-between ${theme.cardBg}`}>
+            <div className="border border-slate-800 rounded-xl p-7 flex flex-col justify-between bg-slate-900/70">
               <div>
-                <div className="text-xs font-medium text-neutral-400 mb-1">For All Exness Registered Traders</div>
+                <div className="text-xs font-medium text-slate-400 mb-1">For All Exness Registered Traders</div>
                 <h3 className="text-lg font-bold text-white">Core Trading Workspace</h3>
                 <div className="text-3xl font-bold font-mono tabular-nums text-white my-4">$0</div>
-                <ul className="space-y-2.5 text-sm text-neutral-300 mb-6">
+                <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
                   <li>· TradingView Charts &amp; Watchlist</li>
                   <li>· Unlimited Trading Journal &amp; Analytics</li>
                   <li>· 8 Risk, Lot Size &amp; Margin Calculators</li>
@@ -929,22 +771,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <button
                 onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                className={`w-full py-2.5 text-sm font-semibold rounded-full transition-colors cursor-pointer ${theme.secondaryBtnDark}`}
+                className="w-full py-2.5 bg-slate-900 border border-slate-700 hover:border-blue-400 text-white text-sm font-semibold rounded-full transition-colors cursor-pointer"
               >
                 {user ? 'Open Workspace' : 'Register via Exness IB'}
               </button>
             </div>
 
-            <div className={`${theme.cardHighlightBorder} rounded-xl p-7 flex flex-col justify-between ${theme.cardBg}`}>
+            <div className="border-2 border-blue-500 rounded-xl p-7 flex flex-col justify-between bg-slate-900/80">
               <div>
-                <div className={`text-xs font-semibold mb-1 ${theme.accentText}`}>ICT Algorithmic Scanner</div>
+                <div className="text-xs font-semibold mb-1 text-blue-400">ICT Algorithmic Scanner</div>
                 <h3 className="text-lg font-bold text-white">ICT Strategy Market Analyzer</h3>
                 <div className="my-4">
                   <span className="text-3xl font-bold font-mono tabular-nums text-white">
                     ${config.analyzerPriceUsd.toFixed(2)}
                   </span>
                 </div>
-                <ul className="space-y-2.5 text-sm text-neutral-300 mb-6">
+                <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
                   <li>· Automated FVG (BISI / SIBI) Detection</li>
                   <li>· Bullish &amp; Bearish Order Block Mapping</li>
                   <li>· BSL / SSL Liquidity Sweep Targets</li>
@@ -954,22 +796,22 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <button
                 onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                className={`w-full py-2.5 text-sm font-semibold rounded-full transition-colors cursor-pointer ${theme.ctaBtn}`}
+                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full transition-colors cursor-pointer"
               >
                 Get ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)}
               </button>
             </div>
 
-            <div className="border border-white rounded-xl p-7 flex flex-col justify-between bg-white text-black">
+            <div className="border border-white rounded-xl p-7 flex flex-col justify-between bg-white text-slate-950">
               <div>
-                <div className="text-xs font-semibold text-amber-700 mb-1">Full MQL5 Source + MT5 Connect</div>
-                <h3 className="text-lg font-bold text-black">MQL5 EA Bots Pack</h3>
+                <div className="text-xs font-semibold text-blue-600 mb-1">Full MQL5 Source + MT5 Connect</div>
+                <h3 className="text-lg font-bold text-slate-950">MQL5 EA Bots Pack</h3>
                 <div className="my-4">
-                  <span className="text-3xl font-bold font-mono tabular-nums text-black">
+                  <span className="text-3xl font-bold font-mono tabular-nums text-slate-950">
                     ${config.eaBotsPriceUsd.toFixed(2)}
                   </span>
                 </div>
-                <ul className="space-y-2.5 text-sm text-neutral-700 mb-6">
+                <ul className="space-y-2.5 text-sm text-slate-700 mb-6">
                   <li>· Grid Pips ICT Silver Bullet EA (.mq5)</li>
                   <li>· Grid Pips SMC Order Block EA (.mq5)</li>
                   <li>· Complete MT5 Installation Guide</li>
@@ -979,7 +821,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <button
                 onClick={() => (user ? onSelectProduct('ea_bots') : onGoAuth('register'))}
-                className="w-full py-2.5 bg-black text-white text-sm font-semibold rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-slate-950 text-white text-sm font-semibold rounded-full hover:bg-slate-800 transition-colors cursor-pointer"
               >
                 Buy MQL5 Bots — ${config.eaBotsPriceUsd.toFixed(2)}
               </button>
@@ -989,18 +831,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Exness IB Banner */}
-      <section className={`${theme.bandBg} py-14 border-b ${theme.borderDark}`}>
+      <section className="bg-slate-900 py-14 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-6">
-          <div className={`${theme.cardBg} text-white border ${theme.borderDark} rounded-xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6`}>
+          <div className="bg-slate-950/90 text-white border border-slate-800 rounded-xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="max-w-2xl">
-              <div className={`flex items-center gap-2 text-xs font-semibold mb-2 ${theme.accentText}`}>
+              <div className="flex items-center gap-2 text-xs font-semibold mb-2 text-blue-400">
                 <ShieldCheck className="w-4 h-4" />
                 <span>Required Brokerage Onboarding</span>
               </div>
               <h3 className="text-2xl font-bold tracking-tight mb-2 text-white">
                 Open your Exness trading account to access Grid Pips.
               </h3>
-              <p className="text-sm text-neutral-300 leading-relaxed">
+              <p className="text-sm text-slate-300 leading-relaxed">
                 Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free workspace and $5.25 pro modules.
               </p>
             </div>
@@ -1009,14 +851,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 href={config.exnessIbUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`px-6 py-3 text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap ${theme.ctaBtn}`}
+                className="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap"
               >
                 Open Exness Account
                 <ArrowUpRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onGoAuth('login')}
-                className={`px-6 py-3 text-sm font-semibold rounded-full transition-colors whitespace-nowrap cursor-pointer ${theme.secondaryBtnDark}`}
+                className="px-6 py-3 bg-slate-900 border border-slate-700 hover:border-blue-400 text-white text-sm font-semibold rounded-full transition-colors whitespace-nowrap cursor-pointer"
               >
                 Member Login
               </button>
@@ -1026,11 +868,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Quiet Footer */}
-      <footer className={`${theme.pageBg} text-neutral-400 py-12`}>
+      <footer className="bg-slate-950 text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
           <div className="md:col-span-2">
-            <BrandLogo variant="light" accent={theme.logoAccent} size="md" showTagline className="mb-3" />
-            <p className="text-xs text-neutral-400 leading-relaxed max-w-md">
+            <BrandLogo variant="light" size="md" showTagline className="mb-3" />
+            <p className="text-xs text-slate-400 leading-relaxed max-w-md">
               Risk Disclosure: CFDs and leveraged forex instruments carry a high risk of losing money rapidly. Grid Pips provides educational tools, ICT market analysis software, and MQL5 source code templates only. We do not hold client funds or execute brokerage orders.
             </p>
           </div>
@@ -1095,7 +937,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </ul>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-6 mt-8 pt-6 border-t border-neutral-900 text-xs text-neutral-500 flex flex-col sm:flex-row justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-6 mt-8 pt-6 border-t border-slate-900 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
           <span>© 2026 Grid Pips. All rights reserved.</span>
           <span>Secured with scrypt hashing, rate limiting, and HTTP-only signed sessions.</span>
         </div>
@@ -1103,37 +945,37 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Watch Demo Modal */}
       {demoOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className={`${theme.cardBg} border ${theme.borderDark} rounded-2xl max-w-2xl w-full p-6 space-y-4 text-white`}>
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+        <div className="fixed inset-0 z-50 bg-slate-950/85 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 space-y-4 text-white">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-white">Grid Pips Platform Walkthrough</h3>
-                <p className="text-xs text-neutral-400">ICT Strategy Market Analyzer + MQL5 EA Bots Pack</p>
+                <p className="text-xs text-slate-400">ICT Strategy Market Analyzer + MQL5 EA Bots Pack</p>
               </div>
               <button
                 type="button"
                 onClick={() => setDemoOpen(false)}
-                className="p-1.5 text-neutral-400 hover:text-white cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
                 aria-label="Close demo preview"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-neutral-300">
-              <div className="p-4 rounded-xl bg-black/70 border border-neutral-800 space-y-2">
-                <div className={`font-semibold ${theme.accentText}`}>01. Exness Onboarding &amp; Free Desk</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-300">
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="font-semibold text-blue-400">01. Exness Onboarding &amp; Free Desk</div>
                 <p>Link your Exness IB account ID once to access TradingView charts, unlimited journal with screenshots, 8 calculators, and $10,000 paper trading.</p>
               </div>
-              <div className="p-4 rounded-xl bg-black/70 border border-neutral-800 space-y-2">
-                <div className={`font-semibold ${theme.accentText}`}>02. $5.25 ICT Strategy Analyzer</div>
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="font-semibold text-blue-400">02. $5.25 ICT Strategy Analyzer</div>
                 <p>Detects London &amp; NY Killzones, Fair Value Gaps (BISI/SIBI), Order Blocks, 0.705 OTE Fibs, and BSL/SSL liquidity targets.</p>
               </div>
-              <div className="p-4 rounded-xl bg-black/70 border border-neutral-800 space-y-2">
-                <div className={`font-semibold ${theme.accentText}`}>03. $5.25 MQL5 EA Bots + MT5 Bridge</div>
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="font-semibold text-blue-400">03. $5.25 MQL5 EA Bots + MT5 Bridge</div>
                 <p>Download compilable .mq5 Expert Advisors with full installation guide and connect directly to your MetaTrader 5 terminal.</p>
               </div>
-              <div className="p-4 rounded-xl bg-black/70 border border-neutral-800 space-y-2">
-                <div className={`font-semibold ${theme.accentText}`}>04. JakoyoFX Community &amp; Referrals</div>
+              <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                <div className="font-semibold text-blue-400">04. JakoyoFX Community &amp; Referrals</div>
                 <p>Join t.me/JakoyoFx for daily setup discussions and share your referral link to earn 20% commission on licenses.</p>
               </div>
             </div>
@@ -1141,7 +983,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => setDemoOpen(false)}
-                className="px-4 py-2 border border-neutral-700 text-neutral-300 text-xs font-semibold rounded-full hover:text-white cursor-pointer"
+                className="px-4 py-2 border border-slate-700 text-slate-300 text-xs font-semibold rounded-full hover:text-white cursor-pointer"
               >
                 Close
               </button>
@@ -1152,7 +994,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   if (user) onGoWorkspace();
                   else onGoAuth('register');
                 }}
-                className={`px-5 py-2 text-xs font-semibold rounded-full cursor-pointer ${theme.ctaBtn}`}
+                className="px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-full cursor-pointer"
               >
                 {user ? 'Open Workspace →' : 'Start Free with Exness →'}
               </button>
@@ -1163,20 +1005,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Legal Disclosure Modal */}
       {legalDoc && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <div className="bg-white border border-neutral-200 rounded-xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
-              <h3 className="text-base font-bold text-black">{LEGAL_DOCS[legalDoc].title}</h3>
+        <div className="fixed inset-0 z-50 bg-slate-950/85 flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-950">{LEGAL_DOCS[legalDoc].title}</h3>
               <button
                 type="button"
                 onClick={() => setLegalDoc(null)}
-                className="p-1.5 text-neutral-500 hover:text-black cursor-pointer"
+                className="p-1.5 text-slate-500 hover:text-slate-950 cursor-pointer"
                 aria-label="Close legal notice"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3 text-xs text-neutral-700 leading-relaxed">
+            <div className="space-y-3 text-xs text-slate-700 leading-relaxed">
               {LEGAL_DOCS[legalDoc].paragraphs.map((p, idx) => (
                 <p key={idx}>{p}</p>
               ))}
@@ -1185,7 +1027,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => setLegalDoc(null)}
-                className="px-5 py-2 bg-black text-white text-xs font-semibold rounded-full hover:bg-neutral-800 cursor-pointer"
+                className="px-5 py-2 bg-slate-950 text-white text-xs font-semibold rounded-full hover:bg-slate-800 cursor-pointer"
               >
                 Close
               </button>
