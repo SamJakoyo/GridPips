@@ -156,7 +156,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-950 mb-6 cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to GRIDPIPs
+          Back to Grid Pips
         </button>
 
         <div className="bg-white border border-slate-200 rounded-xl p-8">
@@ -170,7 +170,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   ? 'Finish Exness IB Linking'
                   : mode === 'register'
                   ? 'Exness Account Onboarding'
-                  : 'Sign in to GRIDPIPs'}
+                  : 'Sign in to Grid Pips'}
               </h1>
               <p className="text-sm text-slate-500 mt-1">
                 {pendingGoogle
@@ -372,7 +372,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     className="mt-0.5 rounded border-slate-300 text-blue-600"
                   />
                   <span>
-                    I confirm I registered my Exness account via the GRIDPIPs Exness IB link and agree to automated email notifications.
+                    I confirm I registered my Exness account via the Grid Pips Exness IB link and agree to automated email notifications.
                   </span>
                 </label>
               </>

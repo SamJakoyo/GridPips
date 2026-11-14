@@ -6,6 +6,7 @@ interface BrandLogoProps {
   variant?: 'dark' | 'light';
   accent?: BrandAccent;
   size?: 'sm' | 'md' | 'lg';
+  showTagline?: boolean;
   className?: string;
 }
 
@@ -23,6 +24,17 @@ const ACCENT_PALETTES: Record<
     dot: string;
   }
 > = {
+  gold: {
+    lightText: 'text-amber-400',
+    darkText: 'text-amber-600',
+    bg: '#09090B',
+    border: '#78350F',
+    grid: '#292524',
+    bar1: '#A8A29E',
+    bar2: '#FDE68A',
+    bar3: '#F59E0B',
+    dot: '#FBBF24',
+  },
   blue: {
     lightText: 'text-blue-400',
     darkText: 'text-blue-600',
@@ -45,17 +57,6 @@ const ACCENT_PALETTES: Record<
     bar3: '#DC2626',
     dot: '#EF4444',
   },
-  gold: {
-    lightText: 'text-amber-400',
-    darkText: 'text-amber-600',
-    bg: '#09090B',
-    border: '#292524',
-    grid: '#292524',
-    bar1: '#78716C',
-    bar2: '#F5F5F4',
-    bar3: '#D97706',
-    dot: '#F59E0B',
-  },
   emerald: {
     lightText: 'text-emerald-400',
     darkText: 'text-emerald-600',
@@ -68,8 +69,8 @@ const ACCENT_PALETTES: Record<
     dot: '#10B981',
   },
   mono: {
-    lightText: 'text-neutral-400',
-    darkText: 'text-neutral-600',
+    lightText: 'text-neutral-300',
+    darkText: 'text-neutral-700',
     bg: '#000000',
     border: '#262626',
     grid: '#262626',
@@ -82,8 +83,9 @@ const ACCENT_PALETTES: Record<
 
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   variant = 'dark',
-  accent = 'blue',
+  accent = 'gold',
   size = 'md',
+  showTagline = false,
   className = '',
 }) => {
   const iconSize = size === 'sm' ? 'w-7 h-7' : size === 'lg' ? 'w-9 h-9' : 'w-8 h-8';
@@ -123,8 +125,15 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         />
         <circle cx="27.5" cy="8" r="2" fill={pal.dot} />
       </svg>
-      <span className={`${textSize} font-bold tracking-tight ${primaryText}`}>
-        GRID<span className={accentText}>PIPs</span>
+      <span className="flex flex-col leading-none">
+        <span className={`${textSize} font-bold tracking-tight ${primaryText}`}>
+          Grid <span className={accentText}>Pips</span>
+        </span>
+        {showTagline && (
+          <span className="text-[9px] tracking-[0.18em] text-neutral-400 font-medium mt-0.5 uppercase">
+            Trade · Automate · Grow
+          </span>
+        )}
       </span>
     </span>
   );

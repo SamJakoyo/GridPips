@@ -199,8 +199,8 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center text-sm text-slate-500">
-        Initializing GRIDPIPs Workspace...
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center text-sm font-mono text-amber-400">
+        Initializing Grid Pips Workspace...
       </div>
     );
   }
