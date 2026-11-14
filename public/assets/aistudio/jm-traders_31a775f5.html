@@ -1,0 +1,1550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JM Traders — Your Trading Workspace</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#081428;
+  --navy-2:#0F2A4A;
+  --navy-3:#132F52;
+  --blue:#2F6FED;
+  --blue-light:#6FA8FF;
+  --ink:#0B1B33;
+  --slate:#5C6B85;
+  --slate-light:#8B99B3;
+  --paper:#F4F7FC;
+  --white:#FFFFFF;
+  --border:#DEE6F2;
+  --green:#16A34A;
+  --red:#E5484D;
+  --amber:#D97706;
+  --radius:14px;
+  --shadow:0 8px 24px -12px rgba(11,27,51,0.18);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  font-family:'Inter',sans-serif;
+  background:var(--paper);
+  color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3,h4{font-family:'Space Grotesk',sans-serif;margin:0 0 8px;letter-spacing:-0.02em;}
+p{margin:0 0 12px;line-height:1.6;color:var(--slate);}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;cursor:pointer;border:none;}
+input,select,textarea{font-family:inherit;}
+.mono{font-family:'JetBrains Mono',monospace;}
+::selection{background:var(--blue-light);color:var(--navy);}
+
+/* ---------- Ticker Tape (signature element) ---------- */
+#ticker-wrap{
+  background:var(--navy);
+  overflow:hidden;
+  white-space:nowrap;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  height:34px;
+  display:flex;
+  align-items:center;
+}
+#ticker-track{
+  display:inline-flex;
+  align-items:center;
+  animation:ticker-scroll 32s linear infinite;
+  white-space:nowrap;
+}
+#ticker-wrap:hover #ticker-track{animation-play-state:paused;}
+@keyframes ticker-scroll{
+  0%{transform:translateX(0);}
+  100%{transform:translateX(-50%);}
+}
+.ticker-item{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:0 22px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:12.5px;
+  color:#C9D6EC;
+  border-right:1px solid rgba(255,255,255,0.08);
+}
+.ticker-item b{color:#fff;font-weight:600;}
+.ticker-up{color:var(--green);}
+.ticker-down{color:#FF6B6B;}
+
+/* ---------- Nav ---------- */
+nav{
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,0.92);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 28px;
+}
+.brand{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:19px;color:var(--navy);cursor:pointer;}
+.brand .mark{
+  width:30px;height:30px;border-radius:8px;
+  background:linear-gradient(135deg,var(--blue),var(--navy-2));
+  display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700;
+}
+.navlinks{display:flex;gap:4px;align-items:center;flex-wrap:wrap;}
+.navlinks a{
+  padding:8px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--slate);
+  transition:all .15s;
+}
+.navlinks a:hover, .navlinks a.active{background:var(--paper);color:var(--navy);}
+.nav-actions{display:flex;gap:10px;align-items:center;}
+.nav-toggle{display:none;background:none;font-size:22px;color:var(--navy);}
+.btn{
+  padding:10px 18px;border-radius:9px;font-weight:600;font-size:13.5px;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  transition:transform .12s ease, box-shadow .12s ease;
+}
+.btn:active{transform:scale(0.97);}
+.btn-primary{background:linear-gradient(135deg,var(--blue),#1E4FBF);color:#fff;box-shadow:0 6px 16px -6px rgba(47,111,237,0.55);}
+.btn-primary:hover{box-shadow:0 8px 20px -6px rgba(47,111,237,0.7);}
+.btn-outline{background:#fff;color:var(--navy);border:1.5px solid var(--border);}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue);}
+.btn-ghost{background:transparent;color:var(--slate);}
+.btn-ghost:hover{color:var(--navy);}
+.btn-sm{padding:7px 12px;font-size:12.5px;}
+.btn-block{width:100%;}
+.btn-danger{background:#FEE9E9;color:var(--red);}
+
+/* ---------- Layout ---------- */
+#app{min-height:70vh;}
+.container{max-width:1180px;margin:0 auto;padding:0 28px;}
+.section{padding:64px 0;}
+
+/* ---------- Landing ---------- */
+.hero{
+  background:radial-gradient(1200px 500px at 15% -10%, rgba(47,111,237,0.14), transparent),
+             linear-gradient(180deg,#fff, var(--paper));
+  padding:90px 0 70px;position:relative;overflow:hidden;
+}
+.hero-inner{max-width:760px;margin:0 auto;text-align:center;}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:8px;
+  background:#EAF1FF;color:var(--blue);font-weight:700;font-size:12px;letter-spacing:0.06em;
+  padding:6px 14px;border-radius:20px;text-transform:uppercase;margin-bottom:18px;
+}
+.hero h1{font-size:52px;line-height:1.05;color:var(--navy);margin-bottom:16px;}
+.hero .sub{font-size:17px;max-width:560px;margin:0 auto 30px;}
+.hero-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+.hero-note{font-size:12px;color:var(--slate-light);}
+.hero-tape{
+  margin-top:56px;border:1px solid var(--border);background:#fff;border-radius:16px;
+  box-shadow:var(--shadow);padding:18px;
+}
+.feature-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:20px;
+}
+.feature-card{
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:transform .15s, box-shadow .15s;
+}
+.feature-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);}
+.feature-card .ic{width:36px;height:36px;border-radius:9px;background:#EAF1FF;color:var(--blue);display:flex;align-items:center;justify-content:center;font-size:17px;margin-bottom:12px;}
+.feature-card h4{font-size:15px;color:var(--navy);margin-bottom:4px;}
+.feature-card p{font-size:13px;margin:0;}
+.section-head{text-align:center;max-width:600px;margin:0 auto 36px;}
+.section-head .eyebrow{margin-bottom:12px;}
+.section-head h2{font-size:32px;color:var(--navy);}
+
+.strip{
+  background:var(--navy);color:#fff;padding:40px 0;
+}
+.strip .container{display:flex;justify-content:space-around;flex-wrap:wrap;gap:24px;text-align:center;}
+.strip .stat b{display:block;font-family:'Space Grotesk',sans-serif;font-size:28px;}
+.strip .stat span{font-size:12.5px;color:#9FB3D6;text-transform:uppercase;letter-spacing:.05em;}
+
+.justmarkets-banner{
+  background:linear-gradient(120deg,var(--navy),var(--navy-3));
+  border-radius:20px;padding:40px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+}
+.justmarkets-banner h3{color:#fff;font-size:24px;}
+.justmarkets-banner p{color:#B9C8E4;margin-bottom:0;max-width:460px;}
+
+/* ---------- Cards / grid dashboard ---------- */
+.grid{display:grid;gap:18px;}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-dash{grid-template-columns:2fr 1fr;}
+.card{
+  background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:20px;
+}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.card-head h3{font-size:15.5px;color:var(--navy);margin:0;}
+.tag{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;}
+.tag-free{background:#E7F8ED;color:var(--green);}
+.tag-demo{background:#FFF3E0;color:var(--amber);}
+.tag-live{background:#EAF1FF;color:var(--blue);}
+
+.page-title{padding:34px 0 6px;}
+.page-title h1{font-size:30px;color:var(--navy);}
+.page-title p{margin-bottom:0;}
+
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;padding:10px 8px;color:var(--slate-light);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);}
+td{padding:11px 8px;border-bottom:1px solid #EEF2F8;}
+tr:last-child td{border-bottom:none;}
+.pill{padding:3px 9px;border-radius:20px;font-size:11.5px;font-weight:700;}
+.pill-buy{background:#E7F8ED;color:var(--green);}
+.pill-sell{background:#FEE9E9;color:var(--red);}
+.up{color:var(--green);}
+.down{color:var(--red);}
+
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+.field input,.field select,.field textarea{
+  width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;font-size:13.5px;color:var(--ink);background:#fff;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.field textarea{resize:vertical;min-height:70px;}
+.hint{font-size:11.5px;color:var(--slate-light);margin-top:4px;}
+.disclaimer{
+  background:#FFF8E8;border:1px solid #F3E3B0;color:#8A6A16;font-size:12px;border-radius:10px;padding:12px 14px;margin:14px 0;
+}
+.disclaimer.blue{background:#EAF1FF;border-color:#C9DBFF;color:#1E4FBF;}
+.result-box{
+  background:var(--navy);color:#fff;border-radius:12px;padding:18px;margin-top:14px;
+}
+.result-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.08);font-size:13.5px;}
+.result-row:last-child{border-bottom:none;}
+.result-row b{font-family:'JetBrains Mono',monospace;}
+
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap;}
+.tab{padding:10px 16px;font-size:13px;font-weight:600;color:var(--slate);border-bottom:2px solid transparent;}
+.tab.active{color:var(--blue);border-color:var(--blue);}
+
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--border);padding:5px 10px;border-radius:20px;font-size:12px;font-weight:600;color:var(--navy);margin:0 6px 6px 0;cursor:pointer;}
+.chip.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+
+.empty{text-align:center;padding:40px 20px;color:var(--slate-light);}
+.empty .ic{font-size:30px;margin-bottom:10px;}
+
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(8,20,40,0.55);z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:20px;
+}
+.modal{
+  background:#fff;border-radius:18px;max-width:440px;width:100%;padding:30px;max-height:90vh;overflow-y:auto;
+  box-shadow:0 30px 60px -20px rgba(0,0,0,0.35);
+}
+.modal-close{float:right;background:var(--paper);width:30px;height:30px;border-radius:50%;color:var(--slate);font-size:16px;}
+
+footer{background:var(--navy);color:#B9C8E4;padding:50px 0 24px;margin-top:60px;}
+footer .container{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:30px;}
+footer h4{color:#fff;font-size:13px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:12px;}
+footer a{display:block;font-size:13px;color:#B9C8E4;margin-bottom:8px;}
+footer a:hover{color:#fff;}
+footer .bottom{border-top:1px solid rgba(255,255,255,0.1);margin-top:30px;padding-top:20px;font-size:12px;color:#7C90B5;text-align:center;}
+.risk-box{background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:10px;padding:14px;font-size:12px;color:#9FB3D6;margin-top:10px;}
+
+.tv-wrap{border:1px solid var(--border);border-radius:12px;overflow:hidden;height:480px;}
+.watchlist-row{display:flex;align-items:center;justify-content:space-between;padding:10px 6px;border-bottom:1px solid #EEF2F8;cursor:pointer;}
+.watchlist-row:hover{background:var(--paper);}
+.wl-sym{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;}
+
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+.kpi .card{padding:16px;}
+.kpi .card b{display:block;font-size:22px;font-family:'Space Grotesk',sans-serif;color:var(--navy);}
+.kpi .card span{font-size:11.5px;color:var(--slate-light);text-transform:uppercase;letter-spacing:.03em;}
+
+.trade-card{border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px;}
+.trade-card .top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;}
+.trade-meta{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+.trade-meta span{background:var(--paper);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--slate);}
+.trade-img{max-width:100%;border-radius:8px;margin-top:10px;border:1px solid var(--border);}
+
+.pos-card{border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;}
+
+.checklist label{display:flex;align-items:center;gap:10px;padding:8px 0;font-size:13.5px;color:var(--ink);border-bottom:1px solid #EEF2F8;}
+.checklist input{width:16px;height:16px;}
+
+.news-item{padding:14px 0;border-bottom:1px solid #EEF2F8;}
+.news-item:last-child{border-bottom:none;}
+.news-item .cat{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.04em;}
+.news-item h4{font-size:14.5px;margin:4px 0 4px;color:var(--navy);}
+.news-item .meta{font-size:11.5px;color:var(--slate-light);}
+
+.imp-high{color:var(--red);font-weight:700;}
+.imp-med{color:var(--amber);font-weight:700;}
+.imp-low{color:var(--slate-light);font-weight:700;}
+
+.edu-card{border:1px solid var(--border);border-radius:var(--radius);padding:20px;}
+.edu-card h4{font-size:15px;color:var(--navy);}
+.edu-list li{font-size:13px;color:var(--slate);margin-bottom:8px;cursor:pointer;}
+.edu-list li:hover{color:var(--blue);}
+.edu-list{list-style:none;padding:0;margin:0;}
+
+.mobile-nav{display:none;position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid var(--border);z-index:60;padding:8px 0;box-shadow:0 -6px 20px rgba(0,0,0,0.06);}
+.mobile-nav .row{display:flex;justify-content:space-around;}
+.mobile-nav a{font-size:10.5px;color:var(--slate);text-align:center;font-weight:600;}
+.mobile-nav a.active{color:var(--blue);}
+.mobile-nav .ic{display:block;font-size:17px;margin-bottom:2px;}
+
+@media(max-width:980px){
+  .navlinks{display:none;}
+  .nav-toggle{display:block;}
+  .feature-grid{grid-template-columns:repeat(2,1fr);}
+  .grid-dash{grid-template-columns:1fr;}
+  .grid-2,.grid-3{grid-template-columns:1fr;}
+  .kpi{grid-template-columns:repeat(2,1fr);}
+  footer .container{grid-template-columns:1fr 1fr;}
+  .hero h1{font-size:36px;}
+  .mobile-nav{display:block;}
+  body{padding-bottom:60px;}
+  .field-row{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<div id="ticker-wrap"><div id="ticker-track"></div></div>
+
+<nav>
+  <div class="brand" onclick="go('/')"><div class="mark">JM</div> JM Traders</div>
+  <div class="navlinks" id="navlinks"></div>
+  <div class="nav-actions" id="navactions"></div>
+  <button class="nav-toggle" onclick="toggleMobileMenu()">☰</button>
+</nav>
+
+<div id="app"></div>
+
+<footer>
+  <div class="container">
+    <div>
+      <div class="brand" style="color:#fff;margin-bottom:10px;">JM Traders</div>
+      <p style="color:#B9C8E4;max-width:280px;">A free trading workspace for charting, journaling, risk management and market awareness — with an approved pathway to open a live account through JustMarkets.</p>
+      <div class="risk-box">CFDs are complex instruments and involve a high risk of losing money rapidly due to leverage. Trading may not be suitable for everyone. JM Traders provides tools and education only — it is not a broker and does not execute trades.</div>
+    </div>
+    <div>
+      <h4>Platform</h4>
+      <a onclick="go('/dashboard')" href="#">Dashboard</a>
+      <a onclick="go('/journal')" href="#">Trading Journal</a>
+      <a onclick="go('/tools')" href="#">Trading Tools</a>
+      <a onclick="go('/paper')" href="#">Paper Trading</a>
+      <a onclick="go('/education')" href="#">Education</a>
+    </div>
+    <div>
+      <h4>JustMarkets</h4>
+      <a onclick="go('/justmarkets')" href="#">Trade With JustMarkets</a>
+      <a onclick="openReferral()" href="#">Open Live Account ↗</a>
+      <a onclick="go('/legal/affiliate')" href="#">Affiliate Disclosure</a>
+      <a onclick="go('/legal/risk')" href="#">Risk Disclosure</a>
+    </div>
+    <div>
+      <h4>Legal</h4>
+      <a onclick="go('/legal/terms')" href="#">Terms of Service</a>
+      <a onclick="go('/legal/privacy')" href="#">Privacy Policy</a>
+      <a onclick="go('/legal/cookies')" href="#">Cookie Policy</a>
+    </div>
+  </div>
+  <div class="bottom">© 2026 JM Traders. Educational tools only — not investment advice. JustMarkets brand and account services are provided solely by JustMarkets; referral compensation may apply per the partner agreement.</div>
+</footer>
+
+<div class="mobile-nav">
+  <div class="row" id="mobilenav"></div>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+/* =========================================================================
+   JM TRADERS — front-end prototype
+   Notes on scope (read me):
+   - This is a fully client-side demo. "Accounts" below are stored locally
+     via the window.storage API for continuity across sessions, not a real
+     authenticated backend — wire up a real server (password hashing,
+     sessions, CSRF, 2FA) before handling real users.
+   - Market prices, news and economic-calendar entries are illustrative
+     placeholder data, clearly labeled, pending a licensed data provider.
+   - The TradingView chart uses TradingView's own free public embeddable
+     widget (their official "Advanced Chart" widget script) — nothing is
+     scraped and no unofficial API is used.
+   ========================================================================= */
+
+const DEFAULT_REFERRAL_URL = "https://one.justmarkets.link/a/f3ohn0rtb8";
+const NAV_ITEMS = [
+  {path:'/dashboard', label:'Home', icon:'🏠'},
+  {path:'/charts', label:'Charts', icon:'📈'},
+  {path:'/journal', label:'Journal', icon:'📓'},
+  {path:'/tools', label:'Tools', icon:'🧮'},
+  {path:'/justmarkets', label:'JM', icon:'🔷'},
+];
+const FULL_NAV = [
+  {path:'/dashboard', label:'Dashboard'},
+  {path:'/charts', label:'Charts'},
+  {path:'/journal', label:'Journal'},
+  {path:'/analytics', label:'Analytics'},
+  {path:'/tools', label:'Tools'},
+  {path:'/watchlist', label:'Watchlist'},
+  {path:'/calendar', label:'Calendar'},
+  {path:'/news', label:'News'},
+  {path:'/paper', label:'Paper Trading'},
+  {path:'/plan', label:'Trading Plan'},
+  {path:'/education', label:'Education'},
+  {path:'/justmarkets', label:'JustMarkets'},
+];
+
+const MOCK_SYMBOLS = [
+  {sym:'EURUSD', name:'Euro / US Dollar', base:1.0862, cls:'fx'},
+  {sym:'GBPUSD', name:'British Pound / US Dollar', base:1.2714, cls:'fx'},
+  {sym:'USDJPY', name:'US Dollar / Japanese Yen', base:151.32, cls:'fx'},
+  {sym:'XAUUSD', name:'Gold Spot', base:2382.4, cls:'metal'},
+  {sym:'BTCUSD', name:'Bitcoin', base:64210, cls:'crypto'},
+  {sym:'US30', name:'Dow Jones 30', base:39875, cls:'index'},
+  {sym:'NAS100', name:'Nasdaq 100', base:18420, cls:'index'},
+  {sym:'ETHUSD', name:'Ethereum', base:3145, cls:'crypto'},
+];
+
+let priceState = {};
+MOCK_SYMBOLS.forEach(s=>priceState[s.sym]={price:s.base, chg:(Math.random()*2-1)*0.6});
+
+function jitterPrices(){
+  MOCK_SYMBOLS.forEach(s=>{
+    const cur = priceState[s.sym];
+    const move = cur.price * (Math.random()*0.0016 - 0.0008);
+    cur.price = +(cur.price + move).toFixed(s.sym==='USDJPY'||s.cls==='index'?2:(s.cls==='crypto'?1:4));
+    cur.chg = +(cur.chg + (Math.random()*0.06-0.03)).toFixed(2);
+  });
+}
+setInterval(()=>{ jitterPrices(); if(['/dashboard','/watchlist','/paper','/charts'].includes(currentPath())) renderApp(); refreshTicker(); }, 4000);
+
+function fmt(n, d=2){ return Number(n).toLocaleString(undefined,{minimumFractionDigits:d, maximumFractionDigits:d}); }
+function uid(){ return Math.random().toString(36).slice(2,10) + Date.now().toString(36).slice(-4); }
+
+/* ---------------- storage helpers ---------------- */
+async function sGet(key, shared=false){
+  try{ const r = await window.storage.get(key, shared); return r ? JSON.parse(r.value) : null; }
+  catch(e){ return null; }
+}
+async function sSet(key, value, shared=false){
+  try{ return await window.storage.set(key, JSON.stringify(value), shared); }
+  catch(e){ console.error('storage set failed', key, e); return null; }
+}
+
+/* ---------------- app state ---------------- */
+let state = {
+  user: null,           // {name,email}
+  accounts: [],         // [{name,email,password}] demo only
+  settings: { referralUrl: DEFAULT_REFERRAL_URL },
+  journal: [],
+  watchlist: ['EURUSD','GBPUSD','XAUUSD','BTCUSD'],
+  paper: { balance: 10000, positions: [], history: [] },
+  plan: null,
+  referralClicks: { total:0, log:[] },
+  loaded:false
+};
+
+async function loadState(){
+  const [accounts, settings, journal, watchlist, paper, plan, clicks, user] = await Promise.all([
+    sGet('jm_accounts', true), sGet('jm_settings', true), sGet('jm_journal_'+sessionId(), false),
+    sGet('jm_watchlist_'+sessionId(), false), sGet('jm_paper_'+sessionId(), false),
+    sGet('jm_plan_'+sessionId(), false), sGet('jm_referral_clicks', true), sGet('jm_session_user', false)
+  ]);
+  state.accounts = accounts || [];
+  state.settings = settings || { referralUrl: DEFAULT_REFERRAL_URL };
+  state.user = user || null;
+  state.journal = journal || [];
+  state.watchlist = watchlist || state.watchlist;
+  state.paper = paper || state.paper;
+  state.plan = plan || null;
+  state.referralClicks = clicks || {total:0, log:[]};
+  state.loaded = true;
+}
+function sessionId(){ return state.user ? state.user.email.replace(/[^a-z0-9]/gi,'_') : 'guest'; }
+
+/* ---------------- router ---------------- */
+function currentPath(){ return (location.hash.replace('#','') || '/'); }
+function go(path){ location.hash = path; }
+window.addEventListener('hashchange', renderApp);
+
+function requireAuth(next){
+  if(!state.user){ go('/login'); openAuthNotice(); return false; }
+  return true;
+}
+function openAuthNotice(){
+  toast('Please log in or create a free account to continue.');
+}
+let toastTimer;
+function toast(msg){
+  let t = document.getElementById('jm-toast');
+  if(!t){
+    t = document.createElement('div'); t.id='jm-toast';
+    t.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#0B1B33;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:200;box-shadow:0 10px 30px rgba(0,0,0,0.25);';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg; t.style.display='block';
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.style.display='none', 2600);
+}
+
+/* ---------------- referral tracking ---------------- */
+async function openReferral(source){
+  const clicks = await sGet('jm_referral_clicks', true) || {total:0, log:[]};
+  clicks.total = (clicks.total||0)+1;
+  clicks.log = clicks.log || [];
+  clicks.log.push({ts:Date.now(), page: source || currentPath()});
+  if(clicks.log.length>500) clicks.log = clicks.log.slice(-500);
+  await sSet('jm_referral_clicks', clicks, true);
+  state.referralClicks = clicks;
+  const url = (state.settings && state.settings.referralUrl) || DEFAULT_REFERRAL_URL;
+  window.open(url, '_blank', 'noopener');
+  toast('Opening JustMarkets in a new tab…');
+}
+
+/* ---------------- nav render ---------------- */
+function renderNav(){
+  const linksEl = document.getElementById('navlinks');
+  linksEl.innerHTML = FULL_NAV.map(n=>`<a href="#${n.path}" onclick="go('${n.path}');return false;" class="${currentPath()===n.path?'active':''}">${n.label}</a>`).join('');
+  const actionsEl = document.getElementById('navactions');
+  if(state.user){
+    actionsEl.innerHTML = `
+      <button class="btn btn-outline btn-sm" onclick="go('/dashboard')">👤 ${state.user.name.split(' ')[0]}</button>
+      <button class="btn btn-primary btn-sm" onclick="openReferral('nav')">Open JustMarkets ↗</button>
+      <button class="btn btn-ghost btn-sm" onclick="logout()">Log out</button>`;
+  } else {
+    actionsEl.innerHTML = `
+      <button class="btn btn-outline btn-sm" onclick="go('/login')">Log in</button>
+      <button class="btn btn-primary btn-sm" onclick="openReferral('nav')">Open JustMarkets ↗</button>`;
+  }
+  const mnav = document.getElementById('mobilenav');
+  mnav.innerHTML = NAV_ITEMS.map(n=>`<a href="#${n.path}" onclick="go('${n.path}');return false;" class="${currentPath()===n.path?'active':''}"><span class="ic">${n.icon}</span>${n.label}</a>`).join('');
+}
+function toggleMobileMenu(){
+  const el = document.getElementById('navlinks');
+  el.style.display = el.style.display==='flex' ? 'none':'flex';
+  el.style.cssText += 'flex-direction:column;position:absolute;top:56px;left:0;right:0;background:#fff;padding:14px 20px;border-bottom:1px solid var(--border);display:flex;';
+}
+async function logout(){
+  state.user = null;
+  await sSet('jm_session_user', null, false);
+  toast('Logged out.');
+  go('/');
+}
+
+/* ---------------- ticker tape ---------------- */
+function refreshTicker(){
+  const track = document.getElementById('ticker-track');
+  const items = MOCK_SYMBOLS.map(s=>{
+    const p = priceState[s.sym];
+    const up = p.chg >= 0;
+    return `<span class="ticker-item"><b>${s.sym}</b> <span class="mono">${fmt(p.price, s.sym==='USDJPY'||s.cls==='index'?2:(s.cls==='crypto'?1:4))}</span> <span class="${up?'ticker-up':'ticker-down'}">${up?'▲':'▼'} ${Math.abs(p.chg).toFixed(2)}%</span></span>`;
+  }).join('');
+  track.innerHTML = items + items; // duplicate for seamless loop
+}
+
+/* ================= VIEW: LANDING ================= */
+function viewLanding(){
+  return `
+  <section class="hero">
+    <div class="container hero-inner">
+      <div class="eyebrow">100% Free Trading Toolkit</div>
+      <h1>Everything You Need for Your Trading Journey.</h1>
+      <p class="sub">Analyze markets, practice your strategies, manage your risk and journal your trades from one powerful trading workspace.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="openReferral('landing_primary')">Open a JustMarkets Account ↗</button>
+        <button class="btn btn-outline" onclick="go('/paper')">Try Paper Trading</button>
+        <button class="btn btn-outline" onclick="go('/tools')">Explore Free Tools</button>
+      </div>
+      <div class="hero-note">Free forever · No credit card · JustMarkets account opened directly on their official site</div>
+    </div>
+    <div class="container">
+      <div class="hero-tape">
+        <div class="grid grid-3" id="landing-market-preview"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="container">
+      <div class="section-head">
+        <div class="eyebrow">The Workspace</div>
+        <h2>One workspace, every free tool a trader needs</h2>
+        <p>Charting, journaling, analytics and risk management — built to be used together, every day.</p>
+      </div>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="ic">📈</div><h4>Live Charts</h4><p>Full TradingView charting with drawing tools and indicators.</p></div>
+        <div class="feature-card"><div class="ic">📓</div><h4>Trading Journal</h4><p>Unlimited free trade logging with screenshots and lessons learned.</p></div>
+        <div class="feature-card"><div class="ic">📊</div><h4>Journal Analytics</h4><p>Win rate, R:R, profit factor, equity curve — calculated automatically.</p></div>
+        <div class="feature-card"><div class="ic">🧮</div><h4>Risk Calculators</h4><p>Position size, pip value, R:R and compounding — instantly.</p></div>
+        <div class="feature-card"><div class="ic">🗞️</div><h4>Market News</h4><p>Curated headlines across forex, gold, crypto and central banks.</p></div>
+        <div class="feature-card"><div class="ic">📅</div><h4>Economic Calendar</h4><p>Upcoming high-impact events with previous/forecast/actual.</p></div>
+        <div class="feature-card"><div class="ic">🕹️</div><h4>Paper Trading</h4><p>Practice with a free $10,000 virtual account before going live.</p></div>
+        <div class="feature-card"><div class="ic">🎓</div><h4>Education</h4><p>Beginner to risk-management lessons, always free.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="strip">
+    <div class="container">
+      <div class="stat"><b>100%</b><span>Free core tools</span></div>
+      <div class="stat"><b>8+</b><span>Markets covered</span></div>
+      <div class="stat"><b>$10,000</b><span>Virtual paper balance</span></div>
+      <div class="stat"><b>0</b><span>Passwords we ask for on your broker account</span></div>
+    </div>
+  </div>
+
+  <section class="section">
+    <div class="container">
+      <div class="justmarkets-banner">
+        <div>
+          <h3>Ready to trade live? Open your account directly with JustMarkets.</h3>
+          <p>Registration, deposits and withdrawals all happen on JustMarkets' official, secure site — we never see or store your broker credentials.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openReferral('landing_banner')">Open JustMarkets Account ↗</button>
+      </div>
+    </div>
+  </section>
+  `;
+}
+function mountLandingExtras(){
+  const el = document.getElementById('landing-market-preview');
+  if(!el) return;
+  el.innerHTML = MOCK_SYMBOLS.slice(0,6).map(s=>{
+    const p = priceState[s.sym]; const up = p.chg>=0;
+    return `<div class="card" style="padding:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="wl-sym">${s.sym}</span><span class="${up?'up':'down'}" style="font-size:12px;font-weight:700;">${up?'▲':'▼'} ${Math.abs(p.chg).toFixed(2)}%</span>
+      </div>
+      <div class="mono" style="font-size:19px;margin-top:6px;">${fmt(p.price, s.cls==='crypto'?1:(s.sym==='USDJPY'||s.cls==='index'?2:4))}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ================= VIEW: LOGIN / SIGNUP ================= */
+function viewLogin(){
+  return `
+  <section class="section" style="padding-top:70px;">
+    <div class="container" style="max-width:420px;">
+      <div class="card">
+        <h2 style="text-align:center;">Do you already have an account?</h2>
+        <p style="text-align:center;">Log in to your JM Traders workspace, or create a free one.</p>
+        <div class="field"><label>Email</label><input id="li-email" type="email" placeholder="you@example.com"></div>
+        <div class="field"><label>Password</label><input id="li-pass" type="password" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-block" onclick="doLogin()">Log In</button>
+        <p style="text-align:center;margin-top:16px;font-size:13px;">No account yet? <a style="color:var(--blue);font-weight:600;cursor:pointer;" onclick="go('/signup')">Create one — it's free</a></p>
+        <div class="disclaimer blue">This is a JM Traders website account, used for your journal, watchlist and settings — it is separate from any JustMarkets brokerage account.</div>
+      </div>
+    </div>
+  </section>`;
+}
+function viewSignup(){
+  return `
+  <section class="section" style="padding-top:70px;">
+    <div class="container" style="max-width:460px;">
+      <div class="card">
+        <h2 style="text-align:center;">Create your free account</h2>
+        <p style="text-align:center;">Your JM Traders profile — for tools, journal and watchlists.</p>
+        <div class="field"><label>Full name</label><input id="su-name" placeholder="Jane Trader"></div>
+        <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com"></div>
+        <div class="field-row">
+          <div class="field"><label>Password</label><input id="su-pass" type="password"></div>
+          <div class="field"><label>Confirm password</label><input id="su-pass2" type="password"></div>
+        </div>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--slate);margin-bottom:10px;">
+          <input type="checkbox" id="su-terms" style="margin-top:3px;"> I accept the Terms of Service and Privacy Policy.
+        </label>
+        <button class="btn btn-primary btn-block" onclick="doSignup()">Create Account</button>
+        <p style="text-align:center;margin-top:16px;font-size:13px;">Already have an account? <a style="color:var(--blue);font-weight:600;cursor:pointer;" onclick="go('/login')">Log in</a></p>
+      </div>
+    </div>
+  </section>`;
+}
+async function doSignup(){
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim().toLowerCase();
+  const pass = document.getElementById('su-pass').value;
+  const pass2 = document.getElementById('su-pass2').value;
+  const terms = document.getElementById('su-terms').checked;
+  if(!name||!email||!pass) return toast('Please fill in all fields.');
+  if(pass!==pass2) return toast('Passwords do not match.');
+  if(!terms) return toast('Please accept the Terms and Privacy Policy.');
+  const accounts = await sGet('jm_accounts', true) || [];
+  if(accounts.find(a=>a.email===email)) return toast('An account with that email already exists.');
+  accounts.push({name,email,pass}); // demo only — hash & verify server-side in production
+  await sSet('jm_accounts', accounts, true);
+  state.accounts = accounts;
+  state.user = {name, email};
+  await sSet('jm_session_user', state.user, false);
+  toast('Account created — welcome!');
+  go('/welcome-justmarkets');
+}
+async function doLogin(){
+  const email = document.getElementById('li-email').value.trim().toLowerCase();
+  const pass = document.getElementById('li-pass').value;
+  const accounts = await sGet('jm_accounts', true) || [];
+  const acc = accounts.find(a=>a.email===email && a.pass===pass);
+  if(!acc) return toast('No matching account found.');
+  state.user = {name:acc.name, email:acc.email};
+  await sSet('jm_session_user', state.user, false);
+  toast('Welcome back, '+acc.name.split(' ')[0]+'!');
+  go('/dashboard');
+}
+function viewWelcomeJustmarkets(){
+  return `
+  <section class="section" style="padding-top:70px;">
+    <div class="container" style="max-width:480px;text-align:center;">
+      <div class="card">
+        <div style="font-size:38px;">🎉</div>
+        <h2>You're in, ${state.user?state.user.name.split(' ')[0]:''}.</h2>
+        <p>Your free JM Traders workspace is ready. Want to trade with real capital?</p>
+        <button class="btn btn-primary btn-block" onclick="openReferral('post_signup')">Open JustMarkets Account ↗</button>
+        <button class="btn btn-outline btn-block" style="margin-top:10px;" onclick="go('/dashboard')">Skip — take me to my dashboard</button>
+        <div class="disclaimer blue" style="text-align:left;margin-top:18px;">You'll complete registration directly on JustMarkets' official website. We never ask for your JustMarkets password.</div>
+      </div>
+    </div>
+  </section>`;
+}
+
+/* ================= VIEW: DASHBOARD ================= */
+async function viewDashboard(){
+  const stats = journalStats();
+  return `
+  <div class="container page-title">
+    <h1>Welcome back${state.user?', '+state.user.name.split(' ')[0]:''}.</h1>
+    <p>Here's your trading workspace at a glance.</p>
+  </div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="grid grid-dash">
+      <div class="grid" style="gap:18px;">
+        <div class="card">
+          <div class="card-head"><h3>Market Overview</h3><span class="tag tag-demo">Sample data</span></div>
+          <table><thead><tr><th>Symbol</th><th>Price</th><th>Chg %</th></tr></thead><tbody>
+          ${MOCK_SYMBOLS.map(s=>{const p=priceState[s.sym]; const up=p.chg>=0; return `<tr><td class="wl-sym">${s.sym}</td><td class="mono">${fmt(p.price, s.cls==='crypto'?1:(s.sym==='USDJPY'||s.cls==='index'?2:4))}</td><td class="${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(p.chg).toFixed(2)}%</td></tr>`}).join('')}
+          </tbody></table>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>TradingView Chart</h3><span class="tag tag-live">Official widget</span></div>
+          <div class="tv-wrap" id="dash-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Journal Statistics</h3><span class="tag tag-free">Free</span></div>
+          <div class="kpi" style="margin-bottom:0;">
+            <div class="card"><b>${stats.total}</b><span>Trades</span></div>
+            <div class="card"><b>${stats.winRate}%</b><span>Win rate</span></div>
+            <div class="card" ><b class="${stats.pnl>=0?'up':'down'}">$${fmt(stats.pnl)}</b><span>Total P&L</span></div>
+            <div class="card"><b>${stats.avgRR}</b><span>Avg R:R</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="grid" style="gap:18px;">
+        <div class="card">
+          <div class="card-head"><h3>Watchlist</h3><button class="btn btn-ghost btn-sm" onclick="go('/watchlist')">Manage →</button></div>
+          ${state.watchlist.slice(0,6).map(sym=>{const s=MOCK_SYMBOLS.find(x=>x.sym===sym); if(!s) return ''; const p=priceState[sym]; const up=p.chg>=0;
+            return `<div class="watchlist-row" onclick="go('/charts')"><span class="wl-sym">${sym}</span><span class="mono ${up?'up':'down'}">${fmt(p.price, s.cls==='crypto'?1:(sym==='USDJPY'||s.cls==='index'?2:4))} <small>${up?'▲':'▼'}${Math.abs(p.chg).toFixed(2)}%</small></span></div>`}).join('')}
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Risk Calculator</h3><button class="btn btn-ghost btn-sm" onclick="go('/tools')">Open →</button></div>
+          <p style="margin:0;">Quick-check your position size and max risk before you enter a trade.</p>
+          <button class="btn btn-outline btn-block" style="margin-top:10px;" onclick="go('/tools')">Calculate Risk</button>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Economic Calendar</h3><button class="btn btn-ghost btn-sm" onclick="go('/calendar')">Full calendar →</button></div>
+          ${mockEvents().slice(0,3).map(e=>`<div style="padding:8px 0;border-bottom:1px solid #EEF2F8;font-size:12.5px;"><span class="imp-${e.imp}">●</span> <b>${e.time}</b> ${e.currency} — ${e.title}</div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Latest News</h3><button class="btn btn-ghost btn-sm" onclick="go('/news')">All news →</button></div>
+          ${mockNews().slice(0,3).map(n=>`<div style="padding:8px 0;border-bottom:1px solid #EEF2F8;"><div class="cat" style="font-size:10px;">${n.cat}</div><div style="font-size:13px;font-weight:600;">${n.title}</div></div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Paper Trading</h3><span class="tag tag-demo">Virtual funds</span></div>
+          <div style="font-size:24px;font-family:'Space Grotesk',sans-serif;">$${fmt(state.paper.balance)}</div>
+          <p style="margin:4px 0 10px;">${state.paper.positions.length} open position(s)</p>
+          <button class="btn btn-primary btn-block" onclick="go('/paper')">Open Paper Trading</button>
+        </div>
+        ${!hasJustMarkets() ? `<div class="card" style="background:var(--navy);color:#fff;">
+          <h3 style="color:#fff;">Ready to go live?</h3>
+          <p style="color:#B9C8E4;">Open your JustMarkets account through our official referral link.</p>
+          <button class="btn btn-primary btn-block" onclick="openReferral('dashboard')">Open JustMarkets Account ↗</button>
+        </div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
+function hasJustMarkets(){ return false; } // no official confirmation mechanism exists client-side; always show CTA per spec
+
+/* ================= VIEW: CHARTS ================= */
+function viewCharts(){
+  return `
+  <div class="container page-title"><h1>Charts</h1><p>Full TradingView charting, powered by TradingView's official widget.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="grid" style="grid-template-columns:220px 1fr;gap:18px;">
+      <div class="card" style="height:fit-content;">
+        <h3 style="font-size:14px;">Watchlist</h3>
+        ${state.watchlist.map(sym=>`<div class="watchlist-row" onclick="setChartSymbol('${sym}')"><span class="wl-sym">${sym}</span></div>`).join('') || '<p style="font-size:12.5px;">No symbols yet.</p>'}
+      </div>
+      <div class="card">
+        <div class="card-head"><h3 id="chart-symbol-label">Chart — ${window.currentChartSymbol||'EURUSD'}</h3><span class="tag tag-live">TradingView</span></div>
+        <div class="tv-wrap" id="full-chart" style="height:600px;"></div>
+      </div>
+    </div>
+  </div>`;
+}
+function setChartSymbol(sym){ window.currentChartSymbol = sym; renderApp(); }
+function mountTradingViewWidget(containerId, symbol){
+  const el = document.getElementById(containerId);
+  if(!el) return;
+  el.innerHTML='';
+  const s = document.createElement('script');
+  s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
+  s.async = true;
+  s.innerHTML = JSON.stringify({
+    autosize:true, symbol:'FX:'+symbol, interval:'60', timezone:'Etc/UTC', theme:'light',
+    style:'1', locale:'en', enable_publishing:false, allow_symbol_change:true,
+    hide_top_toolbar:false, save_image:false, calendar:false, support_host:'https://www.tradingview.com'
+  });
+  el.appendChild(s);
+}
+
+/* ================= VIEW: JOURNAL ================= */
+function journalStats(){
+  const trades = state.journal;
+  const total = trades.length;
+  const wins = trades.filter(t=>parseFloat(t.pnl)>0);
+  const losses = trades.filter(t=>parseFloat(t.pnl)<0);
+  const pnl = trades.reduce((a,t)=>a+(parseFloat(t.pnl)||0),0);
+  const winRate = total? Math.round(wins.length/total*100):0;
+  const avgWin = wins.length? wins.reduce((a,t)=>a+parseFloat(t.pnl),0)/wins.length:0;
+  const avgLoss = losses.length? losses.reduce((a,t)=>a+parseFloat(t.pnl),0)/losses.length:0;
+  const rrs = trades.filter(t=>t.rr).map(t=>parseFloat(t.rr));
+  const avgRR = rrs.length? (rrs.reduce((a,b)=>a+b,0)/rrs.length).toFixed(2):'—';
+  const grossWin = wins.reduce((a,t)=>a+parseFloat(t.pnl),0);
+  const grossLoss = Math.abs(losses.reduce((a,t)=>a+parseFloat(t.pnl),0));
+  const profitFactor = grossLoss? (grossWin/grossLoss).toFixed(2) : (grossWin>0?'∞':'0');
+  return {total, wins:wins.length, losses:losses.length, pnl, winRate, avgWin, avgLoss, avgRR, profitFactor};
+}
+function viewJournal(){
+  const stats = journalStats();
+  return `
+  <div class="container page-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;">
+      <div><h1>Trading Journal</h1><p>Unlimited free trade logging.</p></div>
+      <button class="btn btn-primary" onclick="openTradeModal()">+ Log New Trade</button>
+    </div>
+  </div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="kpi">
+      <div class="card"><b>${stats.total}</b><span>Total trades</span></div>
+      <div class="card"><b>${stats.winRate}%</b><span>Win rate</span></div>
+      <div class="card"><b class="${stats.pnl>=0?'up':'down'}">$${fmt(stats.pnl)}</b><span>Total P&L</span></div>
+      <div class="card"><b>${stats.profitFactor}</b><span>Profit factor</span></div>
+    </div>
+    <div id="journal-list">
+      ${state.journal.length===0 ? `<div class="card empty"><div class="ic">📓</div><h3>No trades yet</h3><p>Log your first trade to start building your edge.</p><button class="btn btn-primary" onclick="openTradeModal()">+ Log New Trade</button></div>` :
+      state.journal.slice().reverse().map(t=>`
+        <div class="trade-card">
+          <div class="top">
+            <div>
+              <span class="wl-sym">${t.instrument}</span> <span class="pill ${t.side==='Buy'?'pill-buy':'pill-sell'}">${t.side}</span>
+              <div style="font-size:11.5px;color:var(--slate-light);margin-top:4px;">${t.date} ${t.time||''} · ${t.session||''} · ${t.strategy||''}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mono ${parseFloat(t.pnl)>=0?'up':'down'}" style="font-size:17px;font-weight:700;">${parseFloat(t.pnl)>=0?'+':''}$${fmt(t.pnl)}</div>
+              <button class="btn btn-ghost btn-sm" onclick="deleteTrade('${t.id}')">Delete</button>
+            </div>
+          </div>
+          <div class="trade-meta">
+            <span>Entry ${t.entry}</span><span>SL ${t.sl||'—'}</span><span>TP ${t.tp||'—'}</span>
+            <span>Size ${t.size||'—'}</span><span>Risk ${t.riskPct||'—'}%</span><span>R:R ${t.rr||'—'}</span>
+          </div>
+          ${t.reasonEntry?`<p style="margin-top:8px;font-size:12.5px;"><b>Entry reason:</b> ${t.reasonEntry}</p>`:''}
+          ${t.reasonExit?`<p style="font-size:12.5px;"><b>Exit reason:</b> ${t.reasonExit}</p>`:''}
+          ${t.lessons?`<p style="font-size:12.5px;"><b>Lessons:</b> ${t.lessons}</p>`:''}
+          ${t.image?`<img class="trade-img" src="${t.image}">`:''}
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function openTradeModal(){
+  const root = document.getElementById('modal-root');
+  root.innerHTML = `
+  <div class="modal-overlay" onclick="if(event.target===this) closeModal()">
+    <div class="modal" style="max-width:560px;">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2>Log a Trade</h2>
+      <div class="field-row">
+        <div class="field"><label>Instrument</label><input id="t-inst" placeholder="EURUSD"></div>
+        <div class="field"><label>Side</label><select id="t-side"><option>Buy</option><option>Sell</option></select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Entry price</label><input id="t-entry" type="number" step="any"></div>
+        <div class="field"><label>Result P&L ($)</label><input id="t-pnl" type="number" step="any"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Stop loss</label><input id="t-sl" type="number" step="any"></div>
+        <div class="field"><label>Take profit</label><input id="t-tp" type="number" step="any"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Position size</label><input id="t-size" type="number" step="any"></div>
+        <div class="field"><label>Risk %</label><input id="t-riskpct" type="number" step="any"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Risk/Reward</label><input id="t-rr" type="number" step="any" placeholder="2.0"></div>
+        <div class="field"><label>Date</label><input id="t-date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Session</label><select id="t-session"><option>London</option><option>New York</option><option>Asian</option><option>Overlap</option></select></div>
+        <div class="field"><label>Strategy / Setup</label><input id="t-strategy" placeholder="Breakout, Pullback…"></div>
+      </div>
+      <div class="field"><label>Entry reason</label><textarea id="t-reason-entry"></textarea></div>
+      <div class="field"><label>Exit reason</label><textarea id="t-reason-exit"></textarea></div>
+      <div class="field"><label>Emotions / Mistakes / Lessons learned</label><textarea id="t-lessons"></textarea></div>
+      <div class="field"><label>Screenshot (optional)</label><input id="t-image" type="file" accept="image/*"></div>
+      <button class="btn btn-primary btn-block" onclick="saveTrade()">Save Trade</button>
+    </div>
+  </div>`;
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
+async function saveTrade(){
+  const inst = document.getElementById('t-inst').value.trim().toUpperCase();
+  const pnl = document.getElementById('t-pnl').value;
+  if(!inst || pnl==='') return toast('Instrument and P&L are required.');
+  const fileInput = document.getElementById('t-image');
+  const finish = (imgData)=>{
+    const trade = {
+      id: uid(), instrument: inst, side: document.getElementById('t-side').value,
+      entry: document.getElementById('t-entry').value, sl: document.getElementById('t-sl').value,
+      tp: document.getElementById('t-tp').value, size: document.getElementById('t-size').value,
+      riskPct: document.getElementById('t-riskpct').value, rr: document.getElementById('t-rr').value,
+      date: document.getElementById('t-date').value, session: document.getElementById('t-session').value,
+      strategy: document.getElementById('t-strategy').value, reasonEntry: document.getElementById('t-reason-entry').value,
+      reasonExit: document.getElementById('t-reason-exit').value, lessons: document.getElementById('t-lessons').value,
+      pnl: pnl, image: imgData || null
+    };
+    state.journal.push(trade);
+    sSet('jm_journal_'+sessionId(), state.journal, false);
+    closeModal(); toast('Trade saved.'); go('/journal');
+  };
+  if(fileInput.files && fileInput.files[0]){
+    const reader = new FileReader();
+    reader.onload = ()=>finish(reader.result);
+    reader.readAsDataURL(fileInput.files[0]);
+  } else finish(null);
+}
+function deleteTrade(id){
+  state.journal = state.journal.filter(t=>t.id!==id);
+  sSet('jm_journal_'+sessionId(), state.journal, false);
+  toast('Trade deleted.'); renderApp();
+}
+
+/* ================= VIEW: ANALYTICS ================= */
+function viewAnalytics(){
+  const stats = journalStats();
+  const bySession = groupBy(state.journal,'session');
+  const byStrategy = groupBy(state.journal,'strategy');
+  const byInstrument = groupBy(state.journal,'instrument');
+  const best = (obj)=>Object.entries(obj).sort((a,b)=>b[1].pnl-a[1].pnl)[0];
+  const worst = (obj)=>Object.entries(obj).sort((a,b)=>a[1].pnl-b[1].pnl)[0];
+  const bs = best(bySession), ws = worst(bySession), bst = best(byStrategy), wst = worst(byStrategy), bi = best(byInstrument), wi = worst(byInstrument);
+  return `
+  <div class="container page-title"><h1>Journal Analytics</h1><p>Automatically calculated from your journal — 100% free.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    ${state.journal.length===0 ? `<div class="card empty"><div class="ic">📊</div><h3>Nothing to analyze yet</h3><p>Log a few trades in your journal and analytics will appear here.</p><button class="btn btn-primary" onclick="go('/journal')">Go to Journal</button></div>` : `
+    <div class="kpi">
+      <div class="card"><b>${stats.total}</b><span>Total trades</span></div>
+      <div class="card"><b class="up">${stats.wins}</b><span>Winning trades</span></div>
+      <div class="card"><b class="down">${stats.losses}</b><span>Losing trades</span></div>
+      <div class="card"><b>${stats.winRate}%</b><span>Win rate</span></div>
+    </div>
+    <div class="kpi">
+      <div class="card"><b class="up">$${fmt(stats.avgWin)}</b><span>Average win</span></div>
+      <div class="card"><b class="down">$${fmt(stats.avgLoss)}</b><span>Average loss</span></div>
+      <div class="card"><b>${stats.profitFactor}</b><span>Profit factor</span></div>
+      <div class="card"><b class="${stats.pnl>=0?'up':'down'}">$${fmt(stats.pnl)}</b><span>Total P&L</span></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card"><div class="card-head"><h3>Equity Curve</h3></div><canvas id="chart-equity" height="220"></canvas></div>
+      <div class="card"><div class="card-head"><h3>Win / Loss</h3></div><canvas id="chart-winloss" height="220"></canvas></div>
+    </div>
+    <div class="grid grid-2" style="margin-top:18px;">
+      <div class="card"><div class="card-head"><h3>Performance by Strategy</h3></div><canvas id="chart-strategy" height="220"></canvas></div>
+      <div class="card"><div class="card-head"><h3>Performance by Session</h3></div><canvas id="chart-session" height="220"></canvas></div>
+    </div>
+    <div class="grid grid-3" style="margin-top:18px;">
+      <div class="card"><h4>Best / Worst Session</h4><p>Best: <b class="up">${bs?bs[0]:'—'}</b> ${bs?('($'+fmt(bs[1].pnl)+')'):''}</p><p>Worst: <b class="down">${ws?ws[0]:'—'}</b> ${ws?('($'+fmt(ws[1].pnl)+')'):''}</p></div>
+      <div class="card"><h4>Best / Worst Strategy</h4><p>Best: <b class="up">${bst?bst[0]:'—'}</b> ${bst?('($'+fmt(bst[1].pnl)+')'):''}</p><p>Worst: <b class="down">${wst?wst[0]:'—'}</b> ${wst?('($'+fmt(wst[1].pnl)+')'):''}</p></div>
+      <div class="card"><h4>Best / Worst Instrument</h4><p>Best: <b class="up">${bi?bi[0]:'—'}</b> ${bi?('($'+fmt(bi[1].pnl)+')'):''}</p><p>Worst: <b class="down">${wi?wi[0]:'—'}</b> ${wi?('($'+fmt(wi[1].pnl)+')'):''}</p></div>
+    </div>
+    `}
+  </div>`;
+}
+function groupBy(trades, key){
+  const out = {};
+  trades.forEach(t=>{
+    const k = t[key] || 'Unspecified';
+    if(!out[k]) out[k] = {pnl:0,count:0};
+    out[k].pnl += parseFloat(t.pnl)||0; out[k].count++;
+  });
+  return out;
+}
+let chartRefs = {};
+function mountAnalyticsCharts(){
+  if(state.journal.length===0) return;
+  Object.values(chartRefs).forEach(c=>c && c.destroy());
+  const trades = state.journal.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+  let running = 0;
+  const equity = trades.map(t=>{ running += parseFloat(t.pnl)||0; return running; });
+  const ctxEq = document.getElementById('chart-equity');
+  if(ctxEq) chartRefs.eq = new Chart(ctxEq, {type:'line', data:{labels:trades.map((t,i)=>'#'+(i+1)), datasets:[{data:equity, borderColor:'#2F6FED', backgroundColor:'rgba(47,111,237,0.08)', fill:true, tension:0.3, pointRadius:0}]}, options:baseChartOpts()});
+
+  const stats = journalStats();
+  const ctxWL = document.getElementById('chart-winloss');
+  if(ctxWL) chartRefs.wl = new Chart(ctxWL, {type:'doughnut', data:{labels:['Wins','Losses'], datasets:[{data:[stats.wins, stats.losses], backgroundColor:['#16A34A','#E5484D']}]}, options:{plugins:{legend:{position:'bottom'}}}});
+
+  const bys = groupBy(state.journal,'strategy');
+  const ctxSt = document.getElementById('chart-strategy');
+  if(ctxSt) chartRefs.st = new Chart(ctxSt, {type:'bar', data:{labels:Object.keys(bys), datasets:[{data:Object.values(bys).map(v=>v.pnl), backgroundColor:'#2F6FED'}]}, options:baseChartOpts()});
+
+  const bysess = groupBy(state.journal,'session');
+  const ctxSe = document.getElementById('chart-session');
+  if(ctxSe) chartRefs.se = new Chart(ctxSe, {type:'bar', data:{labels:Object.keys(bysess), datasets:[{data:Object.values(bysess).map(v=>v.pnl), backgroundColor:'#6FA8FF'}]}, options:baseChartOpts()});
+}
+function baseChartOpts(){ return {plugins:{legend:{display:false}}, scales:{y:{grid:{color:'#EEF2F8'}}, x:{grid:{display:false}}}}; }
+
+/* ================= VIEW: TOOLS ================= */
+function viewTools(){
+  return `
+  <div class="container page-title"><h1>Trading Tools</h1><p>Free calculators for planning trades. Estimates for planning purposes only.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="tabs" id="tool-tabs">
+      ${['Risk Calculator','Position Size','Risk/Reward','Pip Value','Profit/Loss','Percentage','Compounding','Margin'].map((t,i)=>`<div class="tab ${i===0?'active':''}" onclick="setToolTab(${i})">${t}</div>`).join('')}
+    </div>
+    <div id="tool-body"></div>
+  </div>`;
+}
+window.toolTab = 0;
+function setToolTab(i){ window.toolTab = i; renderToolBody(); document.querySelectorAll('#tool-tabs .tab').forEach((el,idx)=>el.classList.toggle('active', idx===i)); }
+function renderToolBody(){
+  const body = document.getElementById('tool-body'); if(!body) return;
+  const tpl = [toolRisk, toolPositionSize, toolRR, toolPip, toolPL, toolPct, toolCompound, toolMargin][window.toolTab];
+  body.innerHTML = tpl();
+}
+function toolRisk(){
+  return `<div class="grid grid-2">
+    <div class="card">
+      <h3>Risk Calculator</h3>
+      <div class="field"><label>Account balance ($)</label><input id="rc-bal" type="number" value="10000"></div>
+      <div class="field"><label>Risk %</label><input id="rc-risk" type="number" value="1"></div>
+      <div class="field-row">
+        <div class="field"><label>Entry price</label><input id="rc-entry" type="number" step="any" value="1.0850"></div>
+        <div class="field"><label>Stop loss</label><input id="rc-sl" type="number" step="any" value="1.0800"></div>
+      </div>
+      <div class="field"><label>Take profit</label><input id="rc-tp" type="number" step="any" value="1.0950"></div>
+      <button class="btn btn-primary btn-block" onclick="calcRisk()">Calculate</button>
+      <div class="disclaimer">Calculations are estimates for planning and educational purposes. Actual broker specifications, spreads, commissions, margin requirements and execution may differ.</div>
+    </div>
+    <div id="rc-result"></div>
+  </div>`;
+}
+function calcRisk(){
+  const bal = +document.getElementById('rc-bal').value, riskPct = +document.getElementById('rc-risk').value;
+  const entry = +document.getElementById('rc-entry').value, sl = +document.getElementById('rc-sl').value, tp = +document.getElementById('rc-tp').value;
+  const maxRisk = bal*riskPct/100;
+  const slDist = Math.abs(entry-sl);
+  const tpDist = Math.abs(tp-entry);
+  const rr = slDist? (tpDist/slDist).toFixed(2) : '—';
+  const posSize = slDist? (maxRisk/slDist).toFixed(2) : '—';
+  document.getElementById('rc-result').innerHTML = `<div class="card result-box">
+    <div class="result-row"><span>Maximum risk</span><b>$${fmt(maxRisk)}</b></div>
+    <div class="result-row"><span>Potential loss</span><b class="down">-$${fmt(maxRisk)}</b></div>
+    <div class="result-row"><span>Potential profit (at TP)</span><b class="up">$${fmt(maxRisk*(rr==='—'?0:rr))}</b></div>
+    <div class="result-row"><span>Risk / Reward ratio</span><b>1 : ${rr}</b></div>
+    <div class="result-row"><span>Estimated position size (units)</span><b>${posSize}</b></div>
+  </div>`;
+}
+function toolPositionSize(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Position Size Calculator</h3>
+    <div class="field"><label>Account balance ($)</label><input id="ps-bal" type="number" value="10000"></div>
+    <div class="field"><label>Risk %</label><input id="ps-risk" type="number" value="1"></div>
+    <div class="field"><label>Stop loss distance (pips)</label><input id="ps-pips" type="number" value="30"></div>
+    <div class="field"><label>Pip value per lot ($)</label><input id="ps-pipval" type="number" value="10"></div>
+    <button class="btn btn-primary btn-block" onclick="calcPS()">Calculate</button>
+    <div class="disclaimer">Estimate only — confirm exact pip value and lot sizing with your broker.</div>
+  </div><div id="ps-result"></div></div>`;
+}
+function calcPS(){
+  const bal=+document.getElementById('ps-bal').value, risk=+document.getElementById('ps-risk').value, pips=+document.getElementById('ps-pips').value, pipval=+document.getElementById('ps-pipval').value;
+  const maxRisk = bal*risk/100;
+  const lots = pips*pipval ? (maxRisk/(pips*pipval)).toFixed(2) : '—';
+  document.getElementById('ps-result').innerHTML = `<div class="card result-box">
+    <div class="result-row"><span>Max risk</span><b>$${fmt(maxRisk)}</b></div>
+    <div class="result-row"><span>Estimated lot size</span><b>${lots} lots</b></div>
+  </div>`;
+}
+function toolRR(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Risk/Reward Calculator</h3>
+    <div class="field-row"><div class="field"><label>Entry</label><input id="rr-entry" type="number" step="any" value="1.0850"></div>
+    <div class="field"><label>Stop loss</label><input id="rr-sl" type="number" step="any" value="1.0800"></div></div>
+    <div class="field"><label>Take profit</label><input id="rr-tp" type="number" step="any" value="1.0950"></div>
+    <button class="btn btn-primary btn-block" onclick="calcRR()">Calculate</button>
+  </div><div id="rr-result"></div></div>`;
+}
+function calcRR(){
+  const e=+document.getElementById('rr-entry').value, sl=+document.getElementById('rr-sl').value, tp=+document.getElementById('rr-tp').value;
+  const risk=Math.abs(e-sl), reward=Math.abs(tp-e);
+  document.getElementById('rr-result').innerHTML = `<div class="card result-box">
+    <div class="result-row"><span>Risk (price)</span><b>${risk.toFixed(5)}</b></div>
+    <div class="result-row"><span>Reward (price)</span><b>${reward.toFixed(5)}</b></div>
+    <div class="result-row"><span>Risk/Reward</span><b>1 : ${risk?(reward/risk).toFixed(2):'—'}</b></div>
+  </div>`;
+}
+function toolPip(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Pip Calculator</h3>
+    <div class="field"><label>Pair</label><select id="pip-pair"><option>EURUSD</option><option>GBPUSD</option><option>USDJPY</option><option>XAUUSD</option></select></div>
+    <div class="field"><label>Lot size</label><input id="pip-lots" type="number" value="1"></div>
+    <button class="btn btn-primary btn-block" onclick="calcPip()">Calculate</button>
+    <div class="disclaimer">Approximate values for standard lots; actual value varies with live rates and account currency.</div>
+  </div><div id="pip-result"></div></div>`;
+}
+function calcPip(){
+  const pair=document.getElementById('pip-pair').value, lots=+document.getElementById('pip-lots').value;
+  const table = {EURUSD:10, GBPUSD:10, USDJPY:9.1, XAUUSD:1};
+  const val = (table[pair]||10)*lots;
+  document.getElementById('pip-result').innerHTML = `<div class="card result-box"><div class="result-row"><span>Approx. pip value</span><b>$${fmt(val)}</b></div></div>`;
+}
+function toolPL(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Profit / Loss Calculator</h3>
+    <div class="field-row"><div class="field"><label>Entry</label><input id="pl-entry" type="number" step="any" value="1.0850"></div>
+    <div class="field"><label>Exit</label><input id="pl-exit" type="number" step="any" value="1.0900"></div></div>
+    <div class="field-row"><div class="field"><label>Position size (units)</label><input id="pl-size" type="number" value="10000"></div>
+    <div class="field"><label>Side</label><select id="pl-side"><option>Buy</option><option>Sell</option></select></div></div>
+    <button class="btn btn-primary btn-block" onclick="calcPL()">Calculate</button>
+  </div><div id="pl-result"></div></div>`;
+}
+function calcPL(){
+  const entry=+document.getElementById('pl-entry').value, exit=+document.getElementById('pl-exit').value, size=+document.getElementById('pl-size').value, side=document.getElementById('pl-side').value;
+  const diff = side==='Buy' ? (exit-entry) : (entry-exit);
+  const pl = diff*size;
+  document.getElementById('pl-result').innerHTML = `<div class="card result-box"><div class="result-row"><span>Hypothetical P&L</span><b class="${pl>=0?'up':'down'}">$${fmt(pl)}</b></div></div>`;
+}
+function toolPct(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Percentage Calculator</h3>
+    <div class="field-row"><div class="field"><label>Starting value</label><input id="pc-start" type="number" value="10000"></div>
+    <div class="field"><label>Ending value</label><input id="pc-end" type="number" value="10850"></div></div>
+    <button class="btn btn-primary btn-block" onclick="calcPct()">Calculate</button>
+  </div><div id="pc-result"></div></div>`;
+}
+function calcPct(){
+  const s=+document.getElementById('pc-start').value, e=+document.getElementById('pc-end').value;
+  const pct = s? ((e-s)/s*100):0;
+  document.getElementById('pc-result').innerHTML = `<div class="card result-box"><div class="result-row"><span>Change</span><b class="${pct>=0?'up':'down'}">${pct.toFixed(2)}%</b></div></div>`;
+}
+function toolCompound(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Compounding Calculator</h3>
+    <div class="field-row"><div class="field"><label>Starting balance ($)</label><input id="cp-bal" type="number" value="1000"></div>
+    <div class="field"><label>Monthly return %</label><input id="cp-ret" type="number" value="5"></div></div>
+    <div class="field"><label>Months</label><input id="cp-months" type="number" value="12"></div>
+    <button class="btn btn-primary btn-block" onclick="calcCompound()">Calculate</button>
+    <div class="disclaimer">Hypothetical scenario only — consistent monthly returns are not guaranteed or typical.</div>
+  </div><div id="cp-result"></div></div>`;
+}
+function calcCompound(){
+  const bal=+document.getElementById('cp-bal').value, ret=+document.getElementById('cp-ret').value/100, months=+document.getElementById('cp-months').value;
+  const final = bal*Math.pow(1+ret, months);
+  document.getElementById('cp-result').innerHTML = `<div class="card result-box"><div class="result-row"><span>Projected balance</span><b>$${fmt(final)}</b></div><div class="result-row"><span>Total growth</span><b class="up">$${fmt(final-bal)}</b></div></div>`;
+}
+function toolMargin(){
+  return `<div class="grid grid-2"><div class="card">
+    <h3>Margin Calculator</h3>
+    <div class="field-row"><div class="field"><label>Position size (units)</label><input id="mg-size" type="number" value="10000"></div>
+    <div class="field"><label>Leverage (1:x)</label><input id="mg-lev" type="number" value="100"></div></div>
+    <div class="field"><label>Price</label><input id="mg-price" type="number" step="any" value="1.0850"></div>
+    <button class="btn btn-primary btn-block" onclick="calcMargin()">Calculate</button>
+    <div class="disclaimer">Estimate — actual margin depends on your broker's specifications for the instrument.</div>
+  </div><div id="mg-result"></div></div>`;
+}
+function calcMargin(){
+  const size=+document.getElementById('mg-size').value, lev=+document.getElementById('mg-lev').value, price=+document.getElementById('mg-price').value;
+  const notional = size*price;
+  const margin = lev? notional/lev : 0;
+  document.getElementById('mg-result').innerHTML = `<div class="card result-box"><div class="result-row"><span>Notional value</span><b>$${fmt(notional)}</b></div><div class="result-row"><span>Estimated required margin</span><b>$${fmt(margin)}</b></div></div>`;
+}
+
+/* ================= VIEW: WATCHLIST ================= */
+function viewWatchlist(){
+  return `
+  <div class="container page-title"><h1>Watchlist</h1><p>Track the instruments you care about.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="card">
+      <div class="field-row" style="align-items:flex-end;">
+        <div class="field"><label>Add instrument</label><select id="wl-add">${MOCK_SYMBOLS.map(s=>`<option>${s.sym}</option>`).join('')}</select></div>
+        <button class="btn btn-primary" onclick="addToWatchlist()" style="height:44px;">Add</button>
+      </div>
+      <table><thead><tr><th>Symbol</th><th>Price</th><th>Chg%</th><th>High</th><th>Low</th><th></th></tr></thead><tbody>
+      ${state.watchlist.map(sym=>{const s=MOCK_SYMBOLS.find(x=>x.sym===sym); if(!s) return ''; const p=priceState[sym]; const up=p.chg>=0;
+        return `<tr><td class="wl-sym">${sym}</td><td class="mono">${fmt(p.price,s.cls==='crypto'?1:(sym==='USDJPY'||s.cls==='index'?2:4))}</td><td class="${up?'up':'down'}">${up?'▲':'▼'}${Math.abs(p.chg).toFixed(2)}%</td><td class="mono">${fmt(p.price*1.004,s.cls==='crypto'?1:4)}</td><td class="mono">${fmt(p.price*0.996,s.cls==='crypto'?1:4)}</td><td><button class="btn btn-ghost btn-sm" onclick="removeFromWatchlist('${sym}')">Remove</button></td></tr>`}).join('')}
+      </tbody></table>
+      ${state.watchlist.length===0?'<p style="padding:20px;text-align:center;">No instruments yet — add one above.</p>':''}
+    </div>
+  </div>`;
+}
+function addToWatchlist(){
+  const sym = document.getElementById('wl-add').value;
+  if(!state.watchlist.includes(sym)){ state.watchlist.push(sym); sSet('jm_watchlist_'+sessionId(), state.watchlist, false); }
+  renderApp();
+}
+function removeFromWatchlist(sym){
+  state.watchlist = state.watchlist.filter(s=>s!==sym);
+  sSet('jm_watchlist_'+sessionId(), state.watchlist, false);
+  renderApp();
+}
+
+/* ================= VIEW: CALENDAR ================= */
+function mockEvents(){
+  return [
+    {time:'08:30', currency:'USD', country:'US', title:'Non-Farm Payrolls', imp:'high', prev:'175K', fc:'190K', actual:'—'},
+    {time:'10:00', currency:'EUR', country:'EU', title:'ECB Interest Rate Decision', imp:'high', prev:'4.25%', fc:'4.25%', actual:'—'},
+    {time:'12:30', currency:'GBP', country:'UK', title:'CPI y/y', imp:'med', prev:'2.3%', fc:'2.2%', actual:'—'},
+    {time:'14:00', currency:'USD', country:'US', title:'ISM Manufacturing PMI', imp:'med', prev:'49.1', fc:'49.6', actual:'—'},
+    {time:'23:50', currency:'JPY', country:'JP', title:'BoJ Monetary Policy Statement', imp:'high', prev:'—', fc:'—', actual:'—'},
+    {time:'09:00', currency:'AUD', country:'AU', title:'Retail Sales m/m', imp:'low', prev:'0.2%', fc:'0.3%', actual:'—'},
+  ];
+}
+function viewCalendar(){
+  const events = mockEvents();
+  return `
+  <div class="container page-title"><h1>Economic Calendar</h1><p>Illustrative sample events — connect a licensed calendar provider for live data.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="card">
+      <div style="margin-bottom:12px;"><span class="chip active">Today</span><span class="chip">Tomorrow</span><span class="chip">This Week</span><span class="chip">High Impact</span></div>
+      <table><thead><tr><th>Time</th><th>Ccy</th><th>Event</th><th>Impact</th><th>Previous</th><th>Forecast</th><th>Actual</th></tr></thead><tbody>
+      ${events.map(e=>`<tr><td class="mono">${e.time}</td><td><b>${e.currency}</b></td><td>${e.title}</td><td class="imp-${e.imp}">${e.imp==='high'?'●●●':e.imp==='med'?'●●':'●'}</td><td class="mono">${e.prev}</td><td class="mono">${e.fc}</td><td class="mono">${e.actual}</td></tr>`).join('')}
+      </tbody></table>
+      <div class="disclaimer">High-impact events can cause rapid price movement and widened spreads — trade with extra caution around these releases.</div>
+    </div>
+  </div>`;
+}
+
+/* ================= VIEW: NEWS ================= */
+function mockNews(){
+  return [
+    {cat:'Central Banks', title:'Fed officials signal patience on rate cuts amid sticky inflation', src:'Market Wire', time:'2h ago'},
+    {cat:'Gold', title:'Gold holds near record highs as safe-haven demand persists', src:'Market Wire', time:'3h ago'},
+    {cat:'Forex', title:'Dollar steadies ahead of key jobs data this week', src:'Market Wire', time:'5h ago'},
+    {cat:'Crypto', title:'Bitcoin consolidates after recent rally as traders eye ETF flows', src:'Market Wire', time:'6h ago'},
+    {cat:'Indices', title:'Wall Street mixed as investors weigh earnings against rate outlook', src:'Market Wire', time:'8h ago'},
+    {cat:'Interest Rates', title:'ECB expected to hold rates steady at next meeting, survey shows', src:'Market Wire', time:'1d ago'},
+  ];
+}
+function viewNews(){
+  const news = mockNews();
+  const cats = ['All',...new Set(news.map(n=>n.cat))];
+  return `
+  <div class="container page-title"><h1>Market News</h1><p>Sample headlines — connect a licensed news feed for live coverage.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="card">
+      <div style="margin-bottom:8px;">${cats.map((c,i)=>`<span class="chip ${i===0?'active':''}">${c}</span>`).join('')}</div>
+      ${news.map(n=>`<div class="news-item"><div class="cat">${n.cat}</div><h4>${n.title}</h4><div class="meta">${n.src} · ${n.time}</div></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ================= VIEW: PAPER TRADING ================= */
+function viewPaper(){
+  const equity = state.paper.balance + state.paper.positions.reduce((a,p)=>a+livePL(p),0);
+  return `
+  <div class="container page-title">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;">
+      <div><h1>Paper Trading</h1><p><span class="tag tag-demo">PAPER TRADING — VIRTUAL FUNDS ONLY</span></p></div>
+      <button class="btn btn-outline" onclick="resetPaper()">Reset Account</button>
+    </div>
+  </div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="kpi">
+      <div class="card"><b>$${fmt(state.paper.balance)}</b><span>Cash balance</span></div>
+      <div class="card"><b class="${equity>=state.paper.balance?'up':'down'}">$${fmt(equity)}</b><span>Equity</span></div>
+      <div class="card"><b>${state.paper.positions.length}</b><span>Open positions</span></div>
+      <div class="card"><b>${state.paper.history.length}</b><span>Closed trades</span></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Open a Simulated Trade</h3>
+        <div class="field-row">
+          <div class="field"><label>Instrument</label><select id="pp-sym">${MOCK_SYMBOLS.map(s=>`<option>${s.sym}</option>`).join('')}</select></div>
+          <div class="field"><label>Side</label><select id="pp-side"><option>Buy</option><option>Sell</option></select></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Size (units)</label><input id="pp-size" type="number" value="10000"></div>
+          <div class="field"><label>Stop loss (optional)</label><input id="pp-sl" type="number" step="any"></div>
+        </div>
+        <div class="field"><label>Take profit (optional)</label><input id="pp-tp" type="number" step="any"></div>
+        <button class="btn btn-primary btn-block" onclick="openPaperTrade()">Open Position</button>
+      </div>
+      <div class="card">
+        <h3>Open Positions</h3>
+        ${state.paper.positions.length===0?'<p>No open positions.</p>': state.paper.positions.map(p=>{
+          const pl = livePL(p);
+          return `<div class="pos-card"><div><span class="wl-sym">${p.sym}</span> <span class="pill ${p.side==='Buy'?'pill-buy':'pill-sell'}">${p.side}</span><div style="font-size:11.5px;color:var(--slate-light);">Entry ${p.entry} · Size ${p.size}</div></div><div style="text-align:right;"><div class="mono ${pl>=0?'up':'down'}">${pl>=0?'+':''}$${fmt(pl)}</div><button class="btn btn-ghost btn-sm" onclick="closePaperTrade('${p.id}')">Close</button></div></div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <h3>Trade History</h3>
+      ${state.paper.history.length===0?'<p>No closed trades yet.</p>':`<table><thead><tr><th>Symbol</th><th>Side</th><th>Entry</th><th>Exit</th><th>P&L</th></tr></thead><tbody>
+      ${state.paper.history.slice().reverse().map(h=>`<tr><td class="wl-sym">${h.sym}</td><td><span class="pill ${h.side==='Buy'?'pill-buy':'pill-sell'}">${h.side}</span></td><td class="mono">${h.entry}</td><td class="mono">${h.exit}</td><td class="mono ${h.pl>=0?'up':'down'}">${h.pl>=0?'+':''}$${fmt(h.pl)}</td></tr>`).join('')}
+      </tbody></table>`}
+    </div>
+  </div>`;
+}
+function livePL(p){
+  const cur = priceState[p.sym].price;
+  const diff = p.side==='Buy' ? (cur-p.entry) : (p.entry-cur);
+  return diff*p.size;
+}
+async function openPaperTrade(){
+  const sym = document.getElementById('pp-sym').value, side = document.getElementById('pp-side').value, size = +document.getElementById('pp-size').value;
+  const sl = document.getElementById('pp-sl').value, tp = document.getElementById('pp-tp').value;
+  state.paper.positions.push({id:uid(), sym, side, size, entry:priceState[sym].price, sl:sl||null, tp:tp||null});
+  await sSet('jm_paper_'+sessionId(), state.paper, false);
+  toast('Position opened.'); renderApp();
+}
+async function closePaperTrade(id){
+  const p = state.paper.positions.find(x=>x.id===id); if(!p) return;
+  const pl = livePL(p);
+  state.paper.balance += pl;
+  state.paper.history.push({sym:p.sym, side:p.side, entry:p.entry, exit:priceState[p.sym].price, pl});
+  state.paper.positions = state.paper.positions.filter(x=>x.id!==id);
+  await sSet('jm_paper_'+sessionId(), state.paper, false);
+  toast('Position closed.'); renderApp();
+}
+async function resetPaper(){
+  state.paper = {balance:10000, positions:[], history:[]};
+  await sSet('jm_paper_'+sessionId(), state.paper, false);
+  toast('Paper account reset to $10,000.'); renderApp();
+}
+
+/* ================= VIEW: TRADING PLAN ================= */
+const DEFAULT_CHECKLIST = ['Market structure checked','Key levels identified','Economic events checked','Risk calculated','Entry criteria satisfied','Stop loss defined','Take profit defined'];
+function viewPlan(){
+  const plan = state.plan || {goals:'',instruments:'',strategies:'',entryRules:'',exitRules:'',riskRules:'',maxDailyRisk:'',sessions:'',psychology:'', checklist: DEFAULT_CHECKLIST.map(c=>({label:c, done:false}))};
+  return `
+  <div class="container page-title"><h1>Trading Plan</h1><p>Define your rules once — follow them every day.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Your Plan</h3>
+        <div class="field"><label>Trading goals</label><textarea id="pl-goals">${plan.goals||''}</textarea></div>
+        <div class="field"><label>Instruments</label><input id="pl-instruments" value="${plan.instruments||''}"></div>
+        <div class="field"><label>Strategies</label><input id="pl-strategies" value="${plan.strategies||''}"></div>
+        <div class="field"><label>Entry rules</label><textarea id="pl-entry">${plan.entryRules||''}</textarea></div>
+        <div class="field"><label>Exit rules</label><textarea id="pl-exit">${plan.exitRules||''}</textarea></div>
+        <div class="field"><label>Risk rules</label><textarea id="pl-risk">${plan.riskRules||''}</textarea></div>
+        <div class="field-row">
+          <div class="field"><label>Max daily risk (%)</label><input id="pl-maxrisk" type="number" value="${plan.maxDailyRisk||''}"></div>
+          <div class="field"><label>Trading sessions</label><input id="pl-sessions" value="${plan.sessions||''}"></div>
+        </div>
+        <div class="field"><label>Psychology rules</label><textarea id="pl-psych">${plan.psychology||''}</textarea></div>
+        <button class="btn btn-primary btn-block" onclick="savePlan()">Save Plan</button>
+      </div>
+      <div class="card">
+        <h3>Daily Checklist</h3>
+        <div class="checklist" id="pl-checklist">
+        ${(plan.checklist||DEFAULT_CHECKLIST.map(c=>({label:c,done:false}))).map((c,i)=>`<label><input type="checkbox" ${c.done?'checked':''} onchange="toggleChecklist(${i})"> ${c.label}</label>`).join('')}
+        </div>
+        <button class="btn btn-outline btn-block" style="margin-top:14px;" onclick="resetChecklist()">Reset Checklist</button>
+      </div>
+    </div>
+  </div>`;
+}
+async function savePlan(){
+  state.plan = {
+    goals:document.getElementById('pl-goals').value, instruments:document.getElementById('pl-instruments').value,
+    strategies:document.getElementById('pl-strategies').value, entryRules:document.getElementById('pl-entry').value,
+    exitRules:document.getElementById('pl-exit').value, riskRules:document.getElementById('pl-risk').value,
+    maxDailyRisk:document.getElementById('pl-maxrisk').value, sessions:document.getElementById('pl-sessions').value,
+    psychology:document.getElementById('pl-psych').value, checklist: (state.plan&&state.plan.checklist)||DEFAULT_CHECKLIST.map(c=>({label:c,done:false}))
+  };
+  await sSet('jm_plan_'+sessionId(), state.plan, false);
+  toast('Trading plan saved.');
+}
+async function toggleChecklist(i){
+  if(!state.plan) state.plan = {checklist: DEFAULT_CHECKLIST.map(c=>({label:c,done:false}))};
+  state.plan.checklist[i].done = !state.plan.checklist[i].done;
+  await sSet('jm_plan_'+sessionId(), state.plan, false);
+  renderApp();
+}
+async function resetChecklist(){
+  if(!state.plan) state.plan = {};
+  state.plan.checklist = DEFAULT_CHECKLIST.map(c=>({label:c,done:false}));
+  await sSet('jm_plan_'+sessionId(), state.plan, false);
+  renderApp();
+}
+
+/* ================= VIEW: EDUCATION ================= */
+function viewEducation(){
+  const cats = [
+    {name:'Beginner', items:['What is forex?','What are CFDs?','What are spreads?','What is leverage?','What is margin?','What are pips?']},
+    {name:'Technical Analysis', items:['Candlesticks','Support & resistance','Market structure','Trend analysis','Indicators','Fibonacci','Chart patterns']},
+    {name:'Risk Management', items:['Position sizing','Stop losses','Risk/reward','Drawdown','Trading discipline']},
+    {name:'Psychology', items:['Emotions','Patience','Discipline','Avoiding revenge trading','Maintaining a trading plan']},
+  ];
+  return `
+  <div class="container page-title"><h1>Education</h1><p>Free lessons from the basics to psychology. Not personalized financial advice.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="grid grid-2">
+      ${cats.map(c=>`<div class="edu-card"><h4>${c.name}</h4><ul class="edu-list">${c.items.map(i=>`<li onclick="toast('${i.replace(/'/g,"")} — lesson content coming soon.')">→ ${i}</li>`).join('')}</ul></div>`).join('')}
+    </div>
+    <div class="disclaimer" style="margin-top:18px;">Educational content is general in nature and is not personalized financial advice. Trading involves risk of loss.</div>
+  </div>`;
+}
+
+/* ================= VIEW: JUSTMARKETS ================= */
+function viewJustmarkets(){
+  return `
+  <div class="container page-title"><h1>Trade With JustMarkets</h1><p>Open your JustMarkets account through our official referral link.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Why JustMarkets</h3>
+        <p>JustMarkets is a global broker offering forex, metals, indices and crypto CFD trading. Account opening, deposits, withdrawals and trade execution all happen on JustMarkets' own official platform — JM Traders never handles your funds or JustMarkets credentials.</p>
+        <button class="btn btn-primary btn-block" onclick="openReferral('jm_page')">Open JustMarkets Account ↗</button>
+        <p class="hint" style="margin-top:10px;">Referral destination: <span class="mono">${state.settings.referralUrl}</span></p>
+      </div>
+      <div class="card">
+        <h3>Referral Disclosure</h3>
+        <p>This website may receive compensation from eligible referrals to JustMarkets in accordance with the applicable partner agreement. JustMarkets is responsible for brokerage services, account management and execution.</p>
+        <a onclick="go('/legal/risk')" href="#" style="color:var(--blue);font-weight:600;">Read the full CFD risk disclosure →</a>
+      </div>
+    </div>
+    <div class="disclaimer" style="margin-top:18px;">JM Traders is not JustMarkets and is not an official JustMarkets website. All brokerage services are provided solely by JustMarkets under their own terms.</div>
+  </div>`;
+}
+
+/* ================= VIEW: ADMIN ================= */
+async function viewAdmin(){
+  const accounts = await sGet('jm_accounts', true) || [];
+  const clicks = await sGet('jm_referral_clicks', true) || {total:0, log:[]};
+  const today = new Date().toDateString();
+  const clicksToday = (clicks.log||[]).filter(l=>new Date(l.ts).toDateString()===today).length;
+  const weekAgo = Date.now()-7*86400000, monthAgo = Date.now()-30*86400000;
+  const clicksWeek = (clicks.log||[]).filter(l=>l.ts>weekAgo).length;
+  const clicksMonth = (clicks.log||[]).filter(l=>l.ts>monthAgo).length;
+  const pageCounts = {};
+  (clicks.log||[]).forEach(l=>{ pageCounts[l.page||'unknown']=(pageCounts[l.page||'unknown']||0)+1; });
+  const topPages = Object.entries(pageCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  return `
+  <div class="container page-title"><h1>Admin Dashboard</h1><p>Platform usage, referral analytics and configuration.</p></div>
+  <div class="container" style="padding-bottom:60px;">
+    <div class="kpi">
+      <div class="card"><b>${accounts.length}</b><span>Total users</span></div>
+      <div class="card"><b>${clicks.total||0}</b><span>Referral link clicks</span></div>
+      <div class="card"><b>${clicksToday}</b><span>Clicks today</span></div>
+      <div class="card"><b>${clicksWeek}</b><span>Clicks this week</span></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3>Referral Link Clicks</h3>
+        <div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>This month</span><b>${clicksMonth}</b></div>
+        <div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>Click-through rate</span><b>${accounts.length? ((clicks.total||0)/accounts.length*100).toFixed(0)+'%':'—'}</b></div>
+        <h4 style="margin-top:16px;">Most effective pages</h4>
+        ${topPages.length===0?'<p>No clicks recorded yet.</p>':topPages.map(([p,c])=>`<div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>${p}</span><b>${c}</b></div>`).join('')}
+        <p class="hint" style="margin-top:10px;">Labeled as Referral Link Clicks, not confirmed clients — confirmed-client counts require an official JustMarkets reporting integration.</p>
+      </div>
+      <div class="card">
+        <h3>Platform Usage</h3>
+        <div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>Journal entries (this device)</span><b>${state.journal.length}</b></div>
+        <div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>Paper trades opened (this device)</span><b>${state.paper.positions.length + state.paper.history.length}</b></div>
+        <div class="result-row" style="border-color:#EEF2F8;color:var(--ink);"><span>Watchlist symbols (this device)</span><b>${state.watchlist.length}</b></div>
+        <p class="hint">Per-user analytics are stored per browser in this prototype — a production build should aggregate usage server-side.</p>
+      </div>
+    </div>
+    <div class="card" style="margin-top:18px;">
+      <h3>Settings</h3>
+      <div class="field"><label>JustMarkets referral URL (JUSTMARKETS_REFERRAL_URL)</label><input id="ad-referral" value="${state.settings.referralUrl}"></div>
+      <button class="btn btn-primary" onclick="saveReferralUrl()">Save Referral URL</button>
+      <div class="disclaimer" style="margin-top:14px;">Changing this updates every "Open JustMarkets Account" button site-wide immediately.</div>
+      <h4 style="margin-top:20px;">Integration placeholders (require real credentials — none are invented here)</h4>
+      <div class="field"><label>TradingView integration</label><input value="Using TradingView's official free public widget — no key required" disabled></div>
+      <div class="field"><label>News provider API key</label><input placeholder="Not connected — add a licensed provider key" disabled></div>
+      <div class="field"><label>Economic calendar provider API key</label><input placeholder="Not connected — add a licensed provider key" disabled></div>
+      <div class="field"><label>Live market-data provider API key</label><input placeholder="Not connected — add a licensed provider key" disabled></div>
+    </div>
+  </div>`;
+}
+async function saveReferralUrl(){
+  const url = document.getElementById('ad-referral').value.trim();
+  if(!url) return toast('Enter a valid URL.');
+  state.settings.referralUrl = url;
+  await sSet('jm_settings', state.settings, true);
+  toast('Referral URL updated.');
+}
+
+/* ================= VIEW: LEGAL ================= */
+function viewLegal(page){
+  const pages = {
+    terms: {title:'Terms of Service', body:'By using JM Traders you agree to use the free tools provided (journal, calculators, charts, paper trading and education) for informational and educational purposes. JM Traders is not a broker, does not execute real trades, and does not handle deposits or withdrawals. Any brokerage relationship you enter into is solely between you and JustMarkets, under JustMarkets\' own terms.'},
+    privacy: {title:'Privacy Policy', body:'We store the account details you provide (name, email, password) and your in-app data (journal entries, watchlist, plan, paper-trading history) to operate your workspace. We never collect or store JustMarkets account passwords. See our Cookie Policy for details on cookies and local storage.'},
+    cookies: {title:'Cookie Policy', body:'JM Traders uses local storage to keep you logged in and to save your workspace data (journal, watchlist, settings) between visits. We do not use cookies for third-party advertising tracking beyond clearly labeled, disclosed ad placements.'},
+    risk: {title:'CFD Risk Disclosure', body:'CFDs are complex instruments and involve a high risk of losing money rapidly due to leverage. Trading may not be suitable for everyone. Past performance is not indicative of future results. You should consider whether you understand how CFDs work and whether you can afford to take the high risk of losing your money. JM Traders does not guarantee profits, returns, risk-free trading, signals, or success of any kind.'},
+    affiliate: {title:'Affiliate / IB Disclosure', body:'This website may receive compensation from eligible referrals to JustMarkets in accordance with the applicable partner agreement. JustMarkets is responsible for brokerage services, account management and execution. This compensation does not influence the free tools we provide.'},
+  };
+  const p = pages[page] || pages.terms;
+  return `
+  <div class="container page-title"><h1>${p.title}</h1></div>
+  <div class="container" style="max-width:760px;padding-bottom:60px;">
+    <div class="card"><p style="color:var(--ink);">${p.body}</p></div>
+  </div>`;
+}
+
+/* ================= ROUTER / RENDER ================= */
+async function renderApp(){
+  if(!state.loaded) await loadState();
+  const path = currentPath();
+  const app = document.getElementById('app');
+  renderNav();
+  let html = '';
+  let matched = true;
+  if(path==='/' ) html = viewLanding();
+  else if(path==='/login') html = viewLogin();
+  else if(path==='/signup') html = viewSignup();
+  else if(path==='/welcome-justmarkets') html = viewWelcomeJustmarkets();
+  else if(path==='/dashboard') { if(!requireAuth()) return; html = await viewDashboard(); }
+  else if(path==='/charts') { if(!requireAuth()) return; html = viewCharts(); }
+  else if(path==='/journal') { if(!requireAuth()) return; html = viewJournal(); }
+  else if(path==='/analytics') { if(!requireAuth()) return; html = viewAnalytics(); }
+  else if(path==='/tools') html = viewTools();
+  else if(path==='/watchlist') { if(!requireAuth()) return; html = viewWatchlist(); }
+  else if(path==='/calendar') html = viewCalendar();
+  else if(path==='/news') html = viewNews();
+  else if(path==='/paper') { if(!requireAuth()) return; html = viewPaper(); }
+  else if(path==='/plan') { if(!requireAuth()) return; html = viewPlan(); }
+  else if(path==='/education') html = viewEducation();
+  else if(path==='/justmarkets') html = viewJustmarkets();
+  else if(path==='/admin') { if(!requireAuth()) return; html = await viewAdmin(); }
+  else if(path.startsWith('/legal/')) html = viewLegal(path.split('/')[2]);
+  else { matched=false; html = `<div class="container page-title"><h1>Page not found</h1><button class="btn btn-primary" onclick="go('/')">Go home</button></div>`; }
+
+  app.innerHTML = html;
+  window.scrollTo(0,0);
+  refreshTicker();
+  if(path==='/') mountLandingExtras();
+  if(path==='/dashboard') mountTradingViewWidget('dash-chart', (state.watchlist[0]||'EURUSD'));
+  if(path==='/charts') mountTradingViewWidget('full-chart', window.currentChartSymbol || (state.watchlist[0]||'EURUSD'));
+  if(path==='/analytics') setTimeout(mountAnalyticsCharts, 30);
+  if(path==='/tools') renderToolBody();
+}
+
+(async function init(){
+  await loadState();
+  refreshTicker();
+  renderApp();
+})();
+</script>
+</body>
+</html>

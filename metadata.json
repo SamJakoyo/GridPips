@@ -1,0 +1,6 @@
+{
+  "name": "PipGrid",
+  "description": "Institutional ICT market analyzer, MQL5 EA bots with MT5 bridge, trading journal, risk calculators, paper trading, and Exness-connected trading workspace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

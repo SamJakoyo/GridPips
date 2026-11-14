@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "TraderRoot": {
+      "title": "TraderRoot",
+      "description": "Root workspace identity record for an authenticated PipGrid trader.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Trader display name",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "role": {
+          "type": "string",
+          "description": "Workspace role",
+          "enum": ["user"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp"
+        }
+      },
+      "required": ["uid", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "TraderPrivateInfo": {
+      "title": "TraderPrivateInfo",
+      "description": "Isolated PII and brokerage link settings for a trader.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified trader email address",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "exnessAccountId": {
+          "type": "string",
+          "description": "Linked Exness partner account ID",
+          "minLength": 0,
+          "maxLength": 40
+        },
+        "preferredModel": {
+          "type": "string",
+          "description": "Preferred Gemini chat model",
+          "enum": [
+            "gemini-4-hydrogen",
+            "gemini-3.1-flash-lite",
+            "gemini-4-argon",
+            "gemini-4-carbon"
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "exnessAccountId", "preferredModel", "createdAt", "updatedAt"]
+    },
+    "SavedIctSetup": {
+      "title": "SavedIctSetup",
+      "description": "Saved ICT Market Analyzer setup snapshot synced in Firestore.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "symbol": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 16
+        },
+        "timeframe": {
+          "type": "string",
+          "enum": ["M15", "H1", "H4", "D1"]
+        },
+        "bias": {
+          "type": "string",
+          "enum": ["Bullish", "Bearish"]
+        },
+        "entryZone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "stopLoss": {
+          "type": "number"
+        },
+        "tp1": {
+          "type": "number"
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "symbol", "timeframe", "bias", "entryZone", "stopLoss", "tp1", "notes", "createdAt", "updatedAt"]
+    },
+    "MediaCreationRecord": {
+      "title": "MediaCreationRecord",
+      "description": "Metadata record of an AI image or video generation run.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["image", "video"]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "aspectRatio": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 12
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "kind", "model", "prompt", "aspectRatio", "createdAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted admin access registry.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 120
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/TraderRoot" },
+      "description": "Root document for each authenticated trader (non-PII workspace profile)."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/TraderPrivateInfo" },
+      "description": "Owner-isolated PII and Exness IB settings."
+    },
+    "/users/{userId}/savedSetups/{setupId}": {
+      "schema": { "$ref": "#/entities/SavedIctSetup" },
+      "description": "Trader's saved ICT Market Analyzer setups."
+    },
+    "/users/{userId}/mediaCreations/{creationId}": {
+      "schema": { "$ref": "#/entities/MediaCreationRecord" },
+      "description": "History log of AI image/video creation prompts."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Server-managed administrator role records."
+    }
+  }
+}

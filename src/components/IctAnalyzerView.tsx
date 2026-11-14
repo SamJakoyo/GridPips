@@ -1,0 +1,645 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import { RefreshCw, Lock, ArrowUpRight, CheckCircle2, BookmarkPlus, Trash2, BookMarked } from 'lucide-react';
+import { signInWithPopup } from 'firebase/auth';
+import { apiFetch, firebaseApiFetch } from '../lib/api';
+import { auth, googleProvider } from '../lib/firebase';
+import {
+  deleteSavedSetupFromFirestore,
+  saveIctSetupToFirestore,
+  subscribeSavedSetups,
+  syncFirestoreTraderProfile,
+  type SavedFirestoreSetup,
+} from '../lib/firestoreStore';
+import type { IctAnalysisResult, PublicConfig, User } from '../types';
+
+interface IctAnalyzerViewProps {
+  user: User;
+  config: PublicConfig;
+  onUnlockClick: () => void;
+}
+
+interface SqlStrategyItem {
+  id: number;
+  title: string;
+  pair: string;
+  timeframe: string;
+  rulesSummary: string;
+}
+
+const SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'NAS100', 'US30', 'BTCUSD', 'ETHUSD'];
+const TIMEFRAMES = ['M15', 'H1', 'H4', 'D1'];
+
+export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
+  user,
+  config,
+  onUnlockClick,
+}) => {
+  const [symbol, setSymbol] = useState('EURUSD');
+  const [timeframe, setTimeframe] = useState('M15');
+  const [analysis, setAnalysis] = useState<IctAnalysisResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Cloud Sync (Firestore Saved Setups + Cloud SQL Playbooks)
+  const [fbUid, setFbUid] = useState<string | null>(() => auth.currentUser?.uid || null);
+  const [savedSetups, setSavedSetups] = useState<SavedFirestoreSetup[]>([]);
+  const [playbooks, setPlaybooks] = useState<SqlStrategyItem[]>([]);
+  const [playbookTitle, setPlaybookTitle] = useState('');
+  const [playbookRules, setPlaybookRules] = useState('');
+  const [cloudNotice, setCloudNotice] = useState('');
+
+  const loadPlaybooks = useCallback(async () => {
+    if (!auth.currentUser) return;
+    try {
+      const res = await firebaseApiFetch<{ strategies: SqlStrategyItem[] }>('/api/sql/strategies');
+      setPlaybooks(res.strategies || []);
+    } catch {
+      // ignore when not Google signed in
+    }
+  }, []);
+
+  useEffect(() => {
+    const unsubAuth = auth.onAuthStateChanged((fbUser) => {
+      setFbUid(fbUser?.uid || null);
+    });
+    return () => unsubAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!fbUid) {
+      setSavedSetups([]);
+      setPlaybooks([]);
+      return;
+    }
+    const unsub = subscribeSavedSetups(fbUid, setSavedSetups);
+    loadPlaybooks();
+    return () => unsub();
+  }, [fbUid, loadPlaybooks]);
+
+  const runScan = useCallback(async () => {
+    if (!user.hasAnalyzer) return;
+    setLoading(true);
+    setError('');
+    try {
+      const res = await apiFetch<{ analysis: IctAnalysisResult }>(
+        `/api/analyzer/scan?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`
+      );
+      setAnalysis(res.analysis);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [symbol, timeframe, user.hasAnalyzer]);
+
+  useEffect(() => {
+    runScan();
+  }, [runScan]);
+
+  async function ensureGoogleLinked() {
+    if (auth.currentUser) return auth.currentUser;
+    const cred = await signInWithPopup(auth, googleProvider);
+    await syncFirestoreTraderProfile({
+      uid: cred.user.uid,
+      displayName: user.name,
+      email: cred.user.email || user.email,
+      exnessAccountId: user.exnessAccountId,
+    });
+    setFbUid(cred.user.uid);
+    return cred.user;
+  }
+
+  async function handleSaveSetup() {
+    if (!analysis) return;
+    setCloudNotice('');
+    try {
+      const fbUser = await ensureGoogleLinked();
+      await saveIctSetupToFirestore(fbUser.uid, {
+        symbol: analysis.symbol,
+        timeframe: analysis.timeframe as 'M15' | 'H1' | 'H4' | 'D1',
+        bias: analysis.dailyBias,
+        entryZone: analysis.setup.entryZone,
+        stopLoss: analysis.setup.stopLoss,
+        tp1: analysis.setup.tp1,
+        notes: `${analysis.structureShift} · ${analysis.activeKillzone}`,
+      });
+      setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to cloud.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save setup.');
+    }
+  }
+
+  async function handleCreatePlaybook(e: React.FormEvent) {
+    e.preventDefault();
+    if (!playbookTitle.trim() || !playbookRules.trim()) return;
+    try {
+      await ensureGoogleLinked();
+      await firebaseApiFetch('/api/sql/strategies', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: playbookTitle,
+          pair: symbol,
+          timeframe,
+          rulesSummary: playbookRules,
+        }),
+      });
+      setPlaybookTitle('');
+      setPlaybookRules('');
+      loadPlaybooks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save playbook.');
+    }
+  }
+
+  async function handleDeletePlaybook(id: number) {
+    try {
+      await firebaseApiFetch(`/api/sql/strategies/${id}`, { method: 'DELETE' });
+      loadPlaybooks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove playbook.');
+    }
+  }
+
+  if (!user.hasAnalyzer) {
+    return (
+      <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-8">
+        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 mb-2">
+          <Lock className="w-4 h-4" />
+          <span>ICT Strategy Module · ${config.analyzerPriceUsd.toFixed(2)} Unlock</span>
+        </div>
+        <h2 className="text-2xl font-bold text-slate-950 mb-3">
+          Unlock the ICT Strategy Market Analyzer
+        </h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-6">
+          Built strictly around Inner Circle Trader (ICT) liquidity concepts from channel{' '}
+          <span className="font-mono text-slate-800">{config.ictYoutubeChannelId}</span>. Scan Forex, Gold, Indices, and Crypto for Fair Value Gaps (BISI/SIBI), Order Blocks, Market Structure Shifts, Optimal Trade Entry (0.618–0.786), and active London/NY Killzones.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 text-sm text-slate-700">
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            · Automated BSL / SSL Liquidity Pool mapping
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            · FVG 50% Consequent Encroachment entries
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            · Power of 3 &amp; NY Silver Bullet Killzones
+          </div>
+          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+            · Exact Entry, Stop Loss &amp; Take Profit targets
+          </div>
+        </div>
+        <button
+          onClick={onUnlockClick}
+          className="px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
+        >
+          Unlock ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)} (M-Pesa / Crypto)
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Toolbar */}
+      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={symbol}
+            onChange={(e) => setSymbol(e.target.value)}
+            className="px-3 py-2 text-sm font-mono font-semibold border border-slate-300 rounded-lg bg-white"
+          >
+            {SYMBOLS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+            {TIMEFRAMES.map((tf) => (
+              <button
+                key={tf}
+                onClick={() => setTimeframe(tf)}
+                className={`px-3 py-1.5 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer ${
+                  timeframe === tf ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <a
+            href={`https://www.youtube.com/channel/${config.ictYoutubeChannelId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-semibold text-slate-600 hover:text-blue-600 inline-flex items-center gap-1"
+          >
+            ICT Channel Ref
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </a>
+          {analysis && (
+            <button
+              type="button"
+              onClick={handleSaveSetup}
+              className="px-3.5 py-2 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer"
+            >
+              <BookmarkPlus className="w-3.5 h-3.5 text-blue-600" />
+              Save Setup
+            </button>
+          )}
+          <button
+            onClick={runScan}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 inline-flex items-center gap-2 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            Scan Setup
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+          {error}
+        </div>
+      )}
+      {cloudNotice && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg">
+          {cloudNotice}
+        </div>
+      )}
+
+      {analysis && (
+        <>
+          {/* Summary Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Daily Bias &amp; Direction</div>
+              <div
+                className={`text-lg font-bold mt-1 ${
+                  analysis.dailyBias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'
+                }`}
+              >
+                {analysis.dailyBias} · {analysis.setup.direction}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Active Killzone</div>
+              <div className="text-sm font-semibold text-slate-950 mt-1">{analysis.activeKillzone}</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Liquidity Draw (BSL / SSL)</div>
+              <div className="text-sm font-mono tabular-nums font-semibold text-slate-950 mt-1">
+                {analysis.bslLevel} / {analysis.sslLevel}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Projected Risk : Reward</div>
+              <div className="text-lg font-bold font-mono tabular-nums text-blue-600 mt-1">
+                1 : {analysis.setup.rrRatio}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* ICT Candlestick & FVG/OB Overlay Chart */}
+            <div className="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-xl p-5 text-white">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-white">
+                    {analysis.symbol} ({analysis.timeframe}) — ICT Liquidity &amp; FVG Map
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {analysis.structureShift} · Power of 3: {analysis.po3Phase}
+                  </p>
+                </div>
+                <div className="text-right font-mono tabular-nums">
+                  <div className="text-sm font-bold text-white">{analysis.currentPrice}</div>
+                  <div className="text-xs text-slate-400">OTE 0.705: {analysis.oteLevels.fib705}</div>
+                </div>
+              </div>
+
+              <IctSvgChart analysis={analysis} />
+
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
+                <span>Green box: Bullish FVG / OB</span>
+                <span>Red box: Bearish FVG / OB</span>
+                <span>Dashed Cyan: BSL / SSL Liquidity</span>
+                <span>Dashed Amber: OTE 0.705 Entry</span>
+              </div>
+            </div>
+
+            {/* Actionable ICT Setup Card */}
+            <div className="lg:col-span-4 space-y-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <h3 className="text-base font-bold text-slate-950 mb-4">Execution Parameters</h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Setup Bias</span>
+                    <span
+                      className={`font-semibold ${
+                        analysis.dailyBias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'
+                      }`}
+                    >
+                      {analysis.setup.direction}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Entry FVG / OTE</span>
+                    <span className="font-mono tabular-nums font-semibold text-slate-950">
+                      {analysis.setup.entryZone}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Stop Loss</span>
+                    <span className="font-mono tabular-nums font-semibold text-rose-600">
+                      {analysis.setup.stopLoss}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">TP1 (2R Target)</span>
+                    <span className="font-mono tabular-nums font-semibold text-emerald-700">
+                      {analysis.setup.tp1}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-slate-500">TP2 (Liquidity Draw)</span>
+                    <span className="font-mono tabular-nums font-semibold text-emerald-700">
+                      {analysis.setup.tp2}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <h3 className="text-sm font-bold text-slate-950 mb-3">ICT Confluence Checklist</h3>
+                <ul className="space-y-2.5 text-xs text-slate-700">
+                  {analysis.setup.confluences.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Cloud Synced Setups & Strategy Playbooks */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+              <BookmarkPlus className="w-4 h-4 text-blue-600" />
+              Saved ICT Setups
+            </h3>
+            {!fbUid && (
+              <button
+                type="button"
+                onClick={() => ensureGoogleLinked()}
+                className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+              >
+                Link Google Account to Sync
+              </button>
+            )}
+          </div>
+          {savedSetups.length === 0 ? (
+            <p className="text-xs text-slate-500 py-4">
+              {fbUid ? 'No saved setups yet. Click "Save Setup" on any scan.' : 'Connect your Google account to save setups across devices.'}
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {savedSetups.map((s) => (
+                <div key={s.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
+                  <div>
+                    <div className="font-mono font-bold text-slate-950">
+                      {s.symbol} · {s.timeframe} ·{' '}
+                      <span className={s.bias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'}>{s.bias}</span>
+                    </div>
+                    <div className="text-slate-600">
+                      Entry {s.entryZone} · SL {s.stopLoss} · TP1 {s.tp1}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fbUid && deleteSavedSetupFromFirestore(fbUid, s.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
+                    aria-label="Delete setup"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+              <BookMarked className="w-4 h-4 text-blue-600" />
+              Strategy Playbooks
+            </h3>
+            {!fbUid && (
+              <button
+                type="button"
+                onClick={() => ensureGoogleLinked()}
+                className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+              >
+                Link Google Account
+              </button>
+            )}
+          </div>
+
+          <form onSubmit={handleCreatePlaybook} className="space-y-2.5">
+            <input
+              type="text"
+              placeholder={`Playbook title (e.g. ${symbol} ${timeframe} Silver Bullet)`}
+              value={playbookTitle}
+              onChange={(e) => setPlaybookTitle(e.target.value)}
+              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                placeholder="Entry trigger, invalidation, & Killzone rules..."
+                value={playbookRules}
+                onChange={(e) => setPlaybookRules(e.target.value)}
+                className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+              />
+              <button
+                type="submit"
+                className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                Save Playbook
+              </button>
+            </div>
+          </form>
+
+          {playbooks.length > 0 && (
+            <div className="divide-y divide-slate-100">
+              {playbooks.map((p) => (
+                <div key={p.id} className="py-2 flex items-start justify-between gap-3 text-xs">
+                  <div>
+                    <div className="font-semibold text-slate-950">
+                      {p.title}{' '}
+                      <span className="font-mono text-slate-500">
+                        ({p.pair} · {p.timeframe})
+                      </span>
+                    </div>
+                    <div className="text-slate-600">{p.rulesSummary}</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDeletePlaybook(p.id)}
+                    className="p-1 text-slate-400 hover:text-rose-600 cursor-pointer"
+                    aria-label="Delete playbook"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) => {
+  const width = 760;
+  const height = 340;
+  const padX = 16;
+  const padY = 20;
+
+  const prices = analysis.candles.flatMap((c) => [c.high, c.low]);
+  const maxP = Math.max(...prices, analysis.bslLevel);
+  const minP = Math.min(...prices, analysis.sslLevel);
+  const range = maxP - minP || 1;
+
+  const toY = (p: number) => padY + ((maxP - p) / range) * (height - padY * 2);
+  const stepX = (width - padX * 2) / analysis.candles.length;
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto min-w-[540px]">
+        {/* Grid lines */}
+        {[0.2, 0.4, 0.6, 0.8].map((r) => (
+          <line
+            key={r}
+            x1={padX}
+            y1={padY + r * (height - padY * 2)}
+            x2={width - padX}
+            y2={padY + r * (height - padY * 2)}
+            stroke="#1e293b"
+            strokeWidth={1}
+          />
+        ))}
+
+        {/* FVG & Order Block Zones */}
+        {analysis.zones.map((z, idx) => {
+          const yTop = toY(z.top);
+          const yBot = toY(z.bottom);
+          const xStart = padX + z.startIndex * stepX;
+          const isBull = z.type.startsWith('Bullish');
+          return (
+            <g key={idx}>
+              <rect
+                x={xStart}
+                y={Math.min(yTop, yBot)}
+                width={width - padX - xStart}
+                height={Math.max(4, Math.abs(yBot - yTop))}
+                fill={isBull ? 'rgba(22, 163, 74, 0.16)' : 'rgba(225, 29, 72, 0.16)'}
+                stroke={isBull ? 'rgba(34, 197, 94, 0.45)' : 'rgba(244, 63, 94, 0.45)'}
+                strokeWidth={0.8}
+              />
+              <text
+                x={width - padX - 4}
+                y={Math.min(yTop, yBot) + 11}
+                textAnchor="end"
+                fill={isBull ? '#86efac' : '#fda4af'}
+                fontSize={9}
+                fontFamily="JetBrains Mono, monospace"
+              >
+                {z.type}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* BSL & SSL Liquidity Lines */}
+        <line
+          x1={padX}
+          y1={toY(analysis.bslLevel)}
+          x2={width - padX}
+          y2={toY(analysis.bslLevel)}
+          stroke="#38bdf8"
+          strokeDasharray="4 4"
+          strokeWidth={1}
+        />
+        <text x={padX + 4} y={toY(analysis.bslLevel) - 4} fill="#38bdf8" fontSize={9} fontFamily="JetBrains Mono, monospace">
+          BSL {analysis.bslLevel}
+        </text>
+
+        <line
+          x1={padX}
+          y1={toY(analysis.sslLevel)}
+          x2={width - padX}
+          y2={toY(analysis.sslLevel)}
+          stroke="#38bdf8"
+          strokeDasharray="4 4"
+          strokeWidth={1}
+        />
+        <text x={padX + 4} y={toY(analysis.sslLevel) + 11} fill="#38bdf8" fontSize={9} fontFamily="JetBrains Mono, monospace">
+          SSL {analysis.sslLevel}
+        </text>
+
+        {/* OTE 0.705 Line */}
+        <line
+          x1={padX}
+          y1={toY(analysis.oteLevels.fib705)}
+          x2={width - padX}
+          y2={toY(analysis.oteLevels.fib705)}
+          stroke="#f59e0b"
+          strokeDasharray="3 3"
+          strokeWidth={1}
+        />
+        <text x={padX + 4} y={toY(analysis.oteLevels.fib705) - 4} fill="#fbbf24" fontSize={9} fontFamily="JetBrains Mono, monospace">
+          OTE 0.705 ({analysis.oteLevels.fib705})
+        </text>
+
+        {/* Candlesticks */}
+        {analysis.candles.map((c, idx) => {
+          const cx = padX + idx * stepX + stepX / 2;
+          const isUp = c.close >= c.open;
+          const color = isUp ? '#22c55e' : '#f43f5e';
+          const yOpen = toY(c.open);
+          const yClose = toY(c.close);
+          const yHigh = toY(c.high);
+          const yLow = toY(c.low);
+          const bodyTop = Math.min(yOpen, yClose);
+          const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
+          return (
+            <g key={c.index}>
+              <line x1={cx} y1={yHigh} x2={cx} y2={yLow} stroke={color} strokeWidth={1.2} />
+              <rect
+                x={cx - stepX * 0.3}
+                y={bodyTop}
+                width={Math.max(3, stepX * 0.6)}
+                height={bodyHeight}
+                fill={color}
+                rx={1}
+              />
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
