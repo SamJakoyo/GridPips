@@ -32,6 +32,7 @@ export interface PublicConfig {
   mpesaMerchantName: string;
   commissionPct: number;
   supabaseConfigured?: boolean;
+  supabaseStatus?: 'connected' | 'missing_url' | 'missing_key' | 'not_configured';
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   cryptoAddresses: {

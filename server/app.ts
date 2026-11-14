@@ -15,7 +15,12 @@ import {
   getClientIp,
   generateSecureToken,
 } from './security.ts';
-import { getSupabaseEnvConfig, verifySupabaseAccessToken } from './supabaseAuth.ts';
+import {
+  checkSupabaseHealth,
+  getServerSupabaseClient,
+  getSupabaseEnvConfig,
+  verifySupabaseAccessToken,
+} from './supabaseAuth.ts';
 import { sendAutomatedEmail } from './email.ts';
 import {
   ICT_SILVER_BULLET_MQ5,
@@ -248,6 +253,11 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'GRIDPIPs' });
 });
 
+app.get('/api/health/supabase', async (_req, res) => {
+  const health = await checkSupabaseHealth();
+  res.json(health);
+});
+
 app.get('/api/config/public', (_req, res) => {
   const s = getSettingsMap();
   const analyzerPriceUsd = Number(s.analyzer_price_usd || 5.25);
@@ -267,6 +277,7 @@ app.get('/api/config/public', (_req, res) => {
     mpesaMerchantName: s.mpesa_merchant_name || 'GRIDPIPs Trading',
     commissionPct: Number(s.influencer_commission_pct || 20),
     supabaseConfigured: sb.configured,
+    supabaseStatus: sb.status,
     supabaseUrl: sb.url,
     supabaseAnonKey: sb.anonKey,
     cryptoAddresses: {
@@ -526,10 +537,130 @@ app.post('/api/auth/firebase-session', authLimiter, requireFirebaseAuth, async (
   }
 });
 
+async function bridgeSupabaseUserToSession(params: {
+  req: Request;
+  res: Response;
+  sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> };
+  overrideName?: string;
+  overrideExnessId?: string;
+  overrideExnessConfirmed?: boolean;
+  overrideReferralCode?: string;
+}) {
+  const { req, res, sbUser } = params;
+  const email = sanitizeText(sbUser.email || '', 120).toLowerCase();
+  if (!email || !email.includes('@')) {
+    res.status(400).json({ error: 'Valid Supabase account email is required.' });
+    return;
+  }
+
+  const metaName =
+    (typeof sbUser.user_metadata?.full_name === 'string' && sbUser.user_metadata.full_name) ||
+    (typeof sbUser.user_metadata?.name === 'string' && sbUser.user_metadata.name) ||
+    email.split('@')[0] ||
+    'Trader';
+  const displayName = sanitizeText(params.overrideName || metaName, 80);
+  const ip = getClientIp(req);
+
+  let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
+
+  if (!user) {
+    const metaExnessId =
+      typeof sbUser.user_metadata?.exness_account_id === 'string'
+        ? sbUser.user_metadata.exness_account_id
+        : '';
+    const exnessAccountId = sanitizeText(params.overrideExnessId || metaExnessId, 40).toUpperCase();
+    const exnessConfirmed = Boolean(params.overrideExnessConfirmed || metaExnessId.length >= 4);
+    const referralCodeUsed = sanitizeText(
+      params.overrideReferralCode ||
+        (typeof sbUser.user_metadata?.referral_code === 'string' ? sbUser.user_metadata.referral_code : ''),
+      30
+    ).toUpperCase();
+
+    if (!exnessConfirmed || exnessAccountId.length < 4) {
+      res.status(409).json({
+        needsExnessOnboarding: true,
+        email,
+        name: displayName,
+        error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
+      });
+      return;
+    }
+
+    let referredById: number | null = null;
+    if (referralCodeUsed) {
+      const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
+        | { id: number }
+        | undefined;
+      if (refUser) referredById = refUser.id;
+    }
+
+    const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
+    const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
+    const bridgeToken = generateSecureToken(16);
+    const randomPassword = generateSecureToken(24);
+    const role = email === 'samjakoyo26@gmail.com' ? 'admin' : 'user';
+
+    const info = db
+      .prepare(
+        `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
+      )
+      .run(
+        displayName,
+        email,
+        hashPassword(randomPassword),
+        role,
+        exnessAccountId,
+        email,
+        uniqueRefCode,
+        referredById,
+        bridgeToken
+      );
+
+    const userId = Number(info.lastInsertRowid);
+    db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
+    db.prepare('INSERT INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
+      userId,
+      JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
+    );
+    user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
+
+    logSecurityEvent('USER_REGISTERED_SUPABASE', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
+
+    const settings = getSettingsMap();
+    await sendAutomatedEmail({
+      to: email,
+      subject: 'Welcome to Grid Pips — Supabase & Exness Workspace Activated',
+      category: 'welcome',
+      textPreview: `Welcome ${displayName}! Your Supabase Auth account and Exness ID (${exnessAccountId}) are linked. Join ${settings.telegram_url}.`,
+      html: `<h2>Welcome to Grid Pips, ${displayName}</h2><p>Your Exness Account ID <strong>${exnessAccountId}</strong> and Supabase Auth account are active.</p>`,
+    });
+  } else {
+    if (user.is_suspended) {
+      logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
+      res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+      return;
+    }
+    db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
+    logSecurityEvent('LOGIN_SUPABASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
+  }
+
+  const sessionToken = setSessionCookie(req, res, user);
+
+  try {
+    await getOrCreateSqlUser(sbUser.id, email, user.name, user.exness_account_id);
+  } catch (sqlErr) {
+    console.error('Cloud SQL user sync warning (Supabase):', sqlErr);
+  }
+
+  const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+  res.json({ user: serializeUser(refreshed), sessionToken });
+}
+
 app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
   try {
     const sbConfig = getSupabaseEnvConfig();
-    if (!sbConfig.configured) {
+    if (!sbConfig.configured && !sbConfig.serviceRoleKey) {
       res.status(503).json({
         error: 'Supabase is not configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY to connect.',
       });
@@ -548,104 +679,112 @@ app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
       return;
     }
 
-    const email = sanitizeText(sbUser.email, 120).toLowerCase();
-    const metaName =
-      (typeof sbUser.user_metadata?.full_name === 'string' && sbUser.user_metadata.full_name) ||
-      (typeof sbUser.user_metadata?.name === 'string' && sbUser.user_metadata.name) ||
-      email.split('@')[0] ||
-      'Trader';
-    const displayName = sanitizeText(req.body?.name || metaName, 80);
-    const ip = getClientIp(req);
-
-    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
-
-    if (!user) {
-      const metaExnessId =
-        typeof sbUser.user_metadata?.exness_account_id === 'string'
-          ? sbUser.user_metadata.exness_account_id
-          : '';
-      const exnessAccountId = sanitizeText(req.body?.exnessAccountId || metaExnessId, 40).toUpperCase();
-      const exnessConfirmed = Boolean(req.body?.exnessConfirmed || metaExnessId.length >= 4);
-      const referralCodeUsed = sanitizeText(
-        req.body?.referralCode || (typeof sbUser.user_metadata?.referral_code === 'string' ? sbUser.user_metadata.referral_code : ''),
-        30
-      ).toUpperCase();
-
-      if (!exnessConfirmed || exnessAccountId.length < 4) {
-        res.status(409).json({
-          needsExnessOnboarding: true,
-          email,
-          name: displayName,
-          error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
-        });
-        return;
-      }
-
-      let referredById: number | null = null;
-      if (referralCodeUsed) {
-        const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
-          | { id: number }
-          | undefined;
-        if (refUser) referredById = refUser.id;
-      }
-
-      const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
-      const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
-      const bridgeToken = generateSecureToken(16);
-      const randomPassword = generateSecureToken(24);
-      const role = email === 'samjakoyo26@gmail.com' ? 'admin' : 'user';
-
-      const info = db
-        .prepare(
-          `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
-        )
-        .run(
-          displayName,
-          email,
-          hashPassword(randomPassword),
-          role,
-          exnessAccountId,
-          email,
-          uniqueRefCode,
-          referredById,
-          bridgeToken
-        );
-
-      const userId = Number(info.lastInsertRowid);
-      db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
-      db.prepare('INSERT INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
-        userId,
-        JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
-      );
-      user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
-
-      logSecurityEvent('USER_REGISTERED_SUPABASE', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
-
-      const settings = getSettingsMap();
-      await sendAutomatedEmail({
-        to: email,
-        subject: 'Welcome to Grid Pips — Supabase & Exness Workspace Activated',
-        category: 'welcome',
-        textPreview: `Welcome ${displayName}! Your Supabase Auth account and Exness ID (${exnessAccountId}) are linked. Join ${settings.telegram_url}.`,
-        html: `<h2>Welcome to Grid Pips, ${displayName}</h2><p>Your Exness Account ID <strong>${exnessAccountId}</strong> and Supabase Auth account are active.</p>`,
-      });
-    } else {
-      if (user.is_suspended) {
-        logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
-        res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
-        return;
-      }
-      db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
-      logSecurityEvent('LOGIN_SUPABASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
-    }
-
-    const sessionToken = setSessionCookie(req, res, user);
-    const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
-    res.json({ user: serializeUser(refreshed), sessionToken });
+    await bridgeSupabaseUserToSession({
+      req,
+      res,
+      sbUser,
+      overrideName: req.body?.name,
+      overrideExnessId: req.body?.exnessAccountId,
+      overrideExnessConfirmed: Boolean(req.body?.exnessConfirmed),
+      overrideReferralCode: req.body?.referralCode,
+    });
   } catch (err) {
     console.error('Supabase session error:', err);
     res.status(500).json({ error: 'Failed to establish Supabase session.' });
+  }
+});
+
+app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
+  try {
+    const sb = getServerSupabaseClient();
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase is not configured on the server.' });
+      return;
+    }
+    const name = sanitizeText(req.body?.name, 80);
+    const email = sanitizeText(req.body?.email, 120).toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    const exnessAccountId = sanitizeText(req.body?.exnessAccountId, 40).toUpperCase();
+    const exnessConfirmed = Boolean(req.body?.exnessConfirmed);
+    const referralCode = sanitizeText(req.body?.referralCode, 30).toUpperCase();
+
+    if (!name || !email || !email.includes('@') || password.length < 8) {
+      res.status(400).json({ error: 'Provide a valid name, email, and password (min 8 characters).' });
+      return;
+    }
+    if (!exnessConfirmed || exnessAccountId.length < 4) {
+      res.status(400).json({ error: 'Enter your Exness Account ID and confirm Exness IB registration.' });
+      return;
+    }
+
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: name,
+          exness_account_id: exnessAccountId,
+          referral_code: referralCode || undefined,
+        },
+      },
+    });
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    if (data.session && data.user) {
+      await bridgeSupabaseUserToSession({
+        req,
+        res,
+        sbUser: data.user,
+        overrideName: name,
+        overrideExnessId: exnessAccountId,
+        overrideExnessConfirmed: exnessConfirmed,
+        overrideReferralCode: referralCode,
+      });
+      return;
+    }
+    res.status(202).json({
+      needsEmailConfirmation: true,
+      message: 'Account created in Supabase! Check your email inbox to confirm your address, then sign in.',
+    });
+  } catch (err) {
+    console.error('Supabase signup error:', err);
+    res.status(500).json({ error: 'Supabase registration failed.' });
+  }
+});
+
+app.post('/api/auth/supabase/login', authLimiter, async (req, res) => {
+  try {
+    const sb = getServerSupabaseClient();
+    if (!sb) {
+      res.status(503).json({ error: 'Supabase is not configured on the server.' });
+      return;
+    }
+    const email = sanitizeText(req.body?.email, 120).toLowerCase();
+    const password = typeof req.body?.password === 'string' ? req.body.password : '';
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required.' });
+      return;
+    }
+
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error || !data.user) {
+      res.status(401).json({ error: error?.message || 'Invalid email or password.' });
+      return;
+    }
+
+    await bridgeSupabaseUserToSession({
+      req,
+      res,
+      sbUser: data.user,
+      overrideExnessId: req.body?.exnessAccountId,
+      overrideExnessConfirmed: Boolean(req.body?.exnessConfirmed),
+      overrideReferralCode: req.body?.referralCode,
+    });
+  } catch (err) {
+    console.error('Supabase login error:', err);
+    res.status(500).json({ error: 'Supabase sign-in failed.' });
   }
 });
 

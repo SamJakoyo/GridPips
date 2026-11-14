@@ -4,7 +4,7 @@ import { ArrowUpRight, Shield, Lock, CheckCircle2, ArrowLeft } from 'lucide-reac
 import { apiFetch, setSessionToken } from '../lib/api';
 import { auth, googleProvider } from '../lib/firebase';
 import { syncFirestoreTraderProfile } from '../lib/firestoreStore';
-import { getSupabaseClient } from '../lib/supabase';
+import { getSupabaseClient, signOutSupabase } from '../lib/supabase';
 import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 
@@ -289,6 +289,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
     try {
       if (pendingOAuth) {
         if (pendingOAuth.provider === 'supabase') {
+          let freshSbToken = pendingOAuth.accessToken;
           if (supabase) {
             await supabase.auth
               .updateUser({
@@ -299,10 +300,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 },
               })
               .catch(() => {});
+            const { data: sessData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+            if (sessData.session?.access_token) {
+              freshSbToken = sessData.session.access_token;
+            }
           }
           await completeSupabaseSession({
             uid: pendingOAuth.uid,
-            accessToken: pendingOAuth.accessToken,
+            accessToken: freshSbToken,
             userName: pendingOAuth.name,
             exnessId: exnessAccountId,
             confirmed: exnessConfirmed,
@@ -331,6 +336,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               data: {
                 full_name: name.trim(),
                 exness_account_id: exnessAccountId.trim().toUpperCase(),
+                referral_code: referralCode.trim().toUpperCase() || undefined,
               },
             },
           });
@@ -347,7 +353,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
             return;
           }
 
-          // Supabase email confirmation enabled: still activate local workspace or prompt confirmation
           setInfoNotice(
             'Account created in Supabase! Check your email inbox to confirm your address, then sign in.'
           );
@@ -370,6 +375,49 @@ export const AuthView: React.FC<AuthViewProps> = ({
           // Fall back to server scrypt check for existing pre-Supabase accounts (e.g. admin)
           if (sbErr && !sbErr.message.toLowerCase().includes('invalid login credentials')) {
             throw new Error(sbErr.message);
+          }
+        }
+      } else if (config.supabaseConfigured) {
+        if (mode === 'register') {
+          const sbRes = await apiFetch<{
+            user?: User;
+            sessionToken?: string;
+            needsEmailConfirmation?: boolean;
+            message?: string;
+          }>('/api/auth/supabase/signup', {
+            method: 'POST',
+            body: JSON.stringify({
+              name,
+              email,
+              password,
+              exnessAccountId,
+              exnessConfirmed,
+              referralCode,
+            }),
+          });
+          if (sbRes.needsEmailConfirmation) {
+            setInfoNotice(sbRes.message || 'Check your email inbox to confirm your account, then sign in.');
+            setMode('login');
+            return;
+          }
+          if (sbRes.user) {
+            if (sbRes.sessionToken) setSessionToken(sbRes.sessionToken);
+            onSuccess(sbRes.user);
+            return;
+          }
+        } else {
+          try {
+            const sbRes = await apiFetch<{ user?: User; sessionToken?: string }>('/api/auth/supabase/login', {
+              method: 'POST',
+              body: JSON.stringify({ email, password }),
+            });
+            if (sbRes.user) {
+              if (sbRes.sessionToken) setSessionToken(sbRes.sessionToken);
+              onSuccess(sbRes.user);
+              return;
+            }
+          } catch {
+            // Fall through to local credentials check
           }
         }
       }
@@ -550,6 +598,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     setInfoNotice('');
                     setError('');
                     void signOut(auth).catch(() => {});
+                    void signOutSupabase(config.supabaseUrl, config.supabaseAnonKey);
                   }}
                   className="shrink-0 underline font-semibold text-emerald-900 hover:text-emerald-700 cursor-pointer"
                 >

@@ -196,6 +196,10 @@ export default function App() {
         }
         const sb = getSupabaseClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
         if (sb) {
+          const hasAuthCode = params.has('code') || window.location.hash.includes('access_token=');
+          if (params.has('code')) {
+            await sb.auth.exchangeCodeForSession(params.get('code')!).catch(() => {});
+          }
           const { data } = await sb.auth.getSession();
           const token = data.session?.access_token;
           if (token) {
@@ -206,14 +210,30 @@ export default function App() {
                 'Content-Type': 'application/json',
                 Authorization: `Bearer ${token}`,
               },
-              body: JSON.stringify({}),
+              body: JSON.stringify({ referralCode: ref ? ref.trim().toUpperCase() : '' }),
             });
             const sbSessionData = await res.json().catch(() => ({}));
+            if (hasAuthCode) {
+              window.history.replaceState({}, document.title, window.location.pathname);
+            }
             if (res.ok && sbSessionData.user) {
               if (sbSessionData.sessionToken) setSessionToken(sbSessionData.sessionToken);
               setUser(sbSessionData.user);
               setScreen('workspace');
               loadUserWorkspaceData();
+              return;
+            }
+            if (res.status === 409 && sbSessionData.needsExnessOnboarding && data.session?.user) {
+              setPendingGoogleOAuth({
+                provider: 'supabase',
+                uid: data.session.user.id,
+                email: sbSessionData.email || data.session.user.email || '',
+                name: sbSessionData.name || 'Trader',
+                accessToken: token,
+              });
+              setAuthMode('register');
+              setScreen('auth');
+              return;
             }
           }
         }
