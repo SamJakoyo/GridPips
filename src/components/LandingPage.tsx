@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowUpRight, ShieldCheck, Send, CheckCircle2, X, Play, Pause, Activity } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ArrowUpRight, ShieldCheck, Send, CheckCircle2, X, Pause, Play } from 'lucide-react';
 import { LANDING_IMAGES } from '../assets/landingImages';
-import { BrandLogo } from './BrandLogo';
+import { BrandLogo, type BrandAccent } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 import type { MarketSymbolQuote } from '../lib/api';
 
@@ -15,6 +15,143 @@ interface LandingPageProps {
 }
 
 type LegalDocKey = 'risk' | 'affiliate' | 'terms' | 'privacy';
+type ThemeKey = 'crimson' | 'gold' | 'navy' | 'emerald' | 'mono';
+
+interface ThemeTokens {
+  id: ThemeKey;
+  label: string;
+  swatch: string;
+  logoAccent: BrandAccent;
+  heroBg: string;
+  bandBg: string;
+  headerBg: string;
+  cardDarkBg: string;
+  borderDark: string;
+  accentTextOnDark: string;
+  accentTextOnLight: string;
+  ctaBtn: string;
+  cardHighlightBorder: string;
+  secondaryBtnDark: string;
+  quoteUpText: string;
+  quoteDownText: string;
+  modalCloseBtn: string;
+}
+
+const THEME_PRESETS: Record<ThemeKey, ThemeTokens> = {
+  gold: {
+    id: 'gold',
+    label: 'Sovereign Gold',
+    swatch: '#d97706',
+    logoAccent: 'gold',
+    heroBg: 'bg-stone-950',
+    bandBg: 'bg-neutral-950',
+    headerBg: 'bg-stone-950/95',
+    cardDarkBg: 'bg-stone-950',
+    borderDark: 'border-stone-800',
+    accentTextOnDark: 'text-amber-400',
+    accentTextOnLight: 'text-amber-700',
+    ctaBtn: 'bg-amber-600 hover:bg-amber-700 text-white',
+    cardHighlightBorder: 'border-2 border-amber-500',
+    secondaryBtnDark: 'bg-stone-900 border border-stone-700 hover:bg-stone-800 text-white',
+    quoteUpText: 'text-amber-300',
+    quoteDownText: 'text-rose-400',
+    modalCloseBtn: 'bg-amber-600 hover:bg-amber-700 text-white',
+  },
+  crimson: {
+    id: 'crimson',
+    label: 'Crimson Black',
+    swatch: '#dc2626',
+    logoAccent: 'red',
+    heroBg: 'bg-black',
+    bandBg: 'bg-neutral-950',
+    headerBg: 'bg-black/95',
+    cardDarkBg: 'bg-black',
+    borderDark: 'border-neutral-800',
+    accentTextOnDark: 'text-red-500',
+    accentTextOnLight: 'text-red-600',
+    ctaBtn: 'bg-red-600 hover:bg-red-700 text-white',
+    cardHighlightBorder: 'border-2 border-red-600',
+    secondaryBtnDark: 'bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white',
+    quoteUpText: 'text-white',
+    quoteDownText: 'text-red-500',
+    modalCloseBtn: 'bg-red-600 hover:bg-red-700 text-white',
+  },
+  navy: {
+    id: 'navy',
+    label: 'Institutional Navy',
+    swatch: '#2563eb',
+    logoAccent: 'blue',
+    heroBg: 'bg-slate-950',
+    bandBg: 'bg-slate-900',
+    headerBg: 'bg-slate-950/95',
+    cardDarkBg: 'bg-slate-950',
+    borderDark: 'border-slate-800',
+    accentTextOnDark: 'text-blue-400',
+    accentTextOnLight: 'text-blue-600',
+    ctaBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
+    cardHighlightBorder: 'border-2 border-blue-500',
+    secondaryBtnDark: 'bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white',
+    quoteUpText: 'text-emerald-400',
+    quoteDownText: 'text-rose-400',
+    modalCloseBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
+  },
+  emerald: {
+    id: 'emerald',
+    label: 'Emerald Carbon',
+    swatch: '#059669',
+    logoAccent: 'emerald',
+    heroBg: 'bg-zinc-950',
+    bandBg: 'bg-neutral-950',
+    headerBg: 'bg-zinc-950/95',
+    cardDarkBg: 'bg-zinc-950',
+    borderDark: 'border-zinc-800',
+    accentTextOnDark: 'text-emerald-400',
+    accentTextOnLight: 'text-emerald-700',
+    ctaBtn: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+    cardHighlightBorder: 'border-2 border-emerald-500',
+    secondaryBtnDark: 'bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 text-white',
+    quoteUpText: 'text-emerald-400',
+    quoteDownText: 'text-rose-400',
+    modalCloseBtn: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+  },
+  mono: {
+    id: 'mono',
+    label: 'Swiss Mono',
+    swatch: '#ffffff',
+    logoAccent: 'mono',
+    heroBg: 'bg-black',
+    bandBg: 'bg-neutral-950',
+    headerBg: 'bg-black/95',
+    cardDarkBg: 'bg-black',
+    borderDark: 'border-neutral-800',
+    accentTextOnDark: 'text-neutral-300',
+    accentTextOnLight: 'text-neutral-900',
+    ctaBtn: 'bg-white hover:bg-neutral-200 text-black',
+    cardHighlightBorder: 'border-2 border-white',
+    secondaryBtnDark: 'bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 text-white',
+    quoteUpText: 'text-white',
+    quoteDownText: 'text-neutral-400',
+    modalCloseBtn: 'bg-black hover:bg-neutral-800 text-white',
+  },
+};
+
+const HERO_FRAMES = [
+  {
+    src: LANDING_IMAGES.heroTrader3d,
+    alt: '3D quantitative forex trader analyzing candlestick markets at an architectural desk',
+    caption: 'Execution Desk · ICT Killzone Mapping',
+  },
+  {
+    src: LANDING_IMAGES.analystIct3d,
+    alt: '3D strategist inspecting smart money liquidity pools and fair value gaps',
+    caption: 'Liquidity Analysis · BSL & FVG Structure',
+  },
+  {
+    src: LANDING_IMAGES.automatorEa3d,
+    alt: '3D algorithmic engineer developing MQL5 automated trading bots',
+    caption: 'MQL5 Automation · MetaTrader 5 Bridge',
+  },
+];
 
 const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> = {
   risk: {
@@ -78,347 +215,15 @@ function ImageWithFallback({
   );
 }
 
-interface LiveCandle {
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-}
-
-const STREAM_SYMBOLS = ['XAUUSD', 'EURUSD', 'NAS100', 'BTCUSD'] as const;
-
-function buildSeedCandles(basePrice: number, digits: number): LiveCandle[] {
-  const step = Math.pow(10, -digits) * (digits >= 4 ? 14 : 6);
-  const candles: LiveCandle[] = [];
-  let price = basePrice - step * 4;
-  for (let i = 0; i < 28; i++) {
-    const wave = Math.sin(i * 0.55) * step * 1.4 + (i > 17 ? step * 0.45 : -step * 0.15);
-    const open = price;
-    const close = Number((open + wave).toFixed(digits));
-    const wickPad = step * (0.55 + ((i * 7) % 5) * 0.18);
-    const high = Number((Math.max(open, close) + wickPad).toFixed(digits));
-    const low = Number((Math.min(open, close) - wickPad * 0.85).toFixed(digits));
-    candles.push({ open, high, low, close });
-    price = close;
-  }
-  return candles;
-}
-
-function getNySessionLabel(now: Date): { clock: string; killzone: string } {
-  const clock = new Intl.DateTimeFormat('en-US', {
+function getNyClock(): string {
+  return new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(now);
-  const nyHour = Number(clock.split(':')[0]);
-  let killzone = 'NY Macro Consolidation';
-  if (nyHour >= 2 && nyHour < 5) killzone = 'London Open Killzone (02:00–05:00 NY)';
-  else if (nyHour >= 7 && nyHour < 10) killzone = 'NY AM Killzone (07:00–10:00 NY)';
-  else if (nyHour >= 10 && nyHour < 12) killzone = 'NY Silver Bullet Window (10:00–11:00 NY)';
-  else if (nyHour >= 13 && nyHour < 16) killzone = 'NY PM Liquidity Expansion (13:30–16:00 NY)';
-  else if (nyHour >= 19 || nyHour < 2) killzone = 'Asian Range Accumulation (19:00–00:00 NY)';
-  return { clock, killzone };
+  }).format(new Date());
 }
-
-const LiveMarketFeed: React.FC<{
-  quotes: MarketSymbolQuote[];
-  onAction: () => void;
-  actionLabel: string;
-}> = ({ quotes, onAction, actionLabel }) => {
-  const [selectedSym, setSelectedSym] = useState<(typeof STREAM_SYMBOLS)[number]>('XAUUSD');
-  const [streaming, setStreaming] = useState(true);
-  const [now, setNow] = useState(() => new Date());
-
-  const activeQuote = useMemo(
-    () => quotes.find((q) => q.sym === selectedSym) || quotes[0] || { sym: 'XAUUSD', name: 'Gold', price: 2742.6, chgPct: 0.48, digits: 2 },
-    [quotes, selectedSym]
-  );
-
-  const [candles, setCandles] = useState<LiveCandle[]>(() =>
-    buildSeedCandles(activeQuote.price, activeQuote.digits)
-  );
-  const [tickCount, setTickCount] = useState(0);
-
-  // Reset candle stream cleanly when user picks a different instrument
-  useEffect(() => {
-    setCandles(buildSeedCandles(activeQuote.price, activeQuote.digits));
-  }, [selectedSym, activeQuote.digits]);
-
-  // Real 1-second live clock + animated candle tick stream
-  useEffect(() => {
-    if (!streaming) return;
-    const id = setInterval(() => {
-      setNow(new Date());
-      setTickCount((c) => c + 1);
-      setCandles((prev) => {
-        if (!prev.length) return prev;
-        const last = prev[prev.length - 1];
-        const digits = activeQuote.digits;
-        const unit = Math.pow(10, -digits) * (digits >= 4 ? 8 : 4);
-        const impulse = (Math.random() - 0.46) * unit * 1.9;
-        const nextClose = Number((last.close + impulse).toFixed(digits));
-        const shouldRollCandle = Math.random() > 0.72;
-
-        if (shouldRollCandle) {
-          const open = last.close;
-          const rolled: LiveCandle = {
-            open,
-            close: nextClose,
-            high: Number((Math.max(open, nextClose) + unit * 0.4).toFixed(digits)),
-            low: Number((Math.min(open, nextClose) - unit * 0.4).toFixed(digits)),
-          };
-          return [...prev.slice(1), rolled];
-        }
-
-        const updatedLast: LiveCandle = {
-          open: last.open,
-          close: nextClose,
-          high: Number(Math.max(last.high, nextClose).toFixed(digits)),
-          low: Number(Math.min(last.low, nextClose).toFixed(digits)),
-        };
-        return [...prev.slice(0, -1), updatedLast];
-      });
-    }, 900);
-    return () => clearInterval(id);
-  }, [streaming, activeQuote.digits]);
-
-  const { clock, killzone } = getNySessionLabel(now);
-  const liveCandle = candles[candles.length - 1];
-  const firstCandle = candles[0];
-  const livePrice = liveCandle ? liveCandle.close : activeQuote.price;
-  const sessionBias = liveCandle && firstCandle && liveCandle.close >= firstCandle.open ? 'Bullish Expansion' : 'Bearish Liquidity Draw';
-
-  const allHighs = candles.map((c) => c.high);
-  const allLows = candles.map((c) => c.low);
-  const maxP = Math.max(...allHighs);
-  const minP = Math.min(...allLows);
-  const span = maxP - minP || 1;
-  const bslPrice = Number((maxP - span * 0.08).toFixed(activeQuote.digits));
-  const sslPrice = Number((minP + span * 0.1).toFixed(activeQuote.digits));
-  const fvgTop = Number((minP + span * 0.56).toFixed(activeQuote.digits));
-  const fvgBot = Number((minP + span * 0.42).toFixed(activeQuote.digits));
-
-  const svgW = 820;
-  const svgH = 300;
-  const padX = 20;
-  const padY = 24;
-  const toY = (p: number) => padY + ((maxP - p) / span) * (svgH - padY * 2);
-  const stepX = (svgW - padX * 2) / Math.max(1, candles.length);
-
-  return (
-    <div className="bg-black border border-neutral-800 rounded-xl overflow-hidden">
-      {/* Live Stream Control Strip */}
-      <div className="px-6 py-4 border-b border-neutral-800 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-xs font-semibold text-white">
-            <Activity className="w-4 h-4 text-red-500" />
-            <span>Live ICT Liquidity Stream</span>
-          </div>
-          <span className="text-neutral-600" aria-hidden="true">·</span>
-          <span className="text-xs font-mono tabular-nums text-neutral-300">
-            NY EST {clock}
-          </span>
-          <span className="text-neutral-600 hidden sm:inline" aria-hidden="true">·</span>
-          <span className="text-xs text-red-400 font-medium hidden sm:inline">{killzone}</span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 p-1 bg-neutral-900 border border-neutral-800 rounded-lg">
-            {STREAM_SYMBOLS.map((sym) => (
-              <button
-                key={sym}
-                type="button"
-                onClick={() => setSelectedSym(sym)}
-                className={`px-3 py-1 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap ${
-                  selectedSym === sym
-                    ? 'bg-red-600 text-white'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
-              >
-                {sym}
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            onClick={() => setStreaming((s) => !s)}
-            className="px-3 py-1.5 bg-neutral-900 border border-neutral-700 hover:border-neutral-500 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
-          >
-            {streaming ? <Pause className="w-3.5 h-3.5 text-red-500" /> : <Play className="w-3.5 h-3.5 text-white" />}
-            {streaming ? 'Live' : 'Paused'}
-          </button>
-        </div>
-      </div>
-
-      {/* Live Metrics Bar */}
-      <div className="px-6 py-4 bg-neutral-950 border-b border-neutral-800 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div>
-          <div className="text-xs text-neutral-400">Live Mark Price ({selectedSym})</div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-white mt-0.5">
-            {livePrice.toFixed(activeQuote.digits)}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-400">Structure Bias</div>
-          <div className={`text-sm font-semibold mt-1.5 ${sessionBias.startsWith('Bullish') ? 'text-white' : 'text-red-500'}`}>
-            {sessionBias}
-          </div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-400">BSL / SSL Liquidity Pool</div>
-          <div className="text-sm font-mono tabular-nums font-semibold text-neutral-200 mt-1.5">
-            {bslPrice.toFixed(activeQuote.digits)} / {sslPrice.toFixed(activeQuote.digits)}
-          </div>
-        </div>
-        <div className="flex items-center md:justify-end">
-          <button
-            type="button"
-            onClick={onAction}
-            className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            {actionLabel}
-          </button>
-        </div>
-      </div>
-
-      {/* Live Animated SVG Candlestick & Sweep Map */}
-      <div className="relative bg-black p-4 sm:p-6 overflow-hidden">
-        {streaming && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 w-32 bg-gradient-to-r from-transparent via-red-600/10 to-transparent animate-live-scan"
-          />
-        )}
-        <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-64 sm:h-72 relative z-10">
-          {/* Subtle grid */}
-          {[0.2, 0.4, 0.6, 0.8].map((r) => (
-            <line
-              key={r}
-              x1={padX}
-              y1={padY + r * (svgH - padY * 2)}
-              x2={svgW - padX}
-              y2={padY + r * (svgH - padY * 2)}
-              stroke="#1f1f23"
-              strokeWidth={1}
-            />
-          ))}
-
-          {/* FVG Imbalance Zone */}
-          <rect
-            x={padX + stepX * 12}
-            y={Math.min(toY(fvgTop), toY(fvgBot))}
-            width={svgW - padX * 2 - stepX * 12}
-            height={Math.max(10, Math.abs(toY(fvgBot) - toY(fvgTop)))}
-            fill="rgba(220, 38, 38, 0.14)"
-            stroke="rgba(220, 38, 38, 0.55)"
-            strokeWidth={1}
-          />
-          <text
-            x={svgW - padX - 6}
-            y={Math.min(toY(fvgTop), toY(fvgBot)) + 13}
-            textAnchor="end"
-            fill="#f87171"
-            fontSize={10}
-            fontFamily="JetBrains Mono, monospace"
-          >
-            ICT FVG ENTRY ZONE
-          </text>
-
-          {/* BSL & SSL Liquidity Lines */}
-          <line
-            x1={padX}
-            y1={toY(bslPrice)}
-            x2={svgW - padX}
-            y2={toY(bslPrice)}
-            stroke="#ffffff"
-            strokeDasharray="4 4"
-            strokeWidth={1}
-            strokeOpacity={0.55}
-          />
-          <text x={padX + 4} y={toY(bslPrice) - 5} fill="#e5e5e5" fontSize={10} fontFamily="JetBrains Mono, monospace">
-            BSL {bslPrice.toFixed(activeQuote.digits)}
-          </text>
-
-          <line
-            x1={padX}
-            y1={toY(sslPrice)}
-            x2={svgW - padX}
-            y2={toY(sslPrice)}
-            stroke="#ef4444"
-            strokeDasharray="4 4"
-            strokeWidth={1}
-            strokeOpacity={0.7}
-          />
-          <text x={padX + 4} y={toY(sslPrice) + 12} fill="#ef4444" fontSize={10} fontFamily="JetBrains Mono, monospace">
-            SSL {sslPrice.toFixed(activeQuote.digits)}
-          </text>
-
-          {/* Live Price Beam */}
-          <line
-            x1={padX}
-            y1={toY(livePrice)}
-            x2={svgW - padX}
-            y2={toY(livePrice)}
-            stroke="#dc2626"
-            strokeWidth={1.2}
-          />
-
-          {/* Candlesticks: Crisp White (Bullish) vs Crimson Red (Bearish) */}
-          {candles.map((c, idx) => {
-            const cx = padX + idx * stepX + stepX / 2;
-            const isBull = c.close >= c.open;
-            const color = isBull ? '#ffffff' : '#dc2626';
-            const yOpen = toY(c.open);
-            const yClose = toY(c.close);
-            const yHigh = toY(c.high);
-            const yLow = toY(c.low);
-            const bodyTop = Math.min(yOpen, yClose);
-            const bodyH = Math.max(2.5, Math.abs(yClose - yOpen));
-            const isLast = idx === candles.length - 1;
-            return (
-              <g key={idx}>
-                <line x1={cx} y1={yHigh} x2={cx} y2={yLow} stroke={color} strokeWidth={1.4} />
-                <rect
-                  x={cx - stepX * 0.28}
-                  y={bodyTop}
-                  width={Math.max(4, stepX * 0.56)}
-                  height={bodyH}
-                  fill={color}
-                  rx={1}
-                />
-                {isLast && (
-                  <circle
-                    cx={cx}
-                    cy={yClose}
-                    r={tickCount % 2 === 0 ? 4.5 : 3}
-                    fill="#ef4444"
-                    stroke="#ffffff"
-                    strokeWidth={1.5}
-                  />
-                )}
-              </g>
-            );
-          })}
-        </svg>
-
-        <div className="mt-3 pt-3 border-t border-neutral-900 flex flex-wrap items-center justify-between gap-3 text-xs text-neutral-400">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <span>White Candles: Bullish Displacement</span>
-            <span aria-hidden="true">·</span>
-            <span>Red Candles: Bearish Imbalance</span>
-            <span aria-hidden="true">·</span>
-            <span>Red Zone: Fair Value Gap</span>
-          </div>
-          <span className="font-mono tabular-nums text-neutral-300">
-            Tick #{tickCount + 1} · {streaming ? 'Streaming' : 'Paused'}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   config,
@@ -428,46 +233,86 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onGoWorkspace,
   onSelectProduct,
 }) => {
+  const [themeKey, setThemeKey] = useState<ThemeKey>(() => {
+    try {
+      const saved = localStorage.getItem('gridpips_landing_theme_v2') as ThemeKey | null;
+      return saved && THEME_PRESETS[saved] ? saved : 'gold';
+    } catch {
+      return 'gold';
+    }
+  });
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
+  const [heroMotionActive, setHeroMotionActive] = useState(true);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [nyClock, setNyClock] = useState(() => getNyClock());
+
+  const theme = THEME_PRESETS[themeKey];
+
+  function handleSelectTheme(next: ThemeKey) {
+    setThemeKey(next);
+    try {
+      localStorage.setItem('gridpips_landing_theme_v2', next);
+    } catch {
+      // ignore storage failure
+    }
+  }
+
+  // Live NY clock update (1s) + gentle living picture crossfade (8s) when active
+  useEffect(() => {
+    const clockId = setInterval(() => {
+      setNyClock(getNyClock());
+    }, 1000);
+    return () => clearInterval(clockId);
+  }, []);
+
+  useEffect(() => {
+    if (!heroMotionActive) return;
+    const frameId = setInterval(() => {
+      setFrameIndex((i) => (i + 1) % HERO_FRAMES.length);
+    }, 7500);
+    return () => clearInterval(frameId);
+  }, [heroMotionActive]);
+
+  const goldQuote = quotes.find((q) => q.sym === 'XAUUSD') || quotes[0];
+  const eurQuote = quotes.find((q) => q.sym === 'EURUSD') || quotes[1];
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Live Market Ticker */}
-      <div className="bg-black text-white border-b border-neutral-800 h-9 overflow-hidden flex items-center">
-        <div className="animate-ticker whitespace-nowrap">
-          {[...quotes, ...quotes].map((q, idx) => {
-            const up = q.chgPct >= 0;
-            return (
-              <span
-                key={`${q.sym}-${idx}`}
-                className="inline-flex items-center gap-2.5 px-5 text-xs font-mono tabular-nums border-r border-neutral-800"
-              >
-                <span className="font-bold text-white">{q.sym}</span>
-                <span className="text-neutral-300">{q.price.toFixed(q.digits)}</span>
-                <span className={up ? 'text-white font-semibold' : 'text-red-500 font-semibold'}>
-                  {up ? '▲ +' : '▼ '}
-                  {q.chgPct.toFixed(2)}%
+    <div className={`min-h-screen ${theme.heroBg} text-white`}>
+      {/* Calm Static Live Market Quote Bar (Reduced Motion) */}
+      <div className={`${theme.heroBg} text-white border-b ${theme.borderDark} py-2`}>
+        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between gap-4 overflow-x-auto">
+          <div className="flex items-center gap-6 whitespace-nowrap">
+            {quotes.slice(0, 5).map((q) => {
+              const up = q.chgPct >= 0;
+              return (
+                <span
+                  key={q.sym}
+                  className="inline-flex items-center gap-2 text-xs font-mono tabular-nums"
+                >
+                  <span className="font-semibold text-white">{q.sym}</span>
+                  <span className="text-neutral-300">{q.price.toFixed(q.digits)}</span>
+                  <span className={up ? theme.quoteUpText : theme.quoteDownText}>
+                    {up ? '+' : ''}
+                    {q.chgPct.toFixed(2)}%
+                  </span>
                 </span>
-              </span>
-            );
-          })}
+              );
+            })}
+          </div>
+          <span className="hidden lg:inline-block text-xs font-mono tabular-nums text-neutral-400 shrink-0">
+            NY EST {nyClock}
+          </span>
         </div>
       </div>
 
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 bg-black/95 backdrop-blur-md border-b border-neutral-800">
+      <header className={`sticky top-0 z-40 ${theme.headerBg} backdrop-blur-md border-b ${theme.borderDark}`}>
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
           <a href="#top" className="shrink-0">
-            <BrandLogo variant="light" accent="red" size="md" />
+            <BrandLogo variant="light" accent={theme.logoAccent} size="md" />
           </a>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-neutral-300">
-            <a
-              href="#live-feed"
-              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
-            >
-              Live Desk
-            </a>
             <a
               href="#capabilities"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
@@ -486,12 +331,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             >
               Education
             </a>
+            <a
+              href={config.telegramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
+            >
+              Community
+            </a>
           </nav>
 
           <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-              className="px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${theme.ctaBtn}`}
             >
               {user ? 'Open Workspace' : 'Access Workspace'}
             </button>
@@ -499,12 +352,42 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* Hero Split (Black + Red + White) */}
-      <section id="top" className="bg-black text-white border-b border-neutral-800">
-        <div className="max-w-7xl mx-auto px-6 py-14 lg:py-20">
+      {/* Hero Split with Live Animated Picture & Theme Switcher */}
+      <section id="top" className={`${theme.heroBg} text-white border-b ${theme.borderDark}`}>
+        <div className="max-w-7xl mx-auto px-6 py-12 lg:py-16">
+          {/* Curated Theme Selector Bar */}
+          <div className="mb-10 pb-5 border-b border-neutral-800/80 flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs font-medium text-neutral-400">
+              Select Workspace Aesthetic
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Landing page theme">
+              {(Object.values(THEME_PRESETS) as ThemeTokens[]).map((preset) => {
+                const active = preset.id === themeKey;
+                return (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleSelectTheme(preset.id)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium inline-flex items-center gap-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer border ${
+                      active
+                        ? 'bg-white text-black border-white'
+                        : 'bg-neutral-900/80 text-neutral-300 border-neutral-800 hover:border-neutral-600 hover:text-white'
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full border border-black/20 shrink-0"
+                      style={{ backgroundColor: preset.swatch }}
+                    />
+                    <span>{preset.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
             <div className="lg:col-span-6 flex flex-col justify-center">
-              <p className="text-xs font-semibold tracking-wide text-red-500 mb-3">
+              <p className={`text-xs font-semibold tracking-wide mb-3 ${theme.accentTextOnDark}`}>
                 GRIDPIPs · Exness IB Partner · ICT &amp; MQL5 Automation
               </p>
               <h1
@@ -519,7 +402,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="flex flex-wrap items-center gap-4">
                 <button
                   onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                  className="px-6 py-3.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                  className={`px-6 py-3.5 text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer ${theme.ctaBtn}`}
                 >
                   {user ? 'Launch Trading Workspace' : 'Open Exness & Start Free'}
                   <ArrowUpRight className="w-4 h-4" />
@@ -528,9 +411,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   href={config.telegramUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-5 py-3.5 bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold rounded-lg hover:bg-neutral-800 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                  className={`px-5 py-3.5 text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap ${theme.secondaryBtnDark}`}
                 >
-                  <Send className="w-4 h-4 text-red-500" />
+                  <Send className={`w-4 h-4 ${theme.accentTextOnDark}`} />
                   Join JakoyoFX Telegram
                 </a>
               </div>
@@ -543,19 +426,81 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
 
+            {/* Live Animated 3D Picture Frame */}
             <div className="lg:col-span-6">
-              <div className="h-full min-h-[340px] lg:min-h-[440px] rounded-xl overflow-hidden border border-neutral-800 bg-neutral-950">
-                <ImageWithFallback
-                  src={LANDING_IMAGES.heroTrader3d}
-                  alt="3D quantitative forex trader analyzing candlestick markets at an architectural desk"
-                  className="w-full h-full object-cover"
-                />
+              <div className={`relative h-full min-h-[360px] lg:min-h-[450px] rounded-xl overflow-hidden border ${theme.borderDark} bg-black`}>
+                {HERO_FRAMES.map((frame, idx) => {
+                  const isActive = idx === frameIndex;
+                  return (
+                    <img
+                      key={frame.src}
+                      src={frame.src}
+                      alt={frame.alt}
+                      referrerPolicy="no-referrer"
+                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                        isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      } ${
+                        heroMotionActive
+                          ? 'animate-hero-picture'
+                          : 'animate-hero-picture animate-hero-picture-paused'
+                      }`}
+                    />
+                  );
+                })}
+
+                {/* Measured Dark Scrim with Calm Live Telemetry & Picture Controls */}
+                <div className="absolute inset-x-0 bottom-0 p-5 bg-gradient-to-t from-black via-black/75 to-transparent flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-medium text-neutral-300">
+                      {HERO_FRAMES[frameIndex].caption}
+                    </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-mono tabular-nums text-white">
+                      {goldQuote && (
+                        <span>
+                          XAUUSD {goldQuote.price.toFixed(goldQuote.digits)}
+                        </span>
+                      )}
+                      {eurQuote && (
+                        <span className="text-neutral-300">
+                          EURUSD {eurQuote.price.toFixed(eurQuote.digits)}
+                        </span>
+                      )}
+                      <span className="text-neutral-400">NY {nyClock}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 bg-black/70 border border-neutral-700 rounded-lg p-1">
+                      {HERO_FRAMES.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setFrameIndex(idx)}
+                          aria-label={`Show live picture frame ${idx + 1}`}
+                          className={`px-2 py-1 text-[11px] font-mono rounded-md transition-colors cursor-pointer ${
+                            idx === frameIndex ? 'bg-white text-black font-semibold' : 'text-neutral-300 hover:text-white'
+                          }`}
+                        >
+                          0{idx + 1}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setHeroMotionActive((m) => !m)}
+                      className="px-3 py-1.5 bg-black/75 border border-neutral-700 hover:border-neutral-500 text-white text-xs font-medium rounded-lg inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                    >
+                      {heroMotionActive ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                      {heroMotionActive ? 'Pause' : 'Play'}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* 4-Column Key Platform Strip */}
-          <div className="mt-12 pt-10 border-t border-neutral-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className={`mt-12 pt-10 border-t ${theme.borderDark} grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6`}>
             <div>
               <div className="text-2xl font-bold font-mono tabular-nums text-white">
                 ${config.analyzerPriceUsd.toFixed(2)}
@@ -582,7 +527,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </p>
             </div>
             <div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-red-500">{config.commissionPct}%</div>
+              <div className={`text-2xl font-bold font-mono tabular-nums ${theme.accentTextOnDark}`}>
+                {config.commissionPct}%
+              </div>
               <div className="text-sm font-semibold text-white mt-1">Influencer Commissions</div>
               <p className="text-xs text-neutral-400 mt-1">
                 Earn instant referral credit on every $5.25 software license.
@@ -592,29 +539,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Live Animated Market & ICT Liquidity Stream */}
-      <section id="live-feed" className="bg-neutral-950 text-white py-14 lg:py-16 border-b border-neutral-800">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="max-w-2xl mb-8">
-            <p className="text-xs font-semibold text-red-500 mb-2">Live Algorithmic Preview</p>
-            <h2 className="text-2xl lg:text-3xl font-bold tracking-tight text-white" style={{ textWrap: 'balance' }}>
-              Watch real-time price action sweep BSL/SSL liquidity and tap Fair Value Gaps.
-            </h2>
-          </div>
-
-          <LiveMarketFeed
-            quotes={quotes}
-            onAction={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-            actionLabel={user ? 'Open Full Analyzer' : 'Start Free & Scan'}
-          />
-        </div>
-      </section>
-
       {/* Capabilities Asymmetric Bento (Crisp White Contrast Band) */}
       <section id="capabilities" className="bg-white text-black py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mb-12">
-            <p className="text-xs font-semibold text-red-600 mb-2">Core Architecture</p>
+            <p className={`text-xs font-semibold mb-2 ${theme.accentTextOnLight}`}>Core Architecture</p>
             <h2 className="text-3xl font-bold tracking-tight text-black" style={{ textWrap: 'balance' }}>
               Built for Inner Circle Trader precision and automated MT5 execution.
             </h2>
@@ -632,7 +561,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-semibold text-red-600 mb-2">
+                  <div className={`text-xs font-semibold mb-2 ${theme.accentTextOnLight}`}>
                     01. Market Intelligence · ${config.analyzerPriceUsd.toFixed(2)} One-Time License
                   </div>
                   <h3 className="text-xl font-bold text-black mb-2">
@@ -646,7 +575,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="text-xs font-mono text-neutral-500">EURUSD · XAUUSD · NAS100 · BTCUSD</span>
                   <button
                     onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                    className="text-sm font-semibold text-red-600 hover:text-red-700 cursor-pointer"
+                    className={`text-sm font-semibold cursor-pointer ${theme.accentTextOnLight}`}
                   >
                     Get ICT Analyzer →
                   </button>
@@ -665,7 +594,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-semibold text-red-600 mb-2">
+                  <div className={`text-xs font-semibold mb-2 ${theme.accentTextOnLight}`}>
                     02. Execution Bots · ${config.eaBotsPriceUsd.toFixed(2)} Source &amp; Docs
                   </div>
                   <h3 className="text-xl font-bold text-black mb-2">
@@ -679,7 +608,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="text-xs font-mono text-neutral-500">.mq5 Source + Setup Guide</span>
                   <button
                     onClick={() => (user ? onSelectProduct('ea_bots') : onGoAuth('register'))}
-                    className="text-sm font-semibold text-red-600 hover:text-red-700 cursor-pointer"
+                    className={`text-sm font-semibold cursor-pointer ${theme.accentTextOnLight}`}
                   >
                     Get MQL5 Bots →
                   </button>
@@ -688,8 +617,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 3: Education + Community */}
-            <div id="education-preview" className="lg:col-span-12 bg-black text-white border border-neutral-800 rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-              <div className="lg:col-span-5 h-64 lg:h-auto bg-neutral-950">
+            <div id="education-preview" className={`lg:col-span-12 ${theme.heroBg} text-white border ${theme.borderDark} rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12`}>
+              <div className="lg:col-span-5 h-64 lg:h-auto bg-black">
                 <ImageWithFallback
                   src={LANDING_IMAGES.mentorCommunity3d}
                   alt="3D trading mentor presenting Smart Money Concepts liquidity structure"
@@ -697,7 +626,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 />
               </div>
               <div className="lg:col-span-7 p-8 flex flex-col justify-center">
-                <div className="text-xs font-semibold text-red-500 mb-2">
+                <div className={`text-xs font-semibold mb-2 ${theme.accentTextOnDark}`}>
                   03. Free Curriculum &amp; Live Community · Included with Exness Registration
                 </div>
                 <h3 className="text-2xl font-bold text-white mb-3">
@@ -708,26 +637,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-neutral-200">
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentTextOnDark}`} />
                     <span>Unlimited Trading Journal with screenshot uploads &amp; analytics</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentTextOnDark}`} />
                     <span>$10,000 Paper Trading Simulator &amp; 8 Risk Calculators</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentTextOnDark}`} />
                     <span>Official TradingView Advanced Charts &amp; Economic Calendar</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 text-red-500 mt-0.5 shrink-0" />
+                    <CheckCircle2 className={`w-4 h-4 mt-0.5 shrink-0 ${theme.accentTextOnDark}`} />
                     <span>Automated email confirmations &amp; encrypted session security</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
                     onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                    className="px-5 py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
+                    className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${theme.ctaBtn}`}
                   >
                     Start Free with Exness
                   </button>
@@ -747,21 +676,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Transparent Pricing (Black + Red + White) */}
-      <section id="pricing" className="py-16 bg-neutral-950 text-white border-t border-b border-neutral-800">
+      {/* Transparent Pricing */}
+      <section id="pricing" className={`py-16 ${theme.bandBg} text-white border-t border-b ${theme.borderDark}`}>
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mb-10">
-            <p className="text-xs font-semibold text-red-500 mb-2">Transparent Access</p>
+            <p className={`text-xs font-semibold mb-2 ${theme.accentTextOnDark}`}>Transparent Access</p>
             <h2 className="text-3xl font-bold tracking-tight text-white">
               Free workspace for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)} pro modules.
             </h2>
             <p className="text-sm text-neutral-400 mt-2">
-              Pay quickly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile money checkout inside your workspace.
+              Pay quickly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile checkout inside your workspace.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border border-neutral-800 rounded-xl p-7 flex flex-col justify-between bg-black">
+            <div className={`border ${theme.borderDark} rounded-xl p-7 flex flex-col justify-between ${theme.cardDarkBg}`}>
               <div>
                 <div className="text-xs font-medium text-neutral-400 mb-1">For All Exness Registered Traders</div>
                 <h3 className="text-lg font-bold text-white">Core Trading Workspace</h3>
@@ -776,15 +705,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <button
                 onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                className="w-full py-2.5 border border-neutral-700 bg-neutral-900 text-white text-sm font-semibold rounded-lg hover:bg-neutral-800 transition-colors cursor-pointer"
+                className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${theme.secondaryBtnDark}`}
               >
                 {user ? 'Open Workspace' : 'Register via Exness IB'}
               </button>
             </div>
 
-            <div className="border-2 border-red-600 rounded-xl p-7 flex flex-col justify-between bg-black">
+            <div className={`${theme.cardHighlightBorder} rounded-xl p-7 flex flex-col justify-between ${theme.cardDarkBg}`}>
               <div>
-                <div className="text-xs font-semibold text-red-500 mb-1">ICT Algorithmic Scanner</div>
+                <div className={`text-xs font-semibold mb-1 ${theme.accentTextOnDark}`}>ICT Algorithmic Scanner</div>
                 <h3 className="text-lg font-bold text-white">ICT Strategy Market Analyzer</h3>
                 <div className="my-4">
                   <span className="text-3xl font-bold font-mono tabular-nums text-white">
@@ -801,7 +730,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
               <button
                 onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                className="w-full py-2.5 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
+                className={`w-full py-2.5 text-sm font-semibold rounded-lg transition-colors cursor-pointer ${theme.ctaBtn}`}
               >
                 Get ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)}
               </button>
@@ -809,7 +738,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
             <div className="border border-white rounded-xl p-7 flex flex-col justify-between bg-white text-black">
               <div>
-                <div className="text-xs font-semibold text-red-600 mb-1">Full MQL5 Source + MT5 Connect</div>
+                <div className={`text-xs font-semibold mb-1 ${theme.accentTextOnLight}`}>Full MQL5 Source + MT5 Connect</div>
                 <h3 className="text-lg font-bold text-black">MQL5 EA Bots Pack</h3>
                 <div className="my-4">
                   <span className="text-3xl font-bold font-mono tabular-nums text-black">
@@ -838,9 +767,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Exness IB Banner */}
       <section className="bg-white py-14">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="bg-black text-white border border-neutral-800 rounded-xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className={`${theme.heroBg} text-white border ${theme.borderDark} rounded-xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6`}>
             <div className="max-w-2xl">
-              <div className="flex items-center gap-2 text-xs font-semibold text-red-500 mb-2">
+              <div className={`flex items-center gap-2 text-xs font-semibold mb-2 ${theme.accentTextOnDark}`}>
                 <ShieldCheck className="w-4 h-4" />
                 <span>Required Brokerage Onboarding</span>
               </div>
@@ -856,14 +785,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 href={config.exnessIbUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-5 py-3 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                className={`px-5 py-3 text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap ${theme.ctaBtn}`}
               >
                 Open Exness Account
                 <ArrowUpRight className="w-4 h-4" />
               </a>
               <button
                 onClick={() => onGoAuth('login')}
-                className="px-5 py-3 bg-neutral-900 border border-neutral-700 text-white text-sm font-semibold rounded-lg hover:bg-neutral-800 transition-colors whitespace-nowrap cursor-pointer"
+                className={`px-5 py-3 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap cursor-pointer ${theme.secondaryBtnDark}`}
               >
                 Sign In
               </button>
@@ -873,10 +802,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Quiet Footer */}
-      <footer className="bg-black text-neutral-400 border-t border-neutral-800 py-12">
+      <footer className={`${theme.heroBg} text-neutral-400 border-t ${theme.borderDark} py-12`}>
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
           <div className="md:col-span-2">
-            <BrandLogo variant="light" accent="red" size="md" className="mb-3" />
+            <BrandLogo variant="light" accent={theme.logoAccent} size="md" className="mb-3" />
             <p className="text-xs text-neutral-400 leading-relaxed max-w-md">
               Risk Disclosure: CFDs and leveraged forex instruments carry a high risk of losing money rapidly. GRIDPIPs provides educational tools, ICT market analysis software, and MQL5 source code templates only. We do not hold client funds or execute brokerage orders.
             </p>
@@ -971,7 +900,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => setLegalDoc(null)}
-                className="px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700 cursor-pointer"
+                className={`px-4 py-2 text-xs font-semibold rounded-lg cursor-pointer ${theme.modalCloseBtn}`}
               >
                 Close
               </button>
