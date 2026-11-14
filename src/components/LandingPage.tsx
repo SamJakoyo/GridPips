@@ -38,6 +38,25 @@ interface ThemeTokens {
 }
 
 const THEME_PRESETS: Record<ThemeKey, ThemeTokens> = {
+  navy: {
+    id: 'navy',
+    label: 'Institutional Navy',
+    swatch: '#2563eb',
+    logoAccent: 'blue',
+    heroBg: 'bg-slate-950',
+    bandBg: 'bg-slate-900',
+    headerBg: 'bg-slate-950/95',
+    cardDarkBg: 'bg-slate-950',
+    borderDark: 'border-slate-800',
+    accentTextOnDark: 'text-blue-400',
+    accentTextOnLight: 'text-blue-600',
+    ctaBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
+    cardHighlightBorder: 'border-2 border-blue-500',
+    secondaryBtnDark: 'bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white',
+    quoteUpText: 'text-emerald-400',
+    quoteDownText: 'text-rose-400',
+    modalCloseBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
+  },
   gold: {
     id: 'gold',
     label: 'Sovereign Gold',
@@ -75,25 +94,6 @@ const THEME_PRESETS: Record<ThemeKey, ThemeTokens> = {
     quoteUpText: 'text-white',
     quoteDownText: 'text-red-500',
     modalCloseBtn: 'bg-red-600 hover:bg-red-700 text-white',
-  },
-  navy: {
-    id: 'navy',
-    label: 'Institutional Navy',
-    swatch: '#2563eb',
-    logoAccent: 'blue',
-    heroBg: 'bg-slate-950',
-    bandBg: 'bg-slate-900',
-    headerBg: 'bg-slate-950/95',
-    cardDarkBg: 'bg-slate-950',
-    borderDark: 'border-slate-800',
-    accentTextOnDark: 'text-blue-400',
-    accentTextOnLight: 'text-blue-600',
-    ctaBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
-    cardHighlightBorder: 'border-2 border-blue-500',
-    secondaryBtnDark: 'bg-slate-900 border border-slate-700 hover:bg-slate-800 text-white',
-    quoteUpText: 'text-emerald-400',
-    quoteDownText: 'text-rose-400',
-    modalCloseBtn: 'bg-blue-600 hover:bg-blue-700 text-white',
   },
   emerald: {
     id: 'emerald',
@@ -235,10 +235,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const [themeKey, setThemeKey] = useState<ThemeKey>(() => {
     try {
-      const saved = localStorage.getItem('gridpips_landing_theme_v2') as ThemeKey | null;
-      return saved && THEME_PRESETS[saved] ? saved : 'gold';
+      const saved = localStorage.getItem('gridpips_landing_theme_v3') as ThemeKey | null;
+      return saved && THEME_PRESETS[saved] ? saved : 'navy';
     } catch {
-      return 'gold';
+      return 'navy';
     }
   });
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
@@ -251,7 +251,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   function handleSelectTheme(next: ThemeKey) {
     setThemeKey(next);
     try {
-      localStorage.setItem('gridpips_landing_theme_v2', next);
+      localStorage.setItem('gridpips_landing_theme_v3', next);
     } catch {
       // ignore storage failure
     }
@@ -385,21 +385,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-stretch">
-            <div className="lg:col-span-6 flex flex-col justify-center">
-              <p className={`text-xs font-semibold tracking-wide mb-3 ${theme.accentTextOnDark}`}>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+            <div className="lg:col-span-5 flex flex-col justify-center">
+              <p className={`text-xs font-medium tracking-wide mb-3 ${theme.accentTextOnDark}`}>
                 GRIDPIPs · Exness IB Partner · ICT &amp; MQL5 Automation
               </p>
               <h1
                 className="text-white font-bold tracking-tight mb-5"
-                style={{ fontSize: 'clamp(2.25rem, 4vw, 3.65rem)', lineHeight: 1.08, textWrap: 'balance' }}
+                style={{ fontSize: 'clamp(2.1rem, 3.4vw, 3.2rem)', lineHeight: 1.1, textWrap: 'balance' }}
               >
                 Institutional ICT market analysis and MQL5 automation in one trading desk.
               </h1>
-              <p className="text-base lg:text-lg text-neutral-300 leading-relaxed mb-8 max-w-xl">
+              <p className="text-[15px] lg:text-base font-normal text-neutral-300 leading-relaxed mb-7 max-w-lg">
                 Scan Fair Value Gaps, Order Blocks, and Killzones with our ${config.analyzerPriceUsd.toFixed(2)} ICT Analyzer, run verified MQL5 Expert Advisors directly on MT5, and use our trading journal, 8 risk calculators, and paper trading workspace free through your Exness account.
               </p>
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3.5">
                 <button
                   onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
                   className={`px-6 py-3.5 text-sm font-semibold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer ${theme.ctaBtn}`}
@@ -417,7 +417,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Join JakoyoFX Telegram
                 </a>
               </div>
-              <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-neutral-400">
+              <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs font-normal text-neutral-400">
                 <span>Crypto accepted (USDT TRC20/ERC20, BTC)</span>
                 <span aria-hidden="true">·</span>
                 <span>Full MQL5 source code included</span>
@@ -426,9 +426,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
 
-            {/* Live Animated 3D Picture Frame */}
-            <div className="lg:col-span-6">
-              <div className={`relative h-full min-h-[360px] lg:min-h-[450px] rounded-xl overflow-hidden border ${theme.borderDark} bg-black`}>
+            {/* Live Animated Landscape 16:9 3D Picture Frame */}
+            <div className="lg:col-span-7">
+              <div className={`relative w-full aspect-video rounded-xl overflow-hidden border ${theme.borderDark} bg-black`}>
                 {HERO_FRAMES.map((frame, idx) => {
                   const isActive = idx === frameIndex;
                   return (
@@ -437,7 +437,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       src={frame.src}
                       alt={frame.alt}
                       referrerPolicy="no-referrer"
-                      className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${
+                      className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
                         isActive ? 'opacity-100' : 'opacity-0 pointer-events-none'
                       } ${
                         heroMotionActive
