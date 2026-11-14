@@ -546,9 +546,16 @@ app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
     let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
 
     if (!user) {
-      const exnessAccountId = sanitizeText(req.body?.exnessAccountId, 40).toUpperCase();
-      const exnessConfirmed = Boolean(req.body?.exnessConfirmed);
-      const referralCodeUsed = sanitizeText(req.body?.referralCode, 30).toUpperCase();
+      const metaExnessId =
+        typeof sbUser.user_metadata?.exness_account_id === 'string'
+          ? sbUser.user_metadata.exness_account_id
+          : '';
+      const exnessAccountId = sanitizeText(req.body?.exnessAccountId || metaExnessId, 40).toUpperCase();
+      const exnessConfirmed = Boolean(req.body?.exnessConfirmed || metaExnessId.length >= 4);
+      const referralCodeUsed = sanitizeText(
+        req.body?.referralCode || (typeof sbUser.user_metadata?.referral_code === 'string' ? sbUser.user_metadata.referral_code : ''),
+        30
+      ).toUpperCase();
 
       if (!exnessConfirmed || exnessAccountId.length < 4) {
         res.status(409).json({

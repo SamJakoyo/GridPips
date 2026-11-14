@@ -172,7 +172,18 @@ export const AuthView: React.FC<AuthViewProps> = ({
         confirmed: exnessConfirmed,
       });
     } catch (err) {
-      setError(formatAuthError(err));
+      const code = err instanceof Error ? err.message : '';
+      if (supabase && (code.includes('auth/unauthorized-domain') || code.includes('auth/popup-blocked'))) {
+        const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin },
+        });
+        if (oauthErr) {
+          setError(oauthErr.message);
+        }
+      } else {
+        setError(formatAuthError(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -192,6 +203,17 @@ export const AuthView: React.FC<AuthViewProps> = ({
     try {
       if (pendingOAuth) {
         if (pendingOAuth.provider === 'supabase') {
+          if (supabase) {
+            await supabase.auth
+              .updateUser({
+                data: {
+                  exness_account_id: exnessAccountId.trim().toUpperCase(),
+                  exness_verified: true,
+                  referral_code: referralCode.trim().toUpperCase() || undefined,
+                },
+              })
+              .catch(() => {});
+          }
           await completeSupabaseSession({
             uid: pendingOAuth.uid,
             accessToken: pendingOAuth.accessToken,
@@ -496,10 +518,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   <input
                     type="password"
                     required
-                    minLength={8}
+                    minLength={mode === 'register' ? 8 : 6}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 8 characters"
+                    placeholder={mode === 'register' ? 'Minimum 8 characters' : 'Enter your password'}
                     className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
                   />
                 </div>
