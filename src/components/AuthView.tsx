@@ -652,7 +652,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Samuel Jakoyo"
+                  placeholder="Daniel Mwangi"
                   className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
                 />
               </div>
@@ -701,7 +701,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     type="text"
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value)}
-                    placeholder="e.g. JAKOYO"
+                    placeholder="e.g. TRADER100"
                     className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-mono uppercase"
                   />
                 </div>
