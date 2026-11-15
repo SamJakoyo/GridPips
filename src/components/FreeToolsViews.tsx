@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Trash2, Plus, RotateCcw, X, Activity } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Trash2, Plus, RotateCcw, X, Activity, RefreshCw, ExternalLink, Calendar, Newspaper, AlertCircle } from 'lucide-react';
 import { apiFetch, type MarketSymbolQuote } from '../lib/api';
 import {
   ANALYZER_TIMEFRAMES,
@@ -1312,117 +1312,353 @@ export const TradingPlanView: React.FC = () => {
   );
 };
 
+interface LiveCalendarEvent {
+  id: string;
+  title: string;
+  currency: string;
+  impact: 'High' | 'Medium' | 'Low' | 'Holiday';
+  dateIso: string;
+  nyDateKey: string;
+  nyDateLabel: string;
+  nyTimeLabel: string;
+  isToday: boolean;
+  isUpcoming: boolean;
+  actual: string;
+  forecast: string;
+  previous: string;
+  ffUrl: string;
+}
+
+interface LiveNewsItem {
+  id: string;
+  title: string;
+  summary: string;
+  category: 'Forex Factory' | 'Central Banks' | 'Forex' | 'Gold' | 'Indices' | 'Crypto';
+  source: string;
+  url: string;
+  publishedAt: string;
+  timeAgo: string;
+}
+
+interface ForexFactoryApiPayload {
+  source: 'forexfactory.com';
+  calendarFeedProvider: string;
+  calendarIsFallback: boolean;
+  newsFeedProviders: string[];
+  updatedAt: string;
+  nyNowLabel: string;
+  nyTodayKey: string;
+  ffCalendarUrl: string;
+  ffNewsUrl: string;
+  events: LiveCalendarEvent[];
+  news: LiveNewsItem[];
+}
+
 export const CalendarAndNewsView: React.FC = () => {
-  const [impactFilter, setImpactFilter] = useState<'All' | 'High'>('All');
+  const [feed, setFeed] = useState<ForexFactoryApiPayload | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [dayScope, setDayScope] = useState<'Upcoming' | 'Today' | 'Week'>('Upcoming');
+  const [impactFilter, setImpactFilter] = useState<'All' | 'High' | 'MediumPlus'>('All');
+  const [currencyFilter, setCurrencyFilter] = useState<string>('ALL');
   const [newsCategory, setNewsCategory] = useState<string>('All');
 
-  const events = [
-    { time: '02:00 NY', ccy: 'GBP', title: 'UK GDP m/m (London Open)', impact: 'Medium', prev: '0.1%', forecast: '0.2%' },
-    { time: '08:30 NY', ccy: 'USD', title: 'Non-Farm Payrolls (NFP)', impact: 'High', prev: '175K', forecast: '190K' },
-    { time: '08:30 NY', ccy: 'USD', title: 'Core CPI m/m', impact: 'High', prev: '0.3%', forecast: '0.3%' },
-    { time: '10:00 NY', ccy: 'USD', title: 'ISM Services PMI (NY Silver Bullet)', impact: 'Medium', prev: '51.4', forecast: '52.0' },
-    { time: '14:00 NY', ccy: 'USD', title: 'FOMC Rate Statement & Press Conference', impact: 'High', prev: '5.25%', forecast: '5.25%' },
-  ];
+  const hasLoadedRef = useRef(false);
 
-  const news = [
-    {
-      cat: 'Central Banks',
-      time: '18m ago',
-      title: 'Federal Reserve policymakers reiterate patience ahead of next CPI release',
-      note: 'Expect USD liquidity sweeps around 08:30 EST before New York AM continuation.',
-    },
-    {
-      cat: 'Gold',
-      time: '42m ago',
-      title: 'XAUUSD holds institutional demand above key H4 bullish order block',
-      note: 'London-NY overlap volume remains elevated near psychological round numbers.',
-    },
-    {
-      cat: 'Forex',
-      time: '1h ago',
-      title: 'EURUSD & GBPUSD compress beneath weekly equal highs ahead of London Killzone',
-      note: 'Watch for Judas Swing fakeout above Asian highs prior to NY displacement.',
-    },
-    {
-      cat: 'Indices',
-      time: '2h ago',
-      title: 'NAS100 institutional flow rotates into NY AM Silver Bullet window',
-      note: 'Monitor 09:30 EST equities open volatility and clean M15 FVG draws.',
-    },
-    {
-      cat: 'Crypto',
-      time: '3h ago',
-      title: 'BTCUSD reclaims mid-range liquidity as spot inflows stabilize',
-      note: 'Maintain disciplined 1% risk caps when holding across high-beta crypto levels.',
-    },
-  ];
+  const fetchFeed = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true);
+    else if (!hasLoadedRef.current) setLoading(true);
 
-  const filteredEvents = impactFilter === 'High' ? events.filter((e) => e.impact === 'High') : events;
-  const filteredNews = newsCategory === 'All' ? news : news.filter((n) => n.cat === newsCategory);
+    try {
+      const data = await apiFetch<ForexFactoryApiPayload>(
+        manual ? '/api/market/forexfactory?refresh=1' : '/api/market/forexfactory'
+      );
+      hasLoadedRef.current = true;
+      setFeed(data);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load live Forex Factory calendar and news.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchFeed(false);
+    const interval = window.setInterval(() => {
+      void fetchFeed(false);
+    }, 90_000);
+    return () => window.clearInterval(interval);
+  }, [fetchFeed]);
+
+  const availableCurrencies = useMemo(() => {
+    const set = new Set<string>(['ALL', 'USD', 'EUR', 'GBP', 'JPY', 'AUD', 'CAD', 'CHF', 'NZD']);
+    (feed?.events || []).forEach((ev) => {
+      if (ev.currency) set.add(ev.currency);
+    });
+    return Array.from(set);
+  }, [feed]);
+
+  const filteredEvents = useMemo(() => {
+    const events = feed?.events || [];
+    return events.filter((ev) => {
+      if (dayScope === 'Today' && !ev.isToday) return false;
+      if (dayScope === 'Upcoming' && !ev.isUpcoming) return false;
+      if (impactFilter === 'High' && ev.impact !== 'High') return false;
+      if (impactFilter === 'MediumPlus' && ev.impact !== 'High' && ev.impact !== 'Medium') return false;
+      if (currencyFilter !== 'ALL' && ev.currency !== currencyFilter) return false;
+      return true;
+    });
+  }, [feed, dayScope, impactFilter, currencyFilter]);
+
+  const filteredNews = useMemo(() => {
+    const items = feed?.news || [];
+    if (newsCategory === 'All') return items;
+    return items.filter((item) => item.category === newsCategory);
+  }, [feed, newsCategory]);
+
+  const updatedLabel = useMemo(() => {
+    if (!feed?.updatedAt) return 'Syncing...';
+    const d = new Date(feed.updatedAt);
+    if (Number.isNaN(d.getTime())) return 'Live';
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }, [feed?.updatedAt]);
 
   return (
     <div className="space-y-6">
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <div>
-            <h3 className="text-base font-bold text-slate-950">Economic Calendar (NY EST)</h3>
-            <p className="text-xs text-slate-500">High-volatility liquidity injection windows</p>
-          </div>
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-            {(['All', 'High'] as const).map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setImpactFilter(f)}
-                className={`px-3 py-1 text-xs font-semibold rounded-md cursor-pointer ${
-                  impactFilter === f ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
-                }`}
-              >
-                {f === 'All' ? 'All Events' : 'High Impact Only'}
-              </button>
-            ))}
-          </div>
+      {/* Top Feed Status & Direct Forex Factory Bar */}
+      <div className="bg-white border border-slate-200 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+          <span className="font-semibold text-slate-950">Forex Factory Live Feed</span>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono tabular-nums">{feed?.nyNowLabel || 'NY EST'}</span>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono tabular-nums">Synced {updatedLabel}</span>
+          {feed?.calendarFeedProvider && (
+            <>
+              <span aria-hidden="true">·</span>
+              <span className="text-slate-500">{feed.calendarFeedProvider}</span>
+            </>
+          )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-xs text-slate-500">
-                <th className="py-2.5 pr-4">Time</th>
-                <th className="py-2.5 pr-4">Currency</th>
-                <th className="py-2.5 pr-4">Event</th>
-                <th className="py-2.5 pr-4">Impact</th>
-                <th className="py-2.5 pr-4 text-right">Previous</th>
-                <th className="py-2.5 text-right">Forecast</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {filteredEvents.map((ev, i) => (
-                <tr key={i} className="hover:bg-slate-50">
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-700">{ev.time}</td>
-                  <td className="py-3 pr-4 font-mono font-bold text-slate-950">{ev.ccy}</td>
-                  <td className="py-3 pr-4 text-slate-800">{ev.title}</td>
-                  <td className={`py-3 pr-4 text-xs font-semibold ${ev.impact === 'High' ? 'text-rose-600' : 'text-amber-600'}`}>
-                    {ev.impact}
-                  </td>
-                  <td className="py-3 pr-4 text-right font-mono tabular-nums text-slate-600">{ev.prev}</td>
-                  <td className="py-3 text-right font-mono tabular-nums font-semibold text-slate-950">{ev.forecast}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href={feed?.ffCalendarUrl || 'https://www.forexfactory.com/calendar'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>ForexFactory.com Calendar</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <a
+            href={feed?.ffNewsUrl || 'https://www.forexfactory.com/news'}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+          >
+            <Newspaper className="w-3.5 h-3.5" />
+            <span>ForexFactory.com News</span>
+            <ExternalLink className="w-3 h-3" />
+          </a>
+          <button
+            type="button"
+            onClick={() => void fetchFeed(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-60 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Live'}</span>
+          </button>
         </div>
       </div>
 
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs text-rose-800 font-medium">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+            <span>{error}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => void fetchFeed(true)}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 cursor-pointer"
+          >
+            Retry Feed
+          </button>
+        </div>
+      )}
+
+      {/* Live Economic Calendar */}
       <div className="bg-white border border-slate-200 rounded-xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <h3 className="text-base font-bold text-slate-950">Institutional Market News Desk</h3>
+          <div>
+            <h3 className="text-base font-bold text-slate-950">Economic Calendar (NY EST · Forex Factory)</h3>
+            <p className="text-xs text-slate-500">
+              Live weekly macro releases, actuals, forecasts, and high-volatility killzone windows
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+              {(['Upcoming', 'Today', 'Week'] as const).map((scope) => (
+                <button
+                  key={scope}
+                  type="button"
+                  onClick={() => setDayScope(scope)}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
+                    dayScope === scope ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  {scope === 'Week' ? 'Full Week' : scope}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+              {([
+                { key: 'All', label: 'All Impact' },
+                { key: 'MediumPlus', label: 'Med + High' },
+                { key: 'High', label: 'High Only' },
+              ] as const).map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setImpactFilter(f.key)}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
+                    impactFilter === f.key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <select
+              aria-label="Filter calendar by currency"
+              value={currencyFilter}
+              onChange={(e) => setCurrencyFilter(e.target.value)}
+              className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
+            >
+              {availableCurrencies.map((ccy) => (
+                <option key={ccy} value={ccy}>
+                  {ccy === 'ALL' ? 'All Currencies' : ccy}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {loading && !feed ? (
+          <div className="py-10 text-center text-xs text-slate-500">
+            Loading live Forex Factory economic calendar...
+          </div>
+        ) : filteredEvents.length === 0 ? (
+          <div className="py-10 text-center space-y-2">
+            <p className="text-sm font-semibold text-slate-800">
+              No events match the current filter ({dayScope}, {currencyFilter}, {impactFilter}).
+            </p>
+            <p className="text-xs text-slate-500">
+              Switch to Full Week or All Impact to view all scheduled Forex Factory releases.
+            </p>
+            {dayScope !== 'Week' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDayScope('Week');
+                  setImpactFilter('All');
+                  setCurrencyFilter('ALL');
+                }}
+                className="mt-1 px-3 py-1.5 rounded-lg bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 cursor-pointer"
+              >
+                Show Full Week Calendar
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                  <th className="py-2.5 pr-4 whitespace-nowrap">Date · NY Time</th>
+                  <th className="py-2.5 pr-4">CCY</th>
+                  <th className="py-2.5 pr-4">Impact</th>
+                  <th className="py-2.5 pr-4">Event</th>
+                  <th className="py-2.5 pr-4 text-right">Actual</th>
+                  <th className="py-2.5 pr-4 text-right">Forecast</th>
+                  <th className="py-2.5 text-right">Previous</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredEvents.slice(0, 80).map((ev) => {
+                  const impactCls =
+                    ev.impact === 'High'
+                      ? 'text-rose-600'
+                      : ev.impact === 'Medium'
+                      ? 'text-amber-600'
+                      : ev.impact === 'Holiday'
+                      ? 'text-slate-400'
+                      : 'text-slate-500';
+                  return (
+                    <tr key={ev.id} className="hover:bg-slate-50">
+                      <td className="py-3 pr-4 font-mono tabular-nums text-xs text-slate-700 whitespace-nowrap">
+                        <span className="text-slate-500">{ev.nyDateLabel}</span>
+                        <span className="mx-1.5 text-slate-300">·</span>
+                        <span className="font-semibold text-slate-900">{ev.nyTimeLabel}</span>
+                      </td>
+                      <td className="py-3 pr-4 font-mono font-bold text-slate-950 whitespace-nowrap">{ev.currency}</td>
+                      <td className={`py-3 pr-4 text-xs font-semibold whitespace-nowrap ${impactCls}`}>
+                        {ev.impact}
+                      </td>
+                      <td className="py-3 pr-4 text-slate-800">
+                        <a
+                          href={ev.ffUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="hover:text-blue-600 hover:underline inline-flex items-center gap-1"
+                        >
+                          <span>{ev.title}</span>
+                        </a>
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950 whitespace-nowrap">
+                        {ev.actual || '—'}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-700 whitespace-nowrap">
+                        {ev.forecast || '—'}
+                      </td>
+                      <td className="py-3 text-right font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                        {ev.previous || '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Live Market & Forex Factory News Desk */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-base font-bold text-slate-950">Live Forex Factory &amp; Institutional News Wire</h3>
+            <p className="text-xs text-slate-500">
+              Real-time FX, central bank, gold, indices, and Forex Factory market headlines
+            </p>
+          </div>
           <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
-            {['All', 'Central Banks', 'Forex', 'Gold', 'Indices', 'Crypto'].map((cat) => (
+            {['All', 'Forex Factory', 'Central Banks', 'Forex', 'Gold', 'Indices', 'Crypto'].map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setNewsCategory(cat)}
-                className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer ${
+                className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
                   newsCategory === cat ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
                 }`}
               >
@@ -1431,20 +1667,42 @@ export const CalendarAndNewsView: React.FC = () => {
             ))}
           </div>
         </div>
-        <div className="divide-y divide-slate-100">
-          {filteredNews.map((item, idx) => (
-            <div key={idx} className="py-3.5">
-              <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-                <span className="font-semibold text-blue-600">{item.cat}</span>
-                <span aria-hidden="true">·</span>
-                <span>{item.time}</span>
+
+        {loading && !feed ? (
+          <div className="py-8 text-center text-xs text-slate-500">
+            Loading live market news wire...
+          </div>
+        ) : filteredNews.length === 0 ? (
+          <div className="py-8 text-center text-xs text-slate-500">
+            No live headlines in {newsCategory} right now. Select All or refresh the live feed.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-100">
+            {filteredNews.map((item) => (
+              <div key={item.id} className="py-3.5">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
+                  <span className="font-semibold text-blue-600">{item.category}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-medium text-slate-700">{item.source}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="font-mono tabular-nums">{item.timeAgo}</span>
+                </div>
+                <a
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-bold text-slate-950 hover:text-blue-600 inline-flex items-start gap-1.5"
+                >
+                  <span>{item.title}</span>
+                  <ExternalLink className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
+                </a>
+                {item.summary && <p className="text-xs text-slate-600 mt-1">{item.summary}</p>}
               </div>
-              <div className="text-sm font-bold text-slate-950">{item.title}</div>
-              <p className="text-xs text-slate-600 mt-1">{item.note}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 };
+

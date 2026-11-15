@@ -41,6 +41,7 @@ import {
   buildInstallationGuide,
 } from './mql5Templates.ts';
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
+import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
   formatGeminiApiError,
   runGeminiChat,
@@ -1889,6 +1890,20 @@ app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
   } catch (err) {
     console.error('Analyzer scan error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to complete ICT market scan.' });
+  }
+});
+
+// ---------------- Live Forex Factory Calendar & Market News ----------------
+app.get('/api/market/forexfactory', async (req, res) => {
+  try {
+    const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';
+    const feed = await getForexFactoryLiveFeed(forceRefresh);
+    res.json(feed);
+  } catch (err) {
+    console.error('Forex Factory live feed error:', err);
+    res.status(502).json({
+      error: err instanceof Error ? err.message : 'Unable to fetch live Forex Factory calendar and news.',
+    });
   }
 });
 
