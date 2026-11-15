@@ -371,16 +371,6 @@ export interface SupabasePlaybookRecord {
   created_at: string;
 }
 
-export interface SupabaseMediaCreationRecord {
-  id: string;
-  user_id: string;
-  kind: 'image' | 'video';
-  model: string;
-  prompt: string;
-  aspect_ratio: string;
-  created_at: string;
-}
-
 export async function listSupabaseSavedSetups(
   userId: string
 ): Promise<{ setups: SupabaseSavedSetupRecord[]; error: string | null }> {
@@ -515,51 +505,6 @@ export async function deleteSupabasePlaybook(
     };
   }
   return { deleted: true, error: null };
-}
-
-export async function listSupabaseMediaCreations(
-  userId: string
-): Promise<{ items: SupabaseMediaCreationRecord[]; error: string | null }> {
-  const client = getServerSupabaseAdminClient();
-  if (!client) {
-    return { items: [], error: 'Supabase admin client not configured.' };
-  }
-  const { data, error } = await client
-    .from('media_creations')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(25);
-  if (error) {
-    console.error('Supabase media_creations select error:', error);
-    return {
-      items: [],
-      error: `Supabase media_creations error (${error.code || 'DB_ERROR'}): ${error.message}`,
-    };
-  }
-  return { items: (data as SupabaseMediaCreationRecord[]) || [], error: null };
-}
-
-export async function createSupabaseMediaCreation(
-  record: Omit<SupabaseMediaCreationRecord, 'id' | 'created_at'>
-): Promise<{ item: SupabaseMediaCreationRecord | null; error: string | null }> {
-  const client = getServerSupabaseAdminClient();
-  if (!client) {
-    return { item: null, error: 'Supabase admin client not configured.' };
-  }
-  const { data, error } = await client
-    .from('media_creations')
-    .insert(record)
-    .select('*')
-    .single();
-  if (error) {
-    console.error('Supabase media_creations insert error:', error);
-    return {
-      item: null,
-      error: `Supabase media_creations insert error (${error.code || 'DB_ERROR'}): ${error.message}`,
-    };
-  }
-  return { item: data as SupabaseMediaCreationRecord, error: null };
 }
 
 export async function verifySupabaseAccessToken(accessToken: string): Promise<SupabaseAuthUser | null> {

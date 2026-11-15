@@ -11,7 +11,7 @@ GRIDPIPs is a full-stack trading workspace featuring an **ICT Strategy Market An
   - **Crypto Gateway** (`USDT TRC20`, `USDT ERC20`, `BTC` with TXID verification).
 - **ICT Strategy Market Analyzer ($5.25)**: Automated FVG (BISI/SIBI), Order Blocks, BSL/SSL liquidity pools, 0.618–0.786 OTE Fibs, and London/NY Killzone mapping anchored to ICT (`UCtjxa77NqamhVC8atV85Rog`).
 - **MQL5 EA Bots Pack ($5.25)**: Uncompiled `.mq5` Expert Advisors (`GRIDPIPs_ICT_SilverBullet_EA.mq5` & `GRIDPIPs_SMC_OrderBlock_EA.mq5`), `INSTALLATION_GUIDE.txt` `.zip` download, and MT5 WebRequest Bridge telemetry.
-- **Free Exness Member Workspace**: TradingView Live Charts + persistent Watchlist, Unlimited Trading Journal + Screenshot uploads, Analytics Dashboard, 8 Trading Calculators, `$10,000` Paper Trading Simulator, Personal Trading Plan + Checklist, Economic Calendar + Market News, ICT & SMC Academy, Gemini Trading Desk, Creative Media Studio, and Three.js 3D Liquidity Lab.
+- **Free Exness Member Workspace**: TradingView Live Charts + persistent Watchlist, Unlimited Trading Journal + Screenshot uploads, Analytics Dashboard, 8 Trading Calculators, `$10,000` Paper Trading Simulator, Personal Trading Plan + Checklist, Forex Factory Live Economic Calendar + Market News, and ICT & SMC Academy.
 - **Admin Command Center**: Manage USD/KES revenue, M-Pesa & Crypto orders, users/roles/suspensions, security audit logs, influencer payouts, email inbox logs, and live site settings.
 
 ---
@@ -44,7 +44,6 @@ This repository is configured for Vercel via `vercel.json` and `api/index.ts` (a
 3. Configure **Environment Variables** in Vercel Project Settings:
    - `SESSION_SECRET` (strong 32+ char random string)
    - `ADMIN_INITIAL_PASSWORD` (admin login password for `samjakoyo26@gmail.com`)
-   - `GEMINI_API_KEY` (required for Gemini Desk & Media Studio)
    - `SQL_HOST`, `SQL_USER`, `SQL_PASSWORD`, `SQL_DB_NAME`, `SQL_PORT=5432` (Cloud SQL PostgreSQL)
    - `MEGAPAY_API_KEY` & `MEGAPAY_EMAIL` (optional — enables live MegaPay STK Push; otherwise runs guided Till checkout)
 4. Add your deployed Vercel domain (`*.vercel.app` and custom domain) to **Firebase Console → Authentication → Settings → Authorized domains** so Google Sign-In works in production.
