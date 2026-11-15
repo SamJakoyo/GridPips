@@ -352,7 +352,7 @@ export interface SupabaseSavedSetupRecord {
   id: string;
   user_id: string;
   symbol: string;
-  timeframe: 'M15' | 'H1' | 'H4' | 'D1';
+  timeframe: string;
   bias: 'Bullish' | 'Bearish';
   entry_zone: string;
   stop_loss: number;

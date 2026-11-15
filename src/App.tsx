@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { getSupabaseClient } from './lib/supabase';
+import type { AnalyzerTimeframe } from './lib/tradingTimeframes';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
 import { LandingPage } from './components/LandingPage';
 import { AuthView, type PendingOAuthUser } from './components/AuthView';
@@ -103,6 +104,8 @@ export default function App() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [journal, setJournal] = useState<JournalTrade[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD']);
+  const [chartSymbol, setChartSymbol] = useState('EURUSD');
+  const [chartTimeframe, setChartTimeframe] = useState<AnalyzerTimeframe>('1M');
 
   const [checkoutState, setCheckoutState] = useState<{
     productKey: 'analyzer' | 'ea_bots';
@@ -268,7 +271,9 @@ export default function App() {
           setScreen('auth');
         }}
         onGoWorkspace={() => setScreen('workspace')}
-        onSelectProduct={(product) => {
+        onSelectProduct={(product, selectedSym, selectedTf) => {
+          if (selectedSym) setChartSymbol(selectedSym);
+          if (selectedTf) setChartTimeframe(selectedTf);
           if (!user) {
             setAuthMode('register');
             setScreen('auth');
@@ -552,6 +557,11 @@ export default function App() {
             <IctAnalyzerView
               user={user}
               config={config}
+              symbol={chartSymbol}
+              timeframe={chartTimeframe}
+              onSymbolChange={setChartSymbol}
+              onTimeframeChange={setChartTimeframe}
+              onOpenFreeChart={() => setActiveTab('charts')}
               onUnlockClick={() => setCheckoutState({ productKey: 'analyzer' })}
             />
           )}
@@ -578,7 +588,15 @@ export default function App() {
             <ThreeLiquidityScene onExit={() => setActiveTab('overview')} />
           )}
           {activeTab === 'charts' && (
-            <TradingViewChartsView watchlist={watchlist} onUpdateWatchlist={handleUpdateWatchlist} />
+            <TradingViewChartsView
+              watchlist={watchlist}
+              symbol={chartSymbol}
+              timeframe={chartTimeframe}
+              onSymbolChange={setChartSymbol}
+              onTimeframeChange={setChartTimeframe}
+              onUpdateWatchlist={handleUpdateWatchlist}
+              onAnalyzeInIct={() => setActiveTab('analyzer')}
+            />
           )}
           {activeTab === 'journal' && (
             <JournalView trades={journal} onRefresh={loadUserWorkspaceData} />

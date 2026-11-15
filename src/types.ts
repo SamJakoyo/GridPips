@@ -14,6 +14,12 @@ export interface User {
   mt5BridgeToken?: string | null;
   mt5Connected: boolean;
   mt5LastSync?: string | null;
+  mt5Balance?: number | null;
+  mt5Equity?: number | null;
+  mt5Symbol?: string | null;
+  mt5EaName?: string | null;
+  mt5OpenPositions?: number;
+  mt5Status?: string | null;
   isSuspended: boolean;
   createdAt: string;
   lastLoginAt?: string | null;
@@ -112,6 +118,8 @@ export interface IctAnalysisResult {
   };
   candles: Candle[];
   ictReferenceChannel: string;
+  dataSource?: 'live_feed' | 'model_fallback';
+  lastUpdated?: string;
 }
 
 export interface JournalTrade {

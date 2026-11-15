@@ -1,11 +1,19 @@
-export const ICT_SILVER_BULLET_MQ5 = `//+------------------------------------------------------------------+
+function sanitizeMqlString(val: string): string {
+  return val.replace(/["\\\r\n]/g, '').trim();
+}
+
+export function buildSilverBulletEa(bridgeUrl: string, bridgeToken: string): string {
+  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://grid-pips.vercel.app/api/ea/mt5/heartbeat';
+  const safeToken = sanitizeMqlString(bridgeToken) || 'PASTE_YOUR_BRIDGE_TOKEN_HERE';
+
+  return `//+------------------------------------------------------------------+
 //|                                GRIDPIPs_ICT_SilverBullet_EA.mq5   |
 //|                        Copyright 2026, GRIDPIPs Automation Labs   |
 //|                                   https://t.me/JakoyoFx          |
 //+------------------------------------------------------------------+
 #property copyright "GRIDPIPs Automation Labs"
 #property link      "https://t.me/JakoyoFx"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 #include <Trade\\Trade.mqh>
@@ -22,10 +30,10 @@ input bool     InpUseNewYorkKZ     = true;     // Trade NY Silver Bullet (15:00-
 input int      InpMaxDailyTrades   = 3;        // Maximum trades per day
 input double   InpMaxDailyLossPct  = 3.0;      // Daily Equity Drawdown Stop (%)
 
-input group "=== GRIDPIPs MT5 Bridge Sync ==="
-input bool     InpEnableWebBridge  = false;    // Sync live status to GRIDPIPs Dashboard
-input string   InpBridgeUrl        = "https://YOUR_GRIDPIPS_DOMAIN/api/ea/mt5/heartbeat";
-input string   InpBridgeToken      = "PASTE_YOUR_BRIDGE_TOKEN_HERE";
+input group "=== GRIDPIPs MT5 Bridge Sync (Pre-Configured) ==="
+input bool     InpEnableWebBridge  = true;     // Sync live telemetry to GRIDPIPs Dashboard
+input string   InpBridgeUrl        = "${safeUrl}";
+input string   InpBridgeToken      = "${safeToken}";
 
 datetime lastBarTime = 0;
 datetime lastSyncTime = 0;
@@ -50,6 +58,14 @@ int OnInit()
 }
 
 //+------------------------------------------------------------------+
+//| Expert deinitialization function                                 |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   SyncWithGRIDPIPsBridge("OFFLINE");
+}
+
+//+------------------------------------------------------------------+
 //| Expert tick function                                             |
 //+------------------------------------------------------------------+
 void OnTick()
@@ -65,8 +81,8 @@ void OnTick()
       dayStartBalance = AccountInfoDouble(ACCOUNT_BALANCE);
    }
 
-   // Periodic MT5 Bridge heartbeat every 60 seconds
-   if(InpEnableWebBridge && TimeCurrent() - lastSyncTime >= 60)
+   // Periodic MT5 Bridge heartbeat every 30 seconds
+   if(InpEnableWebBridge && TimeCurrent() - lastSyncTime >= 30)
    {
       SyncWithGRIDPIPsBridge("ACTIVE");
       lastSyncTime = TimeCurrent();
@@ -150,18 +166,24 @@ bool IsInsideKillzone(int hour)
    return (inLondon || inNY);
 }
 
-bool HasOpenPosition()
+int CountOpenEaPositions()
 {
+   int count = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(PositionGetTicket(i) > 0)
       {
          if(PositionGetString(POSITION_SYMBOL) == _Symbol &&
             PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
-            return true;
+            count++;
       }
    }
-   return false;
+   return count;
+}
+
+bool HasOpenPosition()
+{
+   return CountOpenEaPositions() > 0;
 }
 
 double GetPipSize()
@@ -194,31 +216,45 @@ void SyncWithGRIDPIPsBridge(string eventStatus)
    if(!InpEnableWebBridge || StringLen(InpBridgeToken) < 8) return;
    string headers = "Content-Type: application/json\\r\\n";
    string payload = StringFormat(
-      "{\\"token\\":\\"%s\\",\\"login\\":\\"%I64d\\",\\"server\\":\\"%s\\",\\"symbol\\":\\"%s\\",\\"balance\\":%.2f,\\"equity\\":%.2f,\\"status\\":\\"%s\\"}",
+      "{\\"token\\":\\"%s\\",\\"login\\":\\"%I64d\\",\\"server\\":\\"%s\\",\\"symbol\\":\\"%s\\",\\"balance\\":%.2f,\\"equity\\":%.2f,\\"openPositions\\":%d,\\"eaName\\":\\"ICT Silver Bullet EA\\",\\"status\\":\\"%s\\"}",
       InpBridgeToken,
       AccountInfoInteger(ACCOUNT_LOGIN),
       AccountInfoString(ACCOUNT_SERVER),
       _Symbol,
       AccountInfoDouble(ACCOUNT_BALANCE),
       AccountInfoDouble(ACCOUNT_EQUITY),
+      CountOpenEaPositions(),
       eventStatus
    );
    char post[], result[];
    StringToCharArray(payload, post, 0, StringLen(payload));
    string resHeaders;
    ResetLastError();
-   WebRequest("POST", InpBridgeUrl, headers, 3000, post, result, resHeaders);
+   int code = WebRequest("POST", InpBridgeUrl, headers, 4000, post, result, resHeaders);
+   if(code == -1)
+   {
+      int err = GetLastError();
+      if(err == 4014)
+         Print("GRIDPIPs Bridge: Whitelist ", InpBridgeUrl, " under MT5 Tools -> Options -> Expert Advisors -> Allow WebRequest.");
+      else
+         Print("GRIDPIPs Bridge error code: ", err);
+   }
 }
 `;
+}
 
-export const SMC_ORDERBLOCK_MQ5 = `//+------------------------------------------------------------------+
+export function buildSmcOrderBlockEa(bridgeUrl: string, bridgeToken: string): string {
+  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://grid-pips.vercel.app/api/ea/mt5/heartbeat';
+  const safeToken = sanitizeMqlString(bridgeToken) || 'PASTE_YOUR_BRIDGE_TOKEN_HERE';
+
+  return `//+------------------------------------------------------------------+
 //|                                GRIDPIPs_SMC_OrderBlock_EA.mq5     |
 //|                        Copyright 2026, GRIDPIPs Automation Labs   |
 //|                                   https://t.me/JakoyoFx          |
 //+------------------------------------------------------------------+
 #property copyright "GRIDPIPs Automation Labs"
 #property link      "https://t.me/JakoyoFx"
-#property version   "1.00"
+#property version   "1.10"
 #property strict
 
 #include <Trade\\Trade.mqh>
@@ -231,17 +267,36 @@ input int      InpSwingLookback   = 12;       // Swing High/Low lookback bars
 input double   InpRewardRisk      = 3.0;      // Target R:R Ratio
 input bool     InpMoveToBreakEven = true;     // Move SL to BreakEven at 1:1.5 R:R
 
+input group "=== GRIDPIPs MT5 Bridge Sync (Pre-Configured) ==="
+input bool     InpEnableWebBridge = true;     // Sync live telemetry to GRIDPIPs Dashboard
+input string   InpBridgeUrl       = "${safeUrl}";
+input string   InpBridgeToken     = "${safeToken}";
+
 datetime lastBar = 0;
+datetime lastSyncTime = 0;
 
 int OnInit()
 {
    trade.SetExpertMagicNumber(InpMagicNumber);
+   trade.SetDeviationInPoints(20);
    Print("GRIDPIPs SMC Order Block EA started on ", _Symbol);
+   SyncWithGRIDPIPsBridge("ONLINE");
    return(INIT_SUCCEEDED);
+}
+
+void OnDeinit(const int reason)
+{
+   SyncWithGRIDPIPsBridge("OFFLINE");
 }
 
 void OnTick()
 {
+   if(InpEnableWebBridge && TimeCurrent() - lastSyncTime >= 30)
+   {
+      SyncWithGRIDPIPsBridge("ACTIVE");
+      lastSyncTime = TimeCurrent();
+   }
+
    if(InpMoveToBreakEven) ManageBreakEven();
 
    datetime barTime = iTime(_Symbol, PERIOD_CURRENT, 0);
@@ -273,7 +328,10 @@ void OnTick()
       if(dist > 0)
       {
          double tp = NormalizeDouble(ask + dist * InpRewardRisk, _Digits);
-         trade.Buy(CalcLots(dist), _Symbol, ask, sl, tp, "GRIDPIPs SMC SSL Sweep");
+         if(trade.Buy(CalcLots(dist), _Symbol, ask, sl, tp, "GRIDPIPs SMC SSL Sweep"))
+         {
+            SyncWithGRIDPIPsBridge("BUY_EXECUTED");
+         }
       }
    }
    // Bearish Buy-Side Liquidity Sweep + Rejection
@@ -284,21 +342,30 @@ void OnTick()
       if(dist > 0)
       {
          double tp = NormalizeDouble(bid - dist * InpRewardRisk, _Digits);
-         trade.Sell(CalcLots(dist), _Symbol, bid, sl, tp, "GRIDPIPs SMC BSL Sweep");
+         if(trade.Sell(CalcLots(dist), _Symbol, bid, sl, tp, "GRIDPIPs SMC BSL Sweep"))
+         {
+            SyncWithGRIDPIPsBridge("SELL_EXECUTED");
+         }
       }
    }
 }
 
-bool HasPosition()
+int CountOpenEaPositions()
 {
+   int count = 0;
    for(int i = PositionsTotal() - 1; i >= 0; i--)
    {
       if(PositionGetTicket(i) > 0 &&
          PositionGetString(POSITION_SYMBOL) == _Symbol &&
          PositionGetInteger(POSITION_MAGIC) == InpMagicNumber)
-         return true;
+         count++;
    }
-   return false;
+   return count;
+}
+
+bool HasPosition()
+{
+   return CountOpenEaPositions() > 0;
 }
 
 double CalcLots(double slDist)
@@ -340,9 +407,51 @@ void ManageBreakEven()
       }
    }
 }
+
+void SyncWithGRIDPIPsBridge(string eventStatus)
+{
+   if(!InpEnableWebBridge || StringLen(InpBridgeToken) < 8) return;
+   string headers = "Content-Type: application/json\\r\\n";
+   string payload = StringFormat(
+      "{\\"token\\":\\"%s\\",\\"login\\":\\"%I64d\\",\\"server\\":\\"%s\\",\\"symbol\\":\\"%s\\",\\"balance\\":%.2f,\\"equity\\":%.2f,\\"openPositions\\":%d,\\"eaName\\":\\"SMC Order Block EA\\",\\"status\\":\\"%s\\"}",
+      InpBridgeToken,
+      AccountInfoInteger(ACCOUNT_LOGIN),
+      AccountInfoString(ACCOUNT_SERVER),
+      _Symbol,
+      AccountInfoDouble(ACCOUNT_BALANCE),
+      AccountInfoDouble(ACCOUNT_EQUITY),
+      CountOpenEaPositions(),
+      eventStatus
+   );
+   char post[], result[];
+   StringToCharArray(payload, post, 0, StringLen(payload));
+   string resHeaders;
+   ResetLastError();
+   int code = WebRequest("POST", InpBridgeUrl, headers, 4000, post, result, resHeaders);
+   if(code == -1)
+   {
+      int err = GetLastError();
+      if(err == 4014)
+         Print("GRIDPIPs Bridge: Whitelist ", InpBridgeUrl, " under MT5 Tools -> Options -> Expert Advisors -> Allow WebRequest.");
+      else
+         Print("GRIDPIPs Bridge error code: ", err);
+   }
+}
 `;
+}
+
+export const ICT_SILVER_BULLET_MQ5 = buildSilverBulletEa(
+  'https://grid-pips.vercel.app/api/ea/mt5/heartbeat',
+  'PASTE_YOUR_BRIDGE_TOKEN_HERE'
+);
+
+export const SMC_ORDERBLOCK_MQ5 = buildSmcOrderBlockEa(
+  'https://grid-pips.vercel.app/api/ea/mt5/heartbeat',
+  'PASTE_YOUR_BRIDGE_TOKEN_HERE'
+);
 
 export function buildInstallationGuide(userName: string, bridgeToken: string, appUrl: string): string {
+  const base = appUrl.replace(/\/+$/, '');
   return `====================================================================
 GRIDPIPs MQL5 EXPERT ADVISOR PACK — INSTALLATION & MT5 BRIDGE GUIDE
 ====================================================================
@@ -350,9 +459,11 @@ Licensed To: ${userName}
 Telegram Community: https://t.me/JakoyoFx
 Exness IB Partner Portal: https://one.exnessonelink.com/a/0p67hxlswg?source=app
 
-INCLUDED SOURCE FILES:
+INCLUDED PRE-CONFIGURED SOURCE FILES:
 1. GRIDPIPs_ICT_SilverBullet_EA.mq5  (ICT Fair Value Gap + Killzone Engine)
 2. GRIDPIPs_SMC_OrderBlock_EA.mq5    (SMC Liquidity Sweep + Order Block Engine)
+
+Note: Your personal Bridge URL and Token are ALREADY embedded inside both .mq5 files.
 
 --------------------------------------------------------------------
 STEP 1: INSTALL & COMPILE IN METATRADER 5 (MT5)
@@ -366,25 +477,26 @@ STEP 1: INSTALL & COMPILE IN METATRADER 5 (MT5)
    Verify 0 errors in the Toolbox tab.
 
 --------------------------------------------------------------------
-STEP 2: CONNECT EA TO YOUR PIPGRID MT5 BRIDGE (OPTIONAL TELEMETRY)
+STEP 2: ENABLE MT5 BRIDGE CONNECTION (REQUIRED FOR LIVE SYNC)
 --------------------------------------------------------------------
 1. In MetaTrader 5, go to Tools -> Options -> Expert Advisors.
 2. Check "Allow algorithmic trading".
 3. Check "Allow WebRequest for listed URL" and add:
-   ${appUrl}
-4. Drag "GRIDPIPs_ICT_SilverBullet_EA" onto an M15 or H1 chart (EURUSD, GBPUSD, XAUUSD, or NAS100).
-5. In the EA Inputs tab:
-   - Set InpEnableWebBridge = true
-   - Set InpBridgeUrl = ${appUrl}/api/ea/mt5/heartbeat
-   - Set InpBridgeToken = ${bridgeToken}
-   - Set InpRiskPercent = 1.0 (recommended 0.5% - 1.5% per trade)
+   ${base}
+4. Drag either EA onto an M1, M5, M15, or H1 chart (EURUSD, GBPUSD, XAUUSD, or NAS100).
+5. Confirm EA Inputs (already pre-filled):
+   - InpEnableWebBridge = true
+   - InpBridgeUrl = ${base}/api/ea/mt5/heartbeat
+   - InpBridgeToken = ${bridgeToken}
+   - InpRiskPercent = 1.0 (recommended 0.5% - 1.5% per trade)
+6. Ensure the "Algo Trading" button at the top of MT5 is GREEN.
 
 --------------------------------------------------------------------
 STEP 3: RECOMMENDED EXNESS MT5 SETTINGS
 --------------------------------------------------------------------
 - Recommended Broker: Exness (Raw Spread or Pro account via IB link)
 - Best Pairs: EURUSD, GBPUSD, XAUUSD, NAS100, US30
-- Recommended Timeframes: M15 (Silver Bullet) or H1 (SMC Order Block)
+- Recommended Timeframes: M1 / M5 / M15 (Silver Bullet) or H1 (SMC Order Block)
 - Always test on an Exness MT5 Trial/Demo account before live deployment.
 
 Support & Live ICT Breakdowns: https://t.me/JakoyoFx

@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { LANDING_IMAGES } from '../assets/landingImages';
 import { BrandLogo } from './BrandLogo';
+import { LiveTradingViewChart } from './LiveTradingViewChart';
+import { ANALYZER_TIMEFRAMES, TRADING_SYMBOLS, type AnalyzerTimeframe } from '../lib/tradingTimeframes';
 import type { PublicConfig, User } from '../types';
 import type { MarketSymbolQuote } from '../lib/api';
 
@@ -21,7 +23,7 @@ interface LandingPageProps {
   quotes: MarketSymbolQuote[];
   onGoAuth: (mode: 'login' | 'register') => void;
   onGoWorkspace: () => void;
-  onSelectProduct: (product: 'analyzer' | 'ea_bots') => void;
+  onSelectProduct: (product: 'analyzer' | 'ea_bots', symbol?: string, timeframe?: AnalyzerTimeframe) => void;
 }
 
 type LegalDocKey = 'risk' | 'affiliate' | 'terms' | 'privacy';
@@ -205,6 +207,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [phoneSymIndex, setPhoneSymIndex] = useState(0);
   const [liveCandleTick, setLiveCandleTick] = useState(0);
   const [nyClock, setNyClock] = useState(() => getNyClock());
+  const [freeChartSymbol, setFreeChartSymbol] = useState<string>('EURUSD');
+  const [freeChartTf, setFreeChartTf] = useState<AnalyzerTimeframe>('1M');
 
   useEffect(() => {
     const clockId = setInterval(() => {
@@ -271,6 +275,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               Home
             </a>
             <a
+              href="#free-chart"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
+            >
+              Live Chart
+            </a>
+            <a
               href="#capabilities"
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
@@ -287,14 +297,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
               Education
-            </a>
-            <a
-              href={config.telegramUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
-            >
-              Community
             </a>
           </nav>
 
@@ -665,13 +667,69 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
           <div className="mt-4 flex justify-center">
             <a
-              href="#capabilities"
+              href="#free-chart"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-neutral-400 hover:text-amber-300 transition-colors"
             >
               <ChevronDown className="w-3.5 h-3.5" />
-              Scroll to explore
+              Open Free Live Chart
             </a>
           </div>
+        </div>
+      </section>
+
+      {/* Free Public Live Market Chart (No Login or Subscription Required) */}
+      <section id="free-chart" className="bg-[#08080a] text-white py-14 border-b border-amber-500/20">
+        <div className="max-w-7xl mx-auto px-6 space-y-5">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold text-amber-400 mb-1">Free Live Terminal · No Account Required</p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                Free Live Market Chart (1M to 1W)
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              <select
+                value={freeChartSymbol}
+                onChange={(e) => setFreeChartSymbol(e.target.value)}
+                aria-label="Free chart symbol"
+                className="px-3 py-2 text-xs font-mono font-semibold bg-neutral-900 border border-neutral-700 text-white rounded-lg"
+              >
+                {TRADING_SYMBOLS.map((sym) => (
+                  <option key={sym} value={sym}>
+                    {sym}
+                  </option>
+                ))}
+              </select>
+
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-neutral-900 border border-neutral-800 rounded-lg">
+                {ANALYZER_TIMEFRAMES.map((tf) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setFreeChartTf(tf)}
+                    className={`px-2.5 py-1.5 text-xs font-mono font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                      freeChartTf === tf ? 'bg-amber-400 text-black' : 'text-neutral-300 hover:text-white'
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  user ? onSelectProduct('analyzer', freeChartSymbol, freeChartTf) : onGoAuth('register')
+                }
+                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0"
+              >
+                Scan {freeChartSymbol} ({freeChartTf}) in ICT Analyzer →
+              </button>
+            </div>
+          </div>
+
+          <LiveTradingViewChart symbol={freeChartSymbol} timeframe={freeChartTf} theme="dark" heightClass="h-[520px]" />
         </div>
       </section>
 

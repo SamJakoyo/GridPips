@@ -190,10 +190,29 @@ export function initDatabase(): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS mt5_telemetry_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      ea_name TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      status TEXT NOT NULL,
+      balance REAL NOT NULL DEFAULT 0,
+      equity REAL NOT NULL DEFAULT 0,
+      open_positions INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!userCols.includes('supabase_uid')) db.exec('ALTER TABLE users ADD COLUMN supabase_uid TEXT');
+  if (!userCols.includes('mt5_balance')) db.exec('ALTER TABLE users ADD COLUMN mt5_balance REAL');
+  if (!userCols.includes('mt5_equity')) db.exec('ALTER TABLE users ADD COLUMN mt5_equity REAL');
+  if (!userCols.includes('mt5_symbol')) db.exec('ALTER TABLE users ADD COLUMN mt5_symbol TEXT');
+  if (!userCols.includes('mt5_ea_name')) db.exec('ALTER TABLE users ADD COLUMN mt5_ea_name TEXT');
+  if (!userCols.includes('mt5_open_positions')) db.exec('ALTER TABLE users ADD COLUMN mt5_open_positions INTEGER DEFAULT 0');
+  if (!userCols.includes('mt5_status')) db.exec('ALTER TABLE users ADD COLUMN mt5_status TEXT');
 
   const orderCols = (db.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');

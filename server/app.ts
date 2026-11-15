@@ -36,11 +36,11 @@ import {
 } from './supabaseAuth.ts';
 import { sendAutomatedEmail } from './email.ts';
 import {
-  ICT_SILVER_BULLET_MQ5,
-  SMC_ORDERBLOCK_MQ5,
+  buildSilverBulletEa,
+  buildSmcOrderBlockEa,
   buildInstallationGuide,
 } from './mql5Templates.ts';
-import { runIctMarketAnalysis } from './ictEngine.ts';
+import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
 import {
   formatGeminiApiError,
   runGeminiChat,
@@ -146,6 +146,12 @@ interface DbUser {
   mt5_bridge_token: string | null;
   mt5_connected: number;
   mt5_last_sync: string | null;
+  mt5_balance?: number | null;
+  mt5_equity?: number | null;
+  mt5_symbol?: string | null;
+  mt5_ea_name?: string | null;
+  mt5_open_positions?: number | null;
+  mt5_status?: string | null;
   is_suspended: number;
   created_at: string;
   last_login_at: string | null;
@@ -172,6 +178,12 @@ function serializeUser(u: DbUser) {
     mt5BridgeToken: u.mt5_bridge_token,
     mt5Connected: Boolean(u.mt5_connected),
     mt5LastSync: u.mt5_last_sync,
+    mt5Balance: typeof u.mt5_balance === 'number' ? u.mt5_balance : null,
+    mt5Equity: typeof u.mt5_equity === 'number' ? u.mt5_equity : null,
+    mt5Symbol: u.mt5_symbol || null,
+    mt5EaName: u.mt5_ea_name || null,
+    mt5OpenPositions: typeof u.mt5_open_positions === 'number' ? u.mt5_open_positions : 0,
+    mt5Status: u.mt5_status || null,
     isSuspended: Boolean(u.is_suspended),
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
@@ -1137,11 +1149,7 @@ app.get('/api/supabase/setups', requireAuth, async (req: AuthedRequest, res) => 
 app.post('/api/supabase/setups', requireAuth, async (req: AuthedRequest, res) => {
   try {
     const symbol = sanitizeText(req.body?.symbol || 'EURUSD', 16).toUpperCase();
-    const timeframe = (['M15', 'H1', 'H4', 'D1'].includes(req.body?.timeframe) ? req.body.timeframe : 'M15') as
-      | 'M15'
-      | 'H1'
-      | 'H4'
-      | 'D1';
+    const timeframe = normalizeServerTimeframe(req.body?.timeframe);
     const bias = req.body?.bias === 'Bearish' ? 'Bearish' : 'Bullish';
     const entryZone = sanitizeText(req.body?.entryZone || 'Market', 64);
     const stopLoss = Number(req.body?.stopLoss || 0);
@@ -1866,20 +1874,44 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
 });
 
 // ---------------- ICT Strategy Market Analyzer ($5.25 Gated) ----------------
-app.get('/api/analyzer/scan', requireAuth, (req: AuthedRequest, res) => {
-  const user = req.currentUser!;
-  if (!user.has_analyzer && user.role !== 'admin') {
-    res.status(402).json({ error: 'ICT Market Analyzer requires a one-time $5.25 unlock.' });
-    return;
+app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const user = req.currentUser!;
+    if (!user.has_analyzer && user.role !== 'admin') {
+      res.status(402).json({ error: 'ICT Market Analyzer requires a one-time $5.25 unlock.' });
+      return;
+    }
+    const symbol = sanitizeText(req.query.symbol || 'EURUSD', 12).toUpperCase();
+    const timeframe = normalizeServerTimeframe(sanitizeText(req.query.timeframe || '1M', 8));
+    const settings = getSettingsMap();
+    const analysis = await runIctMarketAnalysis(symbol, timeframe, settings.ict_youtube_channel_id);
+    res.json({ analysis });
+  } catch (err) {
+    console.error('Analyzer scan error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to complete ICT market scan.' });
   }
-  const symbol = sanitizeText(req.query.symbol || 'EURUSD', 12).toUpperCase();
-  const timeframe = sanitizeText(req.query.timeframe || 'M15', 8).toUpperCase();
-  const settings = getSettingsMap();
-  const analysis = runIctMarketAnalysis(symbol, timeframe, settings.ict_youtube_channel_id);
-  res.json({ analysis });
 });
 
 // ---------------- MQL5 EA Bots & MT5 Bridge ($5.25 Gated) ----------------
+function ensureUserBridgeToken(user: DbUser): string {
+  if (user.mt5_bridge_token && user.mt5_bridge_token.length >= 12) {
+    return user.mt5_bridge_token;
+  }
+  const freshToken = generateSecureToken(16);
+  db.prepare('UPDATE users SET mt5_bridge_token = ? WHERE id = ?').run(freshToken, user.id);
+  user.mt5_bridge_token = freshToken;
+  return freshToken;
+}
+
+function resolvePublicAppOrigin(req: Request): string {
+  const host = req.get('host');
+  if (host) {
+    const proto = req.headers['x-forwarded-proto'] === 'https' || req.secure ? 'https' : req.protocol;
+    return `${proto}://${host}`.replace(/\/+$/, '');
+  }
+  return (process.env.APP_URL || 'https://grid-pips.vercel.app').replace(/\/+$/, '');
+}
+
 app.get('/api/ea/source/:bot', requireAuth, (req: AuthedRequest, res) => {
   const user = req.currentUser!;
   if (!user.has_ea_bots && user.role !== 'admin') {
@@ -1887,15 +1919,30 @@ app.get('/api/ea/source/:bot', requireAuth, (req: AuthedRequest, res) => {
     return;
   }
   const bot = req.params.bot;
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const appUrl = resolvePublicAppOrigin(req);
+  const bridgeToken = ensureUserBridgeToken(user);
+  const bridgeEndpoint = `${appUrl}/api/ea/mt5/heartbeat`;
+
   if (bot === 'silverbullet') {
-    res.json({ filename: 'GRIDPIPs_ICT_SilverBullet_EA.mq5', content: ICT_SILVER_BULLET_MQ5 });
+    res.json({
+      filename: 'GRIDPIPs_ICT_SilverBullet_EA.mq5',
+      content: buildSilverBulletEa(bridgeEndpoint, bridgeToken),
+      bridgeToken,
+      bridgeEndpoint,
+    });
   } else if (bot === 'orderblock') {
-    res.json({ filename: 'GRIDPIPs_SMC_OrderBlock_EA.mq5', content: SMC_ORDERBLOCK_MQ5 });
+    res.json({
+      filename: 'GRIDPIPs_SMC_OrderBlock_EA.mq5',
+      content: buildSmcOrderBlockEa(bridgeEndpoint, bridgeToken),
+      bridgeToken,
+      bridgeEndpoint,
+    });
   } else {
     res.json({
       filename: 'INSTALLATION_GUIDE.txt',
-      content: buildInstallationGuide(user.name, user.mt5_bridge_token || '', appUrl),
+      content: buildInstallationGuide(user.name, bridgeToken, appUrl),
+      bridgeToken,
+      bridgeEndpoint,
     });
   }
 });
@@ -1907,16 +1954,34 @@ app.get('/api/ea/download', requireAuth, async (req: AuthedRequest, res) => {
     return;
   }
 
-  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const appUrl = resolvePublicAppOrigin(req);
+  const bridgeToken = ensureUserBridgeToken(user);
+  const bridgeEndpoint = `${appUrl}/api/ea/mt5/heartbeat`;
   const zip = new JSZip();
-  zip.file('GRIDPIPs_ICT_SilverBullet_EA.mq5', ICT_SILVER_BULLET_MQ5);
-  zip.file('GRIDPIPs_SMC_OrderBlock_EA.mq5', SMC_ORDERBLOCK_MQ5);
-  zip.file('INSTALLATION_GUIDE.txt', buildInstallationGuide(user.name, user.mt5_bridge_token || '', appUrl));
+  zip.file('GRIDPIPs_ICT_SilverBullet_EA.mq5', buildSilverBulletEa(bridgeEndpoint, bridgeToken));
+  zip.file('GRIDPIPs_SMC_OrderBlock_EA.mq5', buildSmcOrderBlockEa(bridgeEndpoint, bridgeToken));
+  zip.file('INSTALLATION_GUIDE.txt', buildInstallationGuide(user.name, bridgeToken, appUrl));
 
   const buffer = await zip.generateAsync({ type: 'nodebuffer' });
   res.setHeader('Content-Type', 'application/zip');
   res.setHeader('Content-Disposition', 'attachment; filename="GRIDPIPs_MQL5_EA_Bots_Pack.zip"');
   res.send(buffer);
+});
+
+app.get('/api/ea/mt5/status', requireAuth, (req: AuthedRequest, res) => {
+  const user = req.currentUser!;
+  if (!user.has_ea_bots && user.role !== 'admin') {
+    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+    return;
+  }
+  ensureUserBridgeToken(user);
+  const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+  const events = db
+    .prepare(
+      'SELECT id, ea_name, symbol, status, balance, equity, open_positions, created_at FROM mt5_telemetry_events WHERE user_id = ? ORDER BY id DESC LIMIT 10'
+    )
+    .all(user.id);
+  res.json({ user: serializeUser(refreshed), events });
 });
 
 app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => {
@@ -1931,10 +1996,14 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
     res.status(400).json({ error: 'Provide both your MT5 Login ID and Broker Server (e.g. Exness-MT5Real).' });
     return;
   }
-  const token = user.mt5_bridge_token || generateSecureToken(16);
+  const token = ensureUserBridgeToken(user);
   db.prepare(
-    "UPDATE users SET mt5_login = ?, mt5_server = ?, mt5_bridge_token = ?, mt5_connected = 1, mt5_last_sync = datetime('now') WHERE id = ?"
+    "UPDATE users SET mt5_login = ?, mt5_server = ?, mt5_bridge_token = ?, mt5_connected = 1, mt5_status = 'BOUND_READY', mt5_last_sync = datetime('now') WHERE id = ?"
   ).run(mt5Login, mt5Server, token, user.id);
+
+  db.prepare(
+    'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(user.id, 'MT5 Terminal Bridge', 'MULTI', 'BOUND_READY', 0, 0, 0);
 
   await sendAutomatedEmail({
     to: user.email,
@@ -1952,6 +2021,13 @@ app.post('/api/ea/mt5/heartbeat', (req, res) => {
   const token = sanitizeText(req.body?.token, 64);
   const login = sanitizeText(req.body?.login, 32);
   const server = sanitizeText(req.body?.server, 64);
+  const symbol = sanitizeText(req.body?.symbol || 'EURUSD', 20).toUpperCase();
+  const eaName = sanitizeText(req.body?.eaName || 'GRIDPIPs MQL5 EA', 60);
+  const status = sanitizeText(req.body?.status || 'ACTIVE', 32).toUpperCase();
+  const balance = Number.isFinite(Number(req.body?.balance)) ? Number(req.body?.balance) : null;
+  const equity = Number.isFinite(Number(req.body?.equity)) ? Number(req.body?.equity) : null;
+  const openPositions = Number.isFinite(Number(req.body?.openPositions)) ? Math.max(0, Math.trunc(Number(req.body?.openPositions))) : 0;
+
   if (!token) {
     res.status(401).json({ error: 'Missing bridge token' });
     return;
@@ -1962,9 +2038,25 @@ app.post('/api/ea/mt5/heartbeat', (req, res) => {
     return;
   }
   db.prepare(
-    "UPDATE users SET mt5_connected = 1, mt5_login = COALESCE(NULLIF(?, ''), mt5_login), mt5_server = COALESCE(NULLIF(?, ''), mt5_server), mt5_last_sync = datetime('now') WHERE id = ?"
-  ).run(login, server, user.id);
-  res.json({ ok: true, syncedAt: new Date().toISOString() });
+    `UPDATE users SET
+      mt5_connected = 1,
+      mt5_login = COALESCE(NULLIF(?, ''), mt5_login),
+      mt5_server = COALESCE(NULLIF(?, ''), mt5_server),
+      mt5_symbol = COALESCE(NULLIF(?, ''), mt5_symbol),
+      mt5_ea_name = COALESCE(NULLIF(?, ''), mt5_ea_name),
+      mt5_status = COALESCE(NULLIF(?, ''), mt5_status),
+      mt5_balance = COALESCE(?, mt5_balance),
+      mt5_equity = COALESCE(?, mt5_equity),
+      mt5_open_positions = ?,
+      mt5_last_sync = datetime('now')
+     WHERE id = ?`
+  ).run(login, server, symbol, eaName, status, balance, equity, openPositions, user.id);
+
+  db.prepare(
+    'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run(user.id, eaName, symbol, status, balance ?? 0, equity ?? 0, openPositions);
+
+  res.json({ ok: true, syncedAt: new Date().toISOString(), status });
 });
 
 // ---------------- Free Workspace Tools (Journal, Paper, Plan, Watchlist) ----------------
