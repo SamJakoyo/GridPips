@@ -138,7 +138,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           notes: `${analysis.structureShift} · ${analysis.activeKillzone}`,
         }),
       });
-      setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to Supabase.`);
+      setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to your account.`);
       await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save setup.');
@@ -172,7 +172,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       });
       setPlaybookTitle('');
       setPlaybookRules('');
-      setCloudNotice('Strategy playbook saved to Supabase.');
+      setCloudNotice('Strategy playbook saved to your account.');
       await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save playbook.');
@@ -560,7 +560,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               <BookmarkPlus className="w-4 h-4 text-blue-600" />
               Saved ICT Setups
             </h3>
-            <span className="text-xs text-emerald-700">Synced with Supabase</span>
           </div>
           {savedSetups.length === 0 ? (
             <p className="text-xs text-slate-500 py-4">
@@ -599,7 +598,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               <BookMarked className="w-4 h-4 text-blue-600" />
               Strategy Playbooks
             </h3>
-            <span className="text-xs text-emerald-700">Synced with Supabase</span>
           </div>
 
           <form onSubmit={handleCreatePlaybook} className="space-y-2.5">
