@@ -211,6 +211,82 @@ double CalculateLotSize(double slDistancePrice)
    return MathMax(minLot, MathMin(maxLot, NormalizeDouble(stepped, 2)));
 }
 
+string ExtractJsonValue(string json, string key)
+{
+   string needle = "\\"" + key + "\\":";
+   int pos = StringFind(json, needle);
+   if(pos < 0) return "";
+   int start = pos + StringLen(needle);
+   while(start < StringLen(json) && (StringGetCharacter(json, start) == ' ' || StringGetCharacter(json, start) == '\\t')) start++;
+   if(start >= StringLen(json)) return "";
+   if(StringGetCharacter(json, start) == '"')
+   {
+      start++;
+      int endQ = StringFind(json, "\\"", start);
+      if(endQ < 0) return "";
+      return StringSubstr(json, start, endQ - start);
+   }
+   int endC = StringFind(json, ",", start);
+   int endB = StringFind(json, "}", start);
+   int endIdx = (endC >= 0 && (endB < 0 || endC < endB)) ? endC : endB;
+   if(endIdx < 0) endIdx = StringLen(json);
+   return StringSubstr(json, start, endIdx - start);
+}
+
+void ExecuteRemoteCommandIfPresent(string responseBody)
+{
+   if(StringFind(responseBody, "\\"autoTradeEnabled\\":true") < 0) return;
+   string cmdIdStr = ExtractJsonValue(responseBody, "cmdId");
+   long cmdId = StringToInteger(cmdIdStr);
+   if(cmdId <= 0) return;
+
+   string cmdSym  = ExtractJsonValue(responseBody, "cmdSymbol");
+   string cmdSide = ExtractJsonValue(responseBody, "cmdSide");
+   double cmdVol  = StringToDouble(ExtractJsonValue(responseBody, "cmdVol"));
+   double cmdSl   = StringToDouble(ExtractJsonValue(responseBody, "cmdSl"));
+   double cmdTp   = StringToDouble(ExtractJsonValue(responseBody, "cmdTp"));
+
+   if(StringLen(cmdSym) < 3) cmdSym = _Symbol;
+   if(cmdVol <= 0) cmdVol = SymbolInfoDouble(cmdSym, SYMBOL_VOLUME_MIN);
+   SymbolSelect(cmdSym, true);
+
+   int symDigits = (int)SymbolInfoInteger(cmdSym, SYMBOL_DIGITS);
+   double sl = (cmdSl > 0) ? NormalizeDouble(cmdSl, symDigits) : 0;
+   double tp = (cmdTp > 0) ? NormalizeDouble(cmdTp, symDigits) : 0;
+   bool ok = false;
+
+   if(cmdSide == "BUY")
+      ok = trade.Buy(cmdVol, cmdSym, SymbolInfoDouble(cmdSym, SYMBOL_ASK), sl, tp, "GRIDPIPs Auto-Trade");
+   else if(cmdSide == "SELL")
+      ok = trade.Sell(cmdVol, cmdSym, SymbolInfoDouble(cmdSym, SYMBOL_BID), sl, tp, "GRIDPIPs Auto-Trade");
+
+   if(ok)
+      AcknowledgeCommandExecution(cmdId, "EXECUTED");
+   else
+      AcknowledgeCommandExecution(cmdId, "FAILED");
+}
+
+void AcknowledgeCommandExecution(long cmdId, string cmdStatus)
+{
+   string headers = "Content-Type: application/json\\r\\n";
+   string payload = StringFormat(
+      "{\\"token\\":\\"%s\\",\\"login\\":\\"%I64d\\",\\"server\\":\\"%s\\",\\"symbol\\":\\"%s\\",\\"balance\\":%.2f,\\"equity\\":%.2f,\\"openPositions\\":%d,\\"eaName\\":\\"ICT Silver Bullet EA\\",\\"status\\":\\"CMD_%s\\",\\"executedCmdId\\":%I64d}",
+      InpBridgeToken,
+      AccountInfoInteger(ACCOUNT_LOGIN),
+      AccountInfoString(ACCOUNT_SERVER),
+      _Symbol,
+      AccountInfoDouble(ACCOUNT_BALANCE),
+      AccountInfoDouble(ACCOUNT_EQUITY),
+      CountOpenEaPositions(),
+      cmdStatus,
+      cmdId
+   );
+   char post[], result[];
+   StringToCharArray(payload, post, 0, StringLen(payload));
+   string resHeaders;
+   WebRequest("POST", InpBridgeUrl, headers, 4000, post, result, resHeaders);
+}
+
 void SyncWithGRIDPIPsBridge(string eventStatus)
 {
    if(!InpEnableWebBridge || StringLen(InpBridgeToken) < 8) return;
@@ -238,7 +314,10 @@ void SyncWithGRIDPIPsBridge(string eventStatus)
          Print("GRIDPIPs Bridge: Whitelist ", InpBridgeUrl, " under MT5 Tools -> Options -> Expert Advisors -> Allow WebRequest.");
       else
          Print("GRIDPIPs Bridge error code: ", err);
+      return;
    }
+   string body = CharArrayToString(result);
+   ExecuteRemoteCommandIfPresent(body);
 }
 `;
 }
@@ -408,6 +487,82 @@ void ManageBreakEven()
    }
 }
 
+string ExtractJsonValue(string json, string key)
+{
+   string needle = "\\"" + key + "\\":";
+   int pos = StringFind(json, needle);
+   if(pos < 0) return "";
+   int start = pos + StringLen(needle);
+   while(start < StringLen(json) && (StringGetCharacter(json, start) == ' ' || StringGetCharacter(json, start) == '\\t')) start++;
+   if(start >= StringLen(json)) return "";
+   if(StringGetCharacter(json, start) == '"')
+   {
+      start++;
+      int endQ = StringFind(json, "\\"", start);
+      if(endQ < 0) return "";
+      return StringSubstr(json, start, endQ - start);
+   }
+   int endC = StringFind(json, ",", start);
+   int endB = StringFind(json, "}", start);
+   int endIdx = (endC >= 0 && (endB < 0 || endC < endB)) ? endC : endB;
+   if(endIdx < 0) endIdx = StringLen(json);
+   return StringSubstr(json, start, endIdx - start);
+}
+
+void ExecuteRemoteCommandIfPresent(string responseBody)
+{
+   if(StringFind(responseBody, "\\"autoTradeEnabled\\":true") < 0) return;
+   string cmdIdStr = ExtractJsonValue(responseBody, "cmdId");
+   long cmdId = StringToInteger(cmdIdStr);
+   if(cmdId <= 0) return;
+
+   string cmdSym  = ExtractJsonValue(responseBody, "cmdSymbol");
+   string cmdSide = ExtractJsonValue(responseBody, "cmdSide");
+   double cmdVol  = StringToDouble(ExtractJsonValue(responseBody, "cmdVol"));
+   double cmdSl   = StringToDouble(ExtractJsonValue(responseBody, "cmdSl"));
+   double cmdTp   = StringToDouble(ExtractJsonValue(responseBody, "cmdTp"));
+
+   if(StringLen(cmdSym) < 3) cmdSym = _Symbol;
+   if(cmdVol <= 0) cmdVol = SymbolInfoDouble(cmdSym, SYMBOL_VOLUME_MIN);
+   SymbolSelect(cmdSym, true);
+
+   int symDigits = (int)SymbolInfoInteger(cmdSym, SYMBOL_DIGITS);
+   double sl = (cmdSl > 0) ? NormalizeDouble(cmdSl, symDigits) : 0;
+   double tp = (cmdTp > 0) ? NormalizeDouble(cmdTp, symDigits) : 0;
+   bool ok = false;
+
+   if(cmdSide == "BUY")
+      ok = trade.Buy(cmdVol, cmdSym, SymbolInfoDouble(cmdSym, SYMBOL_ASK), sl, tp, "GRIDPIPs Auto-Trade");
+   else if(cmdSide == "SELL")
+      ok = trade.Sell(cmdVol, cmdSym, SymbolInfoDouble(cmdSym, SYMBOL_BID), sl, tp, "GRIDPIPs Auto-Trade");
+
+   if(ok)
+      AcknowledgeCommandExecution(cmdId, "EXECUTED");
+   else
+      AcknowledgeCommandExecution(cmdId, "FAILED");
+}
+
+void AcknowledgeCommandExecution(long cmdId, string cmdStatus)
+{
+   string headers = "Content-Type: application/json\\r\\n";
+   string payload = StringFormat(
+      "{\\"token\\":\\"%s\\",\\"login\\":\\"%I64d\\",\\"server\\":\\"%s\\",\\"symbol\\":\\"%s\\",\\"balance\\":%.2f,\\"equity\\":%.2f,\\"openPositions\\":%d,\\"eaName\\":\\"SMC Order Block EA\\",\\"status\\":\\"CMD_%s\\",\\"executedCmdId\\":%I64d}",
+      InpBridgeToken,
+      AccountInfoInteger(ACCOUNT_LOGIN),
+      AccountInfoString(ACCOUNT_SERVER),
+      _Symbol,
+      AccountInfoDouble(ACCOUNT_BALANCE),
+      AccountInfoDouble(ACCOUNT_EQUITY),
+      CountOpenEaPositions(),
+      cmdStatus,
+      cmdId
+   );
+   char post[], result[];
+   StringToCharArray(payload, post, 0, StringLen(payload));
+   string resHeaders;
+   WebRequest("POST", InpBridgeUrl, headers, 4000, post, result, resHeaders);
+}
+
 void SyncWithGRIDPIPsBridge(string eventStatus)
 {
    if(!InpEnableWebBridge || StringLen(InpBridgeToken) < 8) return;
@@ -435,7 +590,10 @@ void SyncWithGRIDPIPsBridge(string eventStatus)
          Print("GRIDPIPs Bridge: Whitelist ", InpBridgeUrl, " under MT5 Tools -> Options -> Expert Advisors -> Allow WebRequest.");
       else
          Print("GRIDPIPs Bridge error code: ", err);
+      return;
    }
+   string body = CharArrayToString(result);
+   ExecuteRemoteCommandIfPresent(body);
 }
 `;
 }
@@ -492,7 +650,20 @@ STEP 2: ENABLE MT5 BRIDGE CONNECTION (REQUIRED FOR LIVE SYNC)
 6. Ensure the "Algo Trading" button at the top of MT5 is GREEN.
 
 --------------------------------------------------------------------
-STEP 3: RECOMMENDED EXNESS MT5 SETTINGS
+STEP 3: OPTION B — MTAPI5 SOCKET API (https://github.com/vdemydiuk/mtapi)
+--------------------------------------------------------------------
+For direct WebSocket API control (live Balance/Equity & instant BUY/SELL):
+1. Download the latest MtApi5Installer_x64.msi from:
+   https://github.com/vdemydiuk/mtapi/releases
+2. Run the installer on your trading PC or Windows Forex VPS (this installs
+   MtApi5 Service on default port 8228 plus MtApi5.ex5 in MetaTrader 5).
+3. Open MetaTrader 5 -> Navigator -> Expert Advisors -> attach MtApi5 EA
+   to any chart and ensure "Algo Trading" is GREEN.
+4. In your GRIDPIPs MQL5 EA Bots tab, select "MtApi5 Socket API (vdemydiuk/mtapi)",
+   enter your VPS/tunnel Host and Port 8228, and press "Connect Client MT5 Account".
+
+--------------------------------------------------------------------
+STEP 4: RECOMMENDED EXNESS MT5 SETTINGS
 --------------------------------------------------------------------
 - Recommended Broker: Exness (Raw Spread or Pro account via IB link)
 - Best Pairs: EURUSD, GBPUSD, XAUUSD, NAS100, US30

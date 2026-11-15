@@ -8,6 +8,7 @@ import {
   Trash2,
   BookMarked,
   CandlestickChart,
+  Zap,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import {
@@ -176,6 +177,34 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save playbook.');
+    }
+  }
+
+  const [autoTradingMt5, setAutoTradingMt5] = useState(false);
+
+  async function handleAutoTradeSetupOnMt5() {
+    if (!analysis) return;
+    setError('');
+    setCloudNotice('');
+    setAutoTradingMt5(true);
+    try {
+      const side = analysis.dailyBias === 'Bullish' ? 'BUY' : 'SELL';
+      const res = await apiFetch<{ ok: boolean; message: string }>('/api/ea/mt5/execute', {
+        method: 'POST',
+        body: JSON.stringify({
+          symbol: analysis.symbol,
+          side,
+          volume: 0.05,
+          stopLoss: analysis.setup.stopLoss,
+          takeProfit: analysis.setup.tp1,
+          sourceEa: `ICT ${analysis.timeframe} Scanner`,
+        }),
+      });
+      setCloudNotice(res.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to send setup to connected MT5 account.');
+    } finally {
+      setAutoTradingMt5(false);
     }
   }
 
@@ -538,6 +567,22 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </div>
                   )}
                 </div>
+
+                {user.hasEaBots && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      disabled={autoTradingMt5}
+                      onClick={handleAutoTradeSetupOnMt5}
+                      className="w-full py-2.5 px-4 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60"
+                    >
+                      <Zap className="w-3.5 h-3.5 text-[#E5A93C]" />
+                      {autoTradingMt5
+                        ? 'Sending Order to MT5...'
+                        : `Auto-Trade ${analysis.dailyBias === 'Bullish' ? 'BUY' : 'SELL'} ${analysis.symbol} on MT5`}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-5">

@@ -203,6 +203,24 @@ export function initDatabase(): void {
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS mt5_trade_commands (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      symbol TEXT NOT NULL,
+      side TEXT NOT NULL,
+      volume REAL NOT NULL DEFAULT 0.01,
+      stop_loss REAL,
+      take_profit REAL,
+      source_ea TEXT NOT NULL,
+      execution_mode TEXT NOT NULL DEFAULT 'bridge',
+      status TEXT NOT NULL DEFAULT 'queued',
+      external_order_id TEXT,
+      error_message TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      executed_at TEXT,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>).map((c) => c.name);
@@ -213,6 +231,15 @@ export function initDatabase(): void {
   if (!userCols.includes('mt5_ea_name')) db.exec('ALTER TABLE users ADD COLUMN mt5_ea_name TEXT');
   if (!userCols.includes('mt5_open_positions')) db.exec('ALTER TABLE users ADD COLUMN mt5_open_positions INTEGER DEFAULT 0');
   if (!userCols.includes('mt5_status')) db.exec('ALTER TABLE users ADD COLUMN mt5_status TEXT');
+  if (!userCols.includes('mt5_metaapi_account_id')) db.exec('ALTER TABLE users ADD COLUMN mt5_metaapi_account_id TEXT');
+  if (!userCols.includes('mt5_metaapi_region')) db.exec('ALTER TABLE users ADD COLUMN mt5_metaapi_region TEXT');
+  if (!userCols.includes('mt5_auto_trade')) db.exec('ALTER TABLE users ADD COLUMN mt5_auto_trade INTEGER NOT NULL DEFAULT 0');
+  if (!userCols.includes('mt5_active_bot')) db.exec("ALTER TABLE users ADD COLUMN mt5_active_bot TEXT DEFAULT 'both'");
+  if (!userCols.includes('mt5_risk_percent')) db.exec('ALTER TABLE users ADD COLUMN mt5_risk_percent REAL DEFAULT 1.0');
+  if (!userCols.includes('mt5_connection_mode')) db.exec("ALTER TABLE users ADD COLUMN mt5_connection_mode TEXT DEFAULT 'bridge'");
+  if (!userCols.includes('mt5_mtapi_host')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_host TEXT');
+  if (!userCols.includes('mt5_mtapi_port')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_port INTEGER DEFAULT 8228');
+  if (!userCols.includes('mt5_mtapi_expert_handle')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_expert_handle INTEGER');
 
   const orderCols = (db.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');

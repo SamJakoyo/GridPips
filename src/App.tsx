@@ -559,6 +559,24 @@ export default function App() {
               </span>
               <span>{firstName}</span>
             </button>
+            {user.hasEaBots && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('eabots')}
+                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                  user.mt5Connected
+                    ? 'bg-emerald-950/60 border-emerald-700/60 text-emerald-300 hover:border-emerald-500'
+                    : 'bg-[#17140E] border-[#E5A93C]/50 text-[#E5A93C] hover:bg-[#1F1A11]'
+                }`}
+              >
+                <Bot className="w-3.5 h-3.5" />
+                {user.mt5Connected
+                  ? user.mt5AutoTrade
+                    ? 'MT5 Auto-Trade ON'
+                    : 'MT5 Linked'
+                  : 'Connect MT5'}
+              </button>
+            )}
             <a
               href={config.exnessIbUrl}
               target="_blank"
@@ -912,9 +930,14 @@ const WorkspaceOverview: React.FC<{
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.985 }}
                 onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
-                className="px-5 py-2.5 rounded-lg bg-[#17140F] border border-[#322B1E] hover:border-[#4F432C] text-[#F5F2EB] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="px-5 py-2.5 rounded-lg bg-[#17140F] border border-[#3A3120] hover:border-[#E5A93C] text-[#F5F2EB] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
-                {user.hasEaBots ? 'Download .mq5 & Bridge' : `Get MQL5 EA Bots ($${config.eaBotsPriceUsd.toFixed(2)})`}
+                <Bot className="w-4 h-4 text-[#E5A93C]" />
+                {user.hasEaBots
+                  ? user.mt5Connected
+                    ? 'Manage MT5 & EA Auto-Trade'
+                    : 'Connect Client MT5 Account'
+                  : `Get MQL5 EA Bots ($${config.eaBotsPriceUsd.toFixed(2)})`}
               </motion.button>
             </motion.div>
           </div>
@@ -1090,7 +1113,11 @@ const WorkspaceOverview: React.FC<{
             onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
             className="text-xs font-semibold text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
           >
-            {user.hasEaBots ? 'Download .mq5 & Bridge →' : 'Buy EA Bots Pack →'}
+            {user.hasEaBots
+              ? user.mt5Connected
+                ? 'Manage MT5 Auto-Trading →'
+                : 'Connect Client MT5 Account →'
+              : 'Buy EA Bots Pack →'}
           </button>
         </motion.div>
 
