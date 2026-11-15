@@ -1,9 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { signInWithPopup, signInWithRedirect, signOut } from 'firebase/auth';
 import { ArrowUpRight, Shield, Lock, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { apiFetch, setSessionToken } from '../lib/api';
-import { auth, googleProvider } from '../lib/firebase';
-import { syncFirestoreTraderProfile } from '../lib/firestoreStore';
 import { getSupabaseClient, signOutSupabase } from '../lib/supabase';
 import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
@@ -25,58 +22,8 @@ interface AuthViewProps {
   onBackLanding: () => void;
 }
 
-function getAuthErrorCode(err: unknown): string {
-  if (err && typeof err === 'object' && 'code' in err && typeof (err as { code?: unknown }).code === 'string') {
-    return (err as { code: string }).code;
-  }
-  const msg = err instanceof Error ? err.message : '';
-  const match = msg.match(/\b(auth\/[a-z0-9-]+)\b/i);
-  return match ? match[1] : '';
-}
-
-function isIframeEnvironment(): boolean {
-  try {
-    return typeof window !== 'undefined' && window.self !== window.top;
-  } catch {
-    return true;
-  }
-}
-
 function formatAuthError(err: unknown): string {
-  const code = getAuthErrorCode(err);
-  const msg = err instanceof Error ? err.message : 'Authentication failed.';
-  const host = typeof window !== 'undefined' ? window.location.hostname : 'this domain';
-
-  if (code === 'auth/popup-blocked' || msg.includes('auth/popup-blocked')) {
-    return 'Google Sign-In popup was blocked by your browser or preview frame. Allow popups for this site, open Grid Pips in a new browser tab, or sign in with email below.';
-  }
-  if (code === 'auth/popup-closed-by-user' || msg.includes('auth/popup-closed-by-user')) {
-    return 'Google sign-in window was closed before completing. Please click Continue with Google again.';
-  }
-  if (code === 'auth/cancelled-popup-request' || msg.includes('auth/cancelled-popup-request')) {
-    return 'Another Google sign-in window is already open. Please finish or close it and try again.';
-  }
-  if (code === 'auth/unauthorized-domain' || msg.includes('auth/unauthorized-domain')) {
-    return `Domain "${host}" is not listed under Firebase Console -> Authentication -> Settings -> Authorized domains. Add "${host}" there or sign in with email credentials below.`;
-  }
-  if (code === 'auth/operation-not-allowed' || msg.includes('auth/operation-not-allowed')) {
-    return 'Google Sign-In provider is disabled in Firebase Console -> Authentication -> Sign-in method.';
-  }
-  if (
-    code === 'auth/operation-not-supported-in-this-environment' ||
-    code === 'auth/web-storage-unsupported' ||
-    msg.includes('auth/operation-not-supported-in-this-environment') ||
-    msg.includes('auth/web-storage-unsupported')
-  ) {
-    return 'Your browser blocked third-party storage or popups inside this embedded frame. Open Grid Pips in a new tab or enable cookies/storage.';
-  }
-  if (code === 'auth/network-request-failed' || msg.includes('auth/network-request-failed')) {
-    return 'Network request to Google authentication failed. Check your connection and try again.';
-  }
-  if (code === 'auth/internal-error' || msg.includes('auth/internal-error')) {
-    return 'Google Sign-In encountered a browser frame or CSP interruption. Try opening Grid Pips in a new tab or refreshing.';
-  }
-  return msg;
+  return err instanceof Error ? err.message : 'Authentication failed.';
 }
 
 export const AuthView: React.FC<AuthViewProps> = ({
@@ -97,10 +44,9 @@ export const AuthView: React.FC<AuthViewProps> = ({
   const [openedExness, setOpenedExness] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showNewTabHint, setShowNewTabHint] = useState(false);
   const [infoNotice, setInfoNotice] = useState(
     initialPendingOAuth
-      ? `Google account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
+      ? `Account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
       : ''
   );
 
@@ -112,65 +58,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
       setPendingOAuth(initialPendingOAuth);
       setMode('register');
       setInfoNotice(
-        `Google account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
+        `Account verified (${initialPendingOAuth.email}). Link your Exness Partner Account ID below to finish.`
       );
     }
   }, [initialPendingOAuth]);
-
-  async function completeFirebaseSession(params: {
-    uid: string;
-    idToken: string;
-    exnessId?: string;
-    confirmed?: boolean;
-  }) {
-    const res = await fetch('/api/auth/firebase-session', {
-      method: 'POST',
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${params.idToken}`,
-      },
-      body: JSON.stringify({
-        exnessAccountId: params.exnessId,
-        exnessConfirmed: params.confirmed,
-        referralCode,
-      }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (res.status === 409 && data.needsExnessOnboarding) {
-      setPendingOAuth({
-        provider: 'firebase',
-        uid: params.uid,
-        email: data.email || '',
-        name: data.name || 'Trader',
-        accessToken: params.idToken,
-      });
-      setMode('register');
-      setInfoNotice(
-        `Google account verified (${data.email || 'Trader'}). Complete Step 1 and enter your Exness Account ID below to enter.`
-      );
-      return;
-    }
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Google Sign-In failed.');
-    }
-
-    if (data.sessionToken) {
-      setSessionToken(data.sessionToken);
-    }
-
-    const signedUser = data.user as User;
-    void syncFirestoreTraderProfile({
-      uid: params.uid,
-      displayName: signedUser.name,
-      email: signedUser.email,
-      exnessAccountId: signedUser.exnessAccountId,
-    }).catch((fsErr) => console.error('Firestore profile sync error:', fsErr));
-
-    onSuccess(signedUser);
-  }
 
   async function completeSupabaseSession(params: {
     uid: string;
@@ -221,64 +112,10 @@ export const AuthView: React.FC<AuthViewProps> = ({
     onSuccess(data.user as User);
   }
 
-  async function handleGoogleSignIn() {
-    setError('');
-    setInfoNotice('');
-    setShowNewTabHint(false);
-    setLoading(true);
-    const inIframe = isIframeEnvironment();
-
-    try {
-      const cred = await signInWithPopup(auth, googleProvider);
-      const idToken = await cred.user.getIdToken();
-      await completeFirebaseSession({
-        uid: cred.user.uid,
-        idToken,
-        exnessId: exnessAccountId,
-        confirmed: exnessConfirmed,
-      });
-    } catch (err) {
-      const code = getAuthErrorCode(err);
-      const msg = err instanceof Error ? err.message : '';
-      const isPopupOrEnvIssue =
-        code === 'auth/popup-blocked' ||
-        code === 'auth/operation-not-supported-in-this-environment' ||
-        code === 'auth/web-storage-unsupported' ||
-        code === 'auth/internal-error' ||
-        msg.includes('auth/popup-blocked') ||
-        msg.includes('auth/operation-not-supported-in-this-environment');
-
-      if (!inIframe && isPopupOrEnvIssue) {
-        if (supabase) {
-          const { error: oauthErr } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: { redirectTo: window.location.origin },
-          });
-          if (!oauthErr) return;
-        }
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return;
-        } catch (redirectErr) {
-          setError(formatAuthError(redirectErr));
-          return;
-        }
-      }
-
-      if (inIframe && (isPopupOrEnvIssue || code === 'auth/unauthorized-domain')) {
-        setShowNewTabHint(true);
-      }
-      setError(formatAuthError(err));
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setInfoNotice('');
-    setShowNewTabHint(false);
 
     if ((mode === 'register' || pendingOAuth) && (!exnessConfirmed || exnessAccountId.trim().length < 4)) {
       setError('Please enter your Exness Account ID (at least 4 characters) and check the Exness IB confirmation box.');
@@ -288,41 +125,29 @@ export const AuthView: React.FC<AuthViewProps> = ({
     setLoading(true);
     try {
       if (pendingOAuth) {
-        if (pendingOAuth.provider === 'supabase') {
-          let freshSbToken = pendingOAuth.accessToken;
-          if (supabase) {
-            await supabase.auth
-              .updateUser({
-                data: {
-                  exness_account_id: exnessAccountId.trim().toUpperCase(),
-                  exness_verified: true,
-                  referral_code: referralCode.trim().toUpperCase() || undefined,
-                },
-              })
-              .catch(() => {});
-            const { data: sessData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
-            if (sessData.session?.access_token) {
-              freshSbToken = sessData.session.access_token;
-            }
+        let freshSbToken = pendingOAuth.accessToken;
+        if (supabase) {
+          await supabase.auth
+            .updateUser({
+              data: {
+                exness_account_id: exnessAccountId.trim().toUpperCase(),
+                exness_verified: true,
+                referral_code: referralCode.trim().toUpperCase() || undefined,
+              },
+            })
+            .catch(() => {});
+          const { data: sessData } = await supabase.auth.getSession().catch(() => ({ data: { session: null } }));
+          if (sessData.session?.access_token) {
+            freshSbToken = sessData.session.access_token;
           }
-          await completeSupabaseSession({
-            uid: pendingOAuth.uid,
-            accessToken: freshSbToken,
-            userName: pendingOAuth.name,
-            exnessId: exnessAccountId,
-            confirmed: exnessConfirmed,
-          });
-        } else {
-          const freshToken = auth.currentUser
-            ? await auth.currentUser.getIdToken(true)
-            : pendingOAuth.accessToken;
-          await completeFirebaseSession({
-            uid: pendingOAuth.uid,
-            idToken: freshToken,
-            exnessId: exnessAccountId,
-            confirmed: exnessConfirmed,
-          });
         }
+        await completeSupabaseSession({
+          uid: pendingOAuth.uid,
+          accessToken: freshSbToken,
+          userName: pendingOAuth.name,
+          exnessId: exnessAccountId,
+          confirmed: exnessConfirmed,
+        });
         return;
       }
 
@@ -492,72 +317,34 @@ export const AuthView: React.FC<AuthViewProps> = ({
           </div>
 
           {!pendingOAuth && (
-            <>
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg mb-6">
               <button
                 type="button"
-                disabled={loading}
-                onClick={handleGoogleSignIn}
-                className="w-full mb-5 py-2.5 px-4 bg-white border border-slate-300 text-slate-900 text-sm font-semibold rounded-lg hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-2.5 cursor-pointer"
+                onClick={() => {
+                  setMode('register');
+                  setError('');
+                  setInfoNotice('');
+                }}
+                className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  mode === 'register' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
+                }`}
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    fill="#4285F4"
-                    d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.11-6.72-4.96H1.29v3.14C3.26 21.3 7.31 24 12 24Z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.28 14.24c-.24-.72-.38-1.49-.38-2.24s.14-1.52.38-2.24V6.62H1.29C.47 8.24 0 10.06 0 12s.47 3.76 1.29 5.38l3.99-3.14Z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.7 1.29 6.62l3.99 3.14c.95-2.85 3.6-4.96 6.72-4.96Z"
-                  />
-                </svg>
-                Continue with Google
+                Register with Exness
               </button>
-
-              <div className="relative mb-5">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-200" />
-                </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-white text-slate-400">or use email credentials</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg mb-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('register');
-                    setError('');
-                    setInfoNotice('');
-                  }}
-                  className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                    mode === 'register' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
-                  }`}
-                >
-                  Register with Exness
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMode('login');
-                    setError('');
-                    setInfoNotice('');
-                  }}
-                  className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
-                    mode === 'login' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
-                  }`}
-                >
-                  Existing Member Login
-                </button>
-              </div>
-            </>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                  setInfoNotice('');
+                }}
+                className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
+                  mode === 'login' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-600 hover:text-slate-950'
+                }`}
+              >
+                Existing Member Login
+              </button>
+            </div>
           )}
 
           {(mode === 'register' || pendingOAuth) && (
@@ -597,7 +384,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     setPendingOAuth(null);
                     setInfoNotice('');
                     setError('');
-                    void signOut(auth).catch(() => {});
                     void signOutSupabase(config.supabaseUrl, config.supabaseAnonKey);
                   }}
                   className="shrink-0 underline font-semibold text-emerald-900 hover:text-emerald-700 cursor-pointer"
@@ -609,19 +395,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           {error && (
-            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg space-y-2">
-              <div>{error}</div>
-              {showNewTabHint && typeof window !== 'undefined' && (
-                <a
-                  href={window.location.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-950 text-white rounded-md font-semibold hover:bg-slate-800 transition-colors"
-                >
-                  Open Grid Pips in New Tab
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </a>
-              )}
+            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg">
+              {error}
             </div>
           )}
 

@@ -23,7 +23,7 @@ import {
   Film,
   Box,
 } from 'lucide-react';
-import { getRedirectResult, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { auth } from './lib/firebase';
 import { getSupabaseClient } from './lib/supabase';
@@ -160,39 +160,6 @@ export default function App() {
           setScreen('workspace');
           loadUserWorkspaceData();
           return;
-        }
-        const redirectCred = await getRedirectResult(auth).catch(() => null);
-        if (redirectCred?.user) {
-          const idToken = await redirectCred.user.getIdToken();
-          const fbRes = await fetch('/api/auth/firebase-session', {
-            method: 'POST',
-            credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ referralCode: ref ? ref.trim().toUpperCase() : '' }),
-          });
-          const fbData = await fbRes.json().catch(() => ({}));
-          if (fbRes.ok && fbData.user) {
-            if (fbData.sessionToken) setSessionToken(fbData.sessionToken);
-            setUser(fbData.user);
-            setScreen('workspace');
-            loadUserWorkspaceData();
-            return;
-          }
-          if (fbRes.status === 409 && fbData.needsExnessOnboarding) {
-            setPendingGoogleOAuth({
-              provider: 'firebase',
-              uid: redirectCred.user.uid,
-              email: fbData.email || redirectCred.user.email || '',
-              name: fbData.name || redirectCred.user.displayName || 'Trader',
-              accessToken: idToken,
-            });
-            setAuthMode('register');
-            setScreen('auth');
-            return;
-          }
         }
         const sb = getSupabaseClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
         if (sb) {
