@@ -399,7 +399,7 @@ export default function App() {
     navGroups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.name || 'Dashboard';
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 text-slate-950 flex">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white border-r border-slate-200 sticky top-0 h-screen">
         <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between gap-2">

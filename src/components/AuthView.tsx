@@ -452,7 +452,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6">
+    <div className="min-h-screen bg-slate-50 text-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6">
       <div className="max-w-lg w-full mx-auto">
         <button
           onClick={onBackLanding}
@@ -637,7 +637,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={exnessAccountId}
                   onChange={(e) => setExnessAccountId(e.target.value)}
                   placeholder="e.g. EXN-29481024 or MT5 Login"
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-mono"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-mono"
                 />
               </div>
             )}
@@ -653,7 +653,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Samuel Jakoyo"
-                  className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
                 />
               </div>
             )}
@@ -670,7 +670,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="trader@example.com"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
                   />
                 </div>
 
@@ -685,7 +685,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={mode === 'register' ? 'Minimum 8 characters' : 'Enter your password'}
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
                   />
                 </div>
               </>
@@ -702,7 +702,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value)}
                     placeholder="e.g. JAKOYO"
-                    className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-mono uppercase"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600 font-mono uppercase"
                   />
                 </div>
 

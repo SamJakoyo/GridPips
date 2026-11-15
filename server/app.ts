@@ -523,11 +523,9 @@ app.post('/api/auth/firebase-session', authLimiter, requireFirebaseAuth, async (
 
     const sessionToken = setSessionCookie(req, res, user);
 
-    try {
-      await getOrCreateSqlUser(fbUser.uid, email, user.name, user.exness_account_id);
-    } catch (sqlErr) {
+    void getOrCreateSqlUser(fbUser.uid, email, user.name, user.exness_account_id).catch((sqlErr) => {
       console.error('Cloud SQL user sync warning:', sqlErr);
-    }
+    });
 
     const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
     res.json({ user: serializeUser(refreshed), sessionToken });
@@ -647,11 +645,9 @@ async function bridgeSupabaseUserToSession(params: {
 
   const sessionToken = setSessionCookie(req, res, user);
 
-  try {
-    await getOrCreateSqlUser(sbUser.id, email, user.name, user.exness_account_id);
-  } catch (sqlErr) {
+  void getOrCreateSqlUser(sbUser.id, email, user.name, user.exness_account_id).catch((sqlErr) => {
     console.error('Cloud SQL user sync warning (Supabase):', sqlErr);
-  }
+  });
 
   const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
   res.json({ user: serializeUser(refreshed), sessionToken });
