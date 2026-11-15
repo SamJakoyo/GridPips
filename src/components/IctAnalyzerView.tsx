@@ -114,7 +114,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
   useEffect(() => {
     if (!user.hasAnalyzer || !autoSync) return;
-    const intervalMs = activeTimeframe === '1M' ? 20000 : 35000;
+    const intervalMs = activeTimeframe === '1M' ? 12000 : 25000;
     const id = setInterval(() => {
       runScan();
     }, intervalMs);
@@ -422,8 +422,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                         {analysis.symbol} ({analysis.timeframe}) — ICT Liquidity &amp; FVG Map
                       </h3>
                       <p className="text-xs text-slate-400">
-                        {analysis.structureShift} · Power of 3: {analysis.po3Phase} ·{' '}
-                        {analysis.dataSource === 'live_feed' ? 'Live Market OHLC' : 'Structural Model'}
+                        {analysis.structureShift} · Power of 3: {analysis.po3Phase} · Live TradingView ({analysis.tvSymbol || analysis.symbol})
                       </p>
                     </div>
                     <div className="text-right font-mono tabular-nums">
@@ -447,8 +446,43 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             {/* Actionable ICT Setup Card */}
             <div className="lg:col-span-4 space-y-4">
               <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <h3 className="text-base font-bold text-slate-950 mb-4">Execution Parameters</h3>
+                <div className="flex items-center justify-between gap-2 mb-4">
+                  <h3 className="text-base font-bold text-slate-950">Execution Parameters</h3>
+                  <a
+                    href={analysis.tradingViewUrl || `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(analysis.tvSymbol || analysis.symbol)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-mono font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+                  >
+                    <span>{analysis.tvSymbol || 'TradingView'}</span>
+                    <ArrowUpRight className="w-3.5 h-3.5" />
+                  </a>
+                </div>
                 <div className="space-y-3 text-sm">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Live Price (TradingView)</span>
+                    <span className="font-mono tabular-nums font-bold text-slate-950">
+                      {analysis.currentPrice}
+                      {typeof analysis.changePct === 'number' && (
+                        <span
+                          className={`ml-1.5 text-xs font-semibold ${
+                            analysis.changePct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                          }`}
+                        >
+                          ({analysis.changePct >= 0 ? '+' : ''}
+                          {analysis.changePct}%)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  {typeof analysis.bid === 'number' && typeof analysis.ask === 'number' && (
+                    <div className="flex justify-between py-2 border-b border-slate-100">
+                      <span className="text-slate-500">Bid / Ask</span>
+                      <span className="font-mono tabular-nums text-xs font-semibold text-slate-700">
+                        {analysis.bid} / {analysis.ask}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-500">Timeframe</span>
                     <span className="font-mono font-semibold text-slate-950">{analysis.timeframe}</span>
@@ -481,12 +515,24 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                       {analysis.setup.tp1}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-500">TP2 (Liquidity Draw)</span>
                     <span className="font-mono tabular-nums font-semibold text-emerald-700">
                       {analysis.setup.tp2}
                     </span>
                   </div>
+                  {analysis.lastUpdated && (
+                    <div className="flex justify-between pt-1 text-xs text-slate-400">
+                      <span>TradingView Feed Sync</span>
+                      <span className="font-mono tabular-nums">
+                        {new Date(analysis.lastUpdated).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          second: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

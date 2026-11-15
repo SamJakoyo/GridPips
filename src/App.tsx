@@ -209,19 +209,27 @@ export default function App() {
       .finally(() => setBooting(false));
   }, [loadUserWorkspaceData]);
 
-  // Smooth market quote tick
+  // Live TradingView market quote polling (no synthetic random ticks)
   useEffect(() => {
+    let active = true;
+    const syncQuotes = async () => {
+      try {
+        const res = await apiFetch<{ quotes: MarketSymbolQuote[] }>('/api/market/quotes');
+        if (active && Array.isArray(res.quotes) && res.quotes.length > 0) {
+          setQuotes(res.quotes);
+        }
+      } catch {
+        // retain last verified TradingView quotes if temporarily offline
+      }
+    };
+    void syncQuotes();
     const id = setInterval(() => {
-      setQuotes((prev) =>
-        prev.map((q) => {
-          const delta = q.price * (Math.random() * 0.0012 - 0.0006);
-          const nextPrice = Number((q.price + delta).toFixed(q.digits));
-          const nextChg = Number((q.chgPct + (Math.random() * 0.06 - 0.03)).toFixed(2));
-          return { ...q, price: nextPrice, chgPct: nextChg };
-        })
-      );
-    }, 4000);
-    return () => clearInterval(id);
+      void syncQuotes();
+    }, 12000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, []);
 
   async function handleLogout() {

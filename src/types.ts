@@ -93,8 +93,13 @@ export interface IctZone {
 
 export interface IctAnalysisResult {
   symbol: string;
+  tvSymbol?: string;
+  tradingViewUrl?: string;
   timeframe: string;
   currentPrice: number;
+  bid?: number | null;
+  ask?: number | null;
+  changePct?: number | null;
   dailyBias: 'Bullish' | 'Bearish';
   po3Phase: string;
   activeKillzone: string;
@@ -118,7 +123,7 @@ export interface IctAnalysisResult {
   };
   candles: Candle[];
   ictReferenceChannel: string;
-  dataSource?: 'live_feed' | 'model_fallback';
+  dataSource?: 'tradingview_live';
   lastUpdated?: string;
 }
 

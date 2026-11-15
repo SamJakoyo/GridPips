@@ -41,6 +41,7 @@ import {
   buildInstallationGuide,
 } from './mql5Templates.ts';
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
+import { getTradingViewLiveQuotes } from './tradingViewFeed.ts';
 import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
   formatGeminiApiError,
@@ -1893,7 +1894,33 @@ app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
   }
 });
 
-// ---------------- Live Forex Factory Calendar & Market News ----------------
+// ---------------- Live TradingView Quotes & Forex Factory Feed ----------------
+app.get('/api/market/quotes', async (_req, res) => {
+  try {
+    const quotes = await getTradingViewLiveQuotes();
+    res.json({
+      source: 'tradingview.com',
+      updatedAt: new Date().toISOString(),
+      quotes: quotes.map((q) => ({
+        sym: q.symbol,
+        tvSymbol: q.tvSymbol,
+        name: q.name,
+        price: q.price,
+        chgPct: q.chgPct,
+        bid: q.bid,
+        ask: q.ask,
+        digits: q.digits,
+        assetClass: q.assetClass,
+      })),
+    });
+  } catch (err) {
+    console.error('TradingView live quotes error:', err);
+    res.status(502).json({
+      error: err instanceof Error ? err.message : 'Unable to fetch live TradingView market quotes.',
+    });
+  }
+});
+
 app.get('/api/market/forexfactory', async (req, res) => {
   try {
     const forceRefresh = req.query.refresh === '1' || req.query.refresh === 'true';

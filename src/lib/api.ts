@@ -84,20 +84,23 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
 
 export interface MarketSymbolQuote {
   sym: string;
+  tvSymbol?: string;
   name: string;
   price: number;
   chgPct: number;
+  bid?: number | null;
+  ask?: number | null;
   digits: number;
   assetClass: 'fx' | 'metal' | 'index' | 'crypto';
 }
 
 export const INITIAL_MARKET_QUOTES: MarketSymbolQuote[] = [
-  { sym: 'EURUSD', name: 'Euro / US Dollar', price: 1.0864, chgPct: 0.24, digits: 4, assetClass: 'fx' },
-  { sym: 'GBPUSD', name: 'British Pound / US Dollar', price: 1.2718, chgPct: 0.31, digits: 4, assetClass: 'fx' },
-  { sym: 'USDJPY', name: 'US Dollar / Japanese Yen', price: 151.38, chgPct: -0.18, digits: 2, assetClass: 'fx' },
-  { sym: 'XAUUSD', name: 'Gold Spot / US Dollar', price: 2384.6, chgPct: 0.62, digits: 2, assetClass: 'metal' },
-  { sym: 'NAS100', name: 'US Tech 100 Index', price: 18445.2, chgPct: 0.48, digits: 2, assetClass: 'index' },
-  { sym: 'US30', name: 'Wall Street 30', price: 39882.0, chgPct: 0.14, digits: 2, assetClass: 'index' },
-  { sym: 'BTCUSD', name: 'Bitcoin / US Dollar', price: 64310.0, chgPct: 1.42, digits: 1, assetClass: 'crypto' },
-  { sym: 'ETHUSD', name: 'Ethereum / US Dollar', price: 3148.5, chgPct: 0.95, digits: 1, assetClass: 'crypto' },
+  { sym: 'EURUSD', tvSymbol: 'FX:EURUSD', name: 'Euro / US Dollar', price: 1.10216, chgPct: 0, digits: 5, assetClass: 'fx' },
+  { sym: 'GBPUSD', tvSymbol: 'FX:GBPUSD', name: 'British Pound / US Dollar', price: 1.32109, chgPct: 0, digits: 5, assetClass: 'fx' },
+  { sym: 'USDJPY', tvSymbol: 'FX:USDJPY', name: 'US Dollar / Japanese Yen', price: 159.713, chgPct: 0, digits: 3, assetClass: 'fx' },
+  { sym: 'XAUUSD', tvSymbol: 'OANDA:XAUUSD', name: 'Gold Spot / US Dollar', price: 3884.69, chgPct: 0, digits: 2, assetClass: 'metal' },
+  { sym: 'NAS100', tvSymbol: 'CAPITALCOM:US100', name: 'US Tech 100 Index', price: 27835.9, chgPct: 0, digits: 2, assetClass: 'index' },
+  { sym: 'US30', tvSymbol: 'CAPITALCOM:US30', name: 'Wall Street 30', price: 52261.8, chgPct: 0, digits: 2, assetClass: 'index' },
+  { sym: 'BTCUSD', tvSymbol: 'BITSTAMP:BTCUSD', name: 'Bitcoin / US Dollar', price: 65362.76, chgPct: 0, digits: 2, assetClass: 'crypto' },
+  { sym: 'ETHUSD', tvSymbol: 'BITSTAMP:ETHUSD', name: 'Ethereum / US Dollar', price: 1831.96, chgPct: 0, digits: 2, assetClass: 'crypto' },
 ];
