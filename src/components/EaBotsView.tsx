@@ -10,7 +10,6 @@ import {
   Power,
   Zap,
   ShieldCheck,
-  ExternalLink,
   XCircle,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
@@ -72,14 +71,6 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   const [activeFile, setActiveFile] = useState<'silverbullet' | 'orderblock' | 'guide'>('silverbullet');
   const [fileContent, setFileContent] = useState('');
   const [fileName, setFileName] = useState('');
-  const [bridgeToken, setBridgeToken] = useState(user.mt5BridgeToken || '');
-  const [bridgeEndpoint, setBridgeEndpoint] = useState(`${window.location.origin}/api/ea/mt5/heartbeat`);
-
-  const [connectionMode, setConnectionMode] = useState<'mtapi5' | 'bridge'>(
-    user.mt5ConnectionMode === 'mtapi5' || user.mt5Mtapi5DefaultConfigured ? 'mtapi5' : 'bridge'
-  );
-  const [mtapiHost, setMtapiHost] = useState(user.mt5MtapiHost || '127.0.0.1');
-  const [mtapiPort, setMtapiPort] = useState(String(user.mt5MtapiPort || 8228));
 
   const initialServer = user.mt5Server || 'Exness-MT5Real';
   const [serverPreset, setServerPreset] = useState(
@@ -89,17 +80,21 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
     PRESET_SERVERS.includes(initialServer) ? '' : initialServer
   );
   const [mt5Login, setMt5Login] = useState(user.mt5Login || user.exnessAccountId || '');
+  const [mt5Password, setMt5Password] = useState('');
   const [activeBot, setActiveBot] = useState<'silverbullet' | 'orderblock' | 'both'>(
     (user.mt5ActiveBot as 'silverbullet' | 'orderblock' | 'both') || 'both'
   );
   const [riskPercent, setRiskPercent] = useState(String(user.mt5RiskPercent ?? 1.0));
 
+  const [mt5ApiConfigured, setMt5ApiConfigured] = useState(Boolean(user.mt5ApiConfigured));
+  const [profileConfigured, setProfileConfigured] = useState(
+    Boolean(user.mt5ProvisioningProfileConfigured)
+  );
+
   const [connecting, setConnecting] = useState(false);
   const [togglingAuto, setTogglingAuto] = useState(false);
   const [syncingLive, setSyncingLive] = useState(false);
   const [closingAll, setClosingAll] = useState(false);
-  const [rotatingToken, setRotatingToken] = useState(false);
-  const [testingHeartbeat, setTestingHeartbeat] = useState(false);
   const [refreshingTelemetry, setRefreshingTelemetry] = useState(false);
 
   // Quick Auto-Trade execution form
@@ -115,7 +110,6 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
-  const [copiedField, setCopiedField] = useState<'url' | 'token' | null>(null);
 
   const effectiveServer = serverPreset === 'CUSTOM' ? customServer.trim() : serverPreset;
 
@@ -128,15 +122,18 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
           user: User;
           events: Mt5TelemetryEvent[];
           commands?: Mt5TradeCommand[];
+          mt5ApiConfigured?: boolean;
+          mt5ProvisioningProfileConfigured?: boolean;
         }>('/api/ea/mt5/status');
         if (res.user) {
           onUserUpdated(res.user);
-          if (res.user.mt5BridgeToken) setBridgeToken(res.user.mt5BridgeToken);
-          if (res.user.mt5MtapiHost) setMtapiHost(res.user.mt5MtapiHost);
-          if (res.user.mt5MtapiPort) setMtapiPort(String(res.user.mt5MtapiPort));
         }
         setEvents(res.events || []);
         if (res.commands) setCommands(res.commands);
+        if (typeof res.mt5ApiConfigured === 'boolean') setMt5ApiConfigured(res.mt5ApiConfigured);
+        if (typeof res.mt5ProvisioningProfileConfigured === 'boolean') {
+          setProfileConfigured(res.mt5ProvisioningProfileConfigured);
+        }
       } catch {
         // ignore background poll errors
       } finally {
@@ -148,14 +145,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
 
   useEffect(() => {
     if (!user.hasEaBots) return;
-    apiFetch<{ filename: string; content: string; bridgeToken?: string; bridgeEndpoint?: string }>(
-      `/api/ea/source/${activeFile}`
-    )
+    apiFetch<{ filename: string; content: string }>(`/api/ea/source/${activeFile}`)
       .then((res) => {
         setFileName(res.filename);
         setFileContent(res.content);
-        if (res.bridgeToken) setBridgeToken(res.bridgeToken);
-        if (res.bridgeEndpoint) setBridgeEndpoint(res.bridgeEndpoint);
       })
       .catch(() => {});
   }, [activeFile, user.hasEaBots]);
@@ -163,7 +156,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   useEffect(() => {
     if (!user.hasEaBots) return;
     fetchMt5Status(false);
-    const id = setInterval(() => fetchMt5Status(false), 8000);
+    const id = setInterval(() => fetchMt5Status(false), 10000);
     return () => clearInterval(id);
   }, [user.hasEaBots, fetchMt5Status]);
 
@@ -175,12 +168,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
           <span>MQL5 Automated Trading Pack · ${config.eaBotsPriceUsd.toFixed(2)}</span>
         </div>
         <h2 className="text-2xl font-bold text-slate-950 mb-3">
-          Purchase MQL5 EA Bots + MtApi5 Auto-Trade Bridge
+          Purchase MQL5 EA Bots + MetaApi Cloud MT5 Auto-Trade
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-6">
-          Connect your clients&apos; MetaTrader 5 terminals with one click using the{' '}
-          <span className="font-mono text-slate-900">vdemydiuk/mtapi (MtApi5)</span> WebSocket API or pre-wired{' '}
-          <span className="font-mono text-slate-900">.mq5</span> Expert Advisors for automated execution, live equity sync, and order routing.
+          Connect your clients&apos; MetaTrader 5 accounts directly through MetaApi Cloud with one click for automated execution, live equity monitoring, and instant order management.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 text-sm text-slate-700">
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
@@ -190,10 +181,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
             · GRIDPIPs_SMC_OrderBlock_EA.mq5 (Sweeps + Auto-Trade)
           </div>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Direct MtApi5 (vdemydiuk/mtapi) Socket API Connector
+            · Direct MetaApi Cloud MT5 Provisioning &amp; Execution
           </div>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Live Client MT5 Equity, Execution &amp; Position Controls
+            · Live Client MT5 Balance, Equity &amp; Position Controls
           </div>
         </div>
         <button
@@ -208,12 +199,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
 
   async function handleConnectMt5(e: React.FormEvent) {
     e.preventDefault();
-    if (connectionMode === 'mtapi5' && !mtapiHost.trim()) {
-      setErrorMessage('Enter your MtApi5 Host / VPS Address or wss:// tunnel (port 8228).');
-      return;
-    }
-    if (connectionMode === 'bridge' && (!mt5Login.trim() || !effectiveServer)) {
-      setErrorMessage('Enter your client MT5 Login ID and broker server name.');
+    if (!mt5Login.trim() || !effectiveServer || !mt5Password.trim()) {
+      setErrorMessage(
+        'Enter the client MT5 Login ID, Broker Server, and MT5 Trading Password to connect via MetaApi Cloud.'
+      );
       return;
     }
 
@@ -226,11 +215,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
         {
           method: 'POST',
           body: JSON.stringify({
-            connectionMode,
-            mtapiHost: connectionMode === 'mtapi5' ? mtapiHost.trim() : undefined,
-            mtapiPort: connectionMode === 'mtapi5' ? Number(mtapiPort) || 8228 : undefined,
             mt5Login: mt5Login.trim(),
             mt5Server: effectiveServer,
+            mt5Password: mt5Password.trim(),
             autoTrade: true,
             activeBot,
             riskPercent: Number(riskPercent) || 1.0,
@@ -238,15 +225,14 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
         }
       );
       onUserUpdated(res.user);
-      if (res.user.mt5BridgeToken) setBridgeToken(res.user.mt5BridgeToken);
-      if (res.user.mt5Login) setMt5Login(res.user.mt5Login);
+      setMt5Password('');
       setStatusMessage(
         res.message ||
-          `Client MT5 account ${res.user.mt5Login || mt5Login} connected with Auto-Trading enabled.`
+          `Client MT5 account ${res.user.mt5Login || mt5Login} connected via MetaApi Cloud with Auto-Trading enabled.`
       );
       await fetchMt5Status(false);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect MT5 terminal.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to connect MT5 account via MetaApi Cloud.');
     } finally {
       setConnecting(false);
     }
@@ -294,12 +280,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
       setEvents(res.events || []);
       setCommands(res.commands || []);
       setStatusMessage(
-        res.user.mt5ConnectionMode === 'mtapi5'
-          ? `Live MtApi5 sync completed — Balance: $${(res.user.mt5Balance ?? 0).toFixed(2)}, Open Positions: ${res.user.mt5OpenPositions ?? 0}.`
-          : 'MT5 account telemetry and auto-trade queue synced.'
+        `MetaApi Cloud sync complete — Balance: $${(res.user.mt5Balance ?? 0).toFixed(2)}, Open Positions: ${res.user.mt5OpenPositions ?? 0}.`
       );
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Unable to sync live MT5 terminal.');
+      setErrorMessage(err instanceof Error ? err.message : 'Unable to sync live MT5 account.');
     } finally {
       setSyncingLive(false);
     }
@@ -351,60 +335,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
       setStatusMessage(res.message);
       await fetchMt5Status(false);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Failed to send order to MT5.');
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to execute trade via MetaApi Cloud.');
     } finally {
       setExecutingTrade(false);
-    }
-  }
-
-  async function handleTestHeartbeat() {
-    const activeToken = bridgeToken || user.mt5BridgeToken;
-    if (!activeToken) return;
-    setTestingHeartbeat(true);
-    setStatusMessage('');
-    setErrorMessage('');
-    try {
-      const res = await apiFetch<{ syncedAt: string; status: string }>('/api/ea/mt5/heartbeat', {
-        method: 'POST',
-        body: JSON.stringify({
-          token: activeToken,
-          login: mt5Login,
-          server: effectiveServer || 'Exness-MT5Real',
-          symbol: user.mt5Symbol || 'EURUSD',
-          eaName: 'Dashboard Bridge Ping',
-          status: 'BRIDGE_TEST_OK',
-          balance: user.mt5Balance ?? 0,
-          equity: user.mt5Equity ?? 0,
-          openPositions: user.mt5OpenPositions ?? 0,
-        }),
-      });
-      await fetchMt5Status(false);
-      setStatusMessage(
-        `MT5 Bridge heartbeat verified (${res.status}) at ${new Date(res.syncedAt).toLocaleTimeString()}.`
-      );
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Heartbeat test failed');
-    } finally {
-      setTestingHeartbeat(false);
-    }
-  }
-
-  async function handleRotateBridgeToken() {
-    setRotatingToken(true);
-    setStatusMessage('');
-    setErrorMessage('');
-    try {
-      const res = await apiFetch<{ user: User; bridgeToken: string; message?: string }>(
-        '/api/ea/mt5/rotate-token',
-        { method: 'POST' }
-      );
-      onUserUpdated(res.user);
-      setBridgeToken(res.bridgeToken);
-      setStatusMessage(res.message || 'Generated a new MT5 Bridge API Key.');
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Unable to rotate bridge API key.');
-    } finally {
-      setRotatingToken(false);
     }
   }
 
@@ -414,14 +347,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
     setTimeout(() => setCopiedCode(false), 1800);
   }
 
-  function copyText(field: 'url' | 'token', value: string) {
-    navigator.clipboard.writeText(value);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 1600);
-  }
-
   const autoTradeOn = Boolean(user.mt5AutoTrade);
-  const isMtApi5Active = user.mt5ConnectionMode === 'mtapi5';
 
   return (
     <div className="space-y-6">
@@ -429,13 +355,13 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
       <div className="bg-slate-950 text-white rounded-xl p-6 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border border-slate-800">
         <div>
           <div className="text-xs font-medium text-[#E5A93C] mb-1">
-            {isMtApi5Active
-              ? `MtApi5 Socket API Connected (Expert #${user.mt5MtapiExpertHandle ?? '1'})`
-              : 'MtApi5 (vdemydiuk/mtapi) + MQL5 EA Two-Way Auto-Trade Engine'}
+            {mt5ApiConfigured
+              ? 'MetaApi Cloud MT5 Backend Ready'
+              : 'MetaApi Cloud MT5 Integration (Server Configuration Needed)'}
           </div>
-          <h2 className="text-xl font-bold">Connect Client MT5 Accounts &amp; Automate EA Trading</h2>
+          <h2 className="text-xl font-bold">Connect Client MT5 Accounts via MetaApi Cloud</h2>
           <p className="text-xs text-slate-300 mt-1 max-w-2xl">
-            Connect directly to any client MT5 terminal running <span className="font-mono text-[#E5A93C]">MtApi5 (ws://host:8228/ws)</span> from <span className="font-mono">vdemydiuk/mtapi</span>, or bind our pre-wired <span className="font-mono">.mq5</span> Expert Advisors for automated execution.
+            Provision and deploy your clients&apos; MT5 trading accounts securely through the backend MetaApi Cloud connection for automated EA trade execution and live account telemetry.
           </p>
         </div>
 
@@ -501,7 +427,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
               : 'Pending MT5 Link'}
           </div>
           <div className="text-[11px] text-slate-500 mt-0.5">
-            Mode: {isMtApi5Active ? 'MtApi5 (vdemydiuk/mtapi)' : 'MQL5 EA Bridge'}
+            Mode: MetaApi Cloud
           </div>
         </div>
 
@@ -510,7 +436,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
           <div className="text-sm font-mono tabular-nums font-bold text-slate-950 mt-1">
             {user.mt5Login || 'Not Bound'}
           </div>
-          <div className="text-xs text-slate-500 truncate">{user.mt5Server || 'Select connection below'}</div>
+          <div className="text-xs text-slate-500 truncate">{user.mt5Server || 'Select server below'}</div>
         </div>
 
         <div className="bg-white border border-slate-200 rounded-xl p-4">
@@ -556,7 +482,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Column: Connect Client MT5 + Direct Auto-Trade Execution */}
+        {/* Left Column: Connect Client MT5 via MetaApi + Direct Auto-Trade Execution */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
             <div className="flex items-center justify-between">
@@ -569,130 +495,77 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
               </span>
             </div>
 
-            {/* Connection Mode Toggle */}
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-slate-100 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setConnectionMode('mtapi5')}
-                className={`py-2 px-2.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
-                  connectionMode === 'mtapi5'
-                    ? 'bg-slate-950 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                MtApi5 API (Port 8228)
-              </button>
-              <button
-                type="button"
-                onClick={() => setConnectionMode('bridge')}
-                className={`py-2 px-2.5 text-xs font-semibold rounded-md cursor-pointer transition-colors ${
-                  connectionMode === 'bridge'
-                    ? 'bg-slate-950 text-white shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                MQL5 .mq5 Bridge
-              </button>
-            </div>
+            {!mt5ApiConfigured && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-[11px] text-amber-900">
+                <span className="font-semibold">Backend Env Pending:</span> Set{' '}
+                <span className="font-mono">METAAPI_TOKEN</span> and{' '}
+                <span className="font-mono">METAAPI_PROVISIONING_PROFILE_ID</span> in your server environment variables (<span className="font-mono">METAAPI_REGION</span> is optional).
+              </div>
+            )}
+
+            {mt5ApiConfigured && !profileConfigured && (
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-[11px] text-blue-900">
+                <span className="font-semibold">Tip:</span> Set{' '}
+                <span className="font-mono">METAAPI_PROVISIONING_PROFILE_ID</span> on your server so custom MT5 broker servers using your <span className="font-mono">servers.dat</span> file provision automatically.
+              </div>
+            )}
 
             <form onSubmit={handleConnectMt5} className="space-y-3.5">
-              {connectionMode === 'mtapi5' ? (
-                <>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 space-y-1">
-                    <div className="font-semibold text-slate-900 flex items-center justify-between">
-                      <span>Uses vdemydiuk/mtapi WebSocket RPC</span>
-                      <a
-                        href="https://github.com/vdemydiuk/mtapi/releases"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline inline-flex items-center gap-1 font-semibold"
-                      >
-                        Download Installer
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                    <p>
-                      Connects over <span className="font-mono text-slate-900">ws://host:8228/ws</span> directly to the client&apos;s running <span className="font-mono text-slate-900">MtApi5</span> EA and reads live Login, Server, Balance &amp; Equity automatically.
-                    </p>
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Client MT5 Login ID
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={mt5Login}
+                  onChange={(e) => setMt5Login(e.target.value)}
+                  placeholder="e.g. 192837465"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                />
+              </div>
 
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div className="col-span-2">
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        MtApi5 Host / VPS or Tunnel
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={mtapiHost}
-                        onChange={(e) => setMtapiHost(e.target.value)}
-                        placeholder="127.0.0.1 or vps-ip or wss://..."
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Port
-                      </label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="65535"
-                        required
-                        value={mtapiPort}
-                        onChange={(e) => setMtapiPort(e.target.value)}
-                        className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg font-mono"
-                      />
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div>
-                    <div className="mb-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900">
-                      <span className="font-semibold">MT5 Bridge API Key Auto-Connected:</span> Your personal key is already generated and embedded into both downloadable <span className="font-mono">.mq5</span> EAs—no external paid API key required.
-                    </div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Client MT5 Login ID
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={mt5Login}
-                      onChange={(e) => setMt5Login(e.target.value)}
-                      placeholder="e.g. 192837465"
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
-                    />
-                  </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  MT5 Broker Server
+                </label>
+                <select
+                  value={serverPreset}
+                  onChange={(e) => setServerPreset(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
+                >
+                  {PRESET_SERVERS.map((srv) => (
+                    <option key={srv} value={srv}>
+                      {srv === 'CUSTOM' ? 'Other / Custom MT5 Server...' : srv}
+                    </option>
+                  ))}
+                </select>
+                {serverPreset === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    required
+                    value={customServer}
+                    onChange={(e) => setCustomServer(e.target.value)}
+                    placeholder="Enter exact MT5 Server (e.g. Exness-MT5Real18)"
+                    className="mt-2 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  />
+                )}
+              </div>
 
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      MT5 Broker Server
-                    </label>
-                    <select
-                      value={serverPreset}
-                      onChange={(e) => setServerPreset(e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
-                    >
-                      {PRESET_SERVERS.map((srv) => (
-                        <option key={srv} value={srv}>
-                          {srv === 'CUSTOM' ? 'Other / Custom MT5 Server...' : srv}
-                        </option>
-                      ))}
-                    </select>
-                    {serverPreset === 'CUSTOM' && (
-                      <input
-                        type="text"
-                        required
-                        value={customServer}
-                        onChange={(e) => setCustomServer(e.target.value)}
-                        placeholder="Enter exact MT5 Server (e.g. Exness-MT5Real18)"
-                        className="mt-2 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
-                      />
-                    )}
-                  </div>
-                </>
-              )}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Client MT5 Trading Password
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={mt5Password}
+                  onChange={(e) => setMt5Password(e.target.value)}
+                  placeholder="Client MT5 trading password"
+                  autoComplete="new-password"
+                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                />
+              </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -730,11 +603,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                 disabled={connecting}
                 className="w-full py-2.5 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer transition-colors"
               >
-                {connecting
-                  ? 'Connecting to Client MT5...'
-                  : connectionMode === 'mtapi5'
-                  ? 'Connect Client MT5 via MtApi5 API'
-                  : 'Bind MT5 Account & Activate Bridge'}
+                {connecting ? 'Connecting via MetaApi Cloud...' : 'Connect Client MT5 via MetaApi Cloud'}
               </button>
             </form>
 
@@ -813,11 +682,11 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                 >
                   {executingTrade
                     ? 'Executing on MT5...'
-                    : `Execute ${execSide} ${execVolume} ${execSymbol} on MT5`}
+                    : `Execute ${execSide} ${execVolume} ${execSymbol} via MetaApi`}
                 </button>
               </form>
 
-              {isMtApi5Active && (
+              {user.mt5Connected && (
                 <button
                   type="button"
                   onClick={handleCloseAllPositions}
@@ -825,84 +694,19 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                   className="w-full py-2 border border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <XCircle className="w-3.5 h-3.5" />
-                  {closingAll ? 'Closing MT5 Positions...' : 'Close All Open MT5 Positions (MtApi5)'}
+                  {closingAll ? 'Closing MT5 Positions...' : 'Close All Open MT5 Positions'}
                 </button>
               )}
-            </div>
-
-            <div className="pt-4 border-t border-slate-200 space-y-2.5">
-              <div className="text-xs font-semibold text-slate-700">MQL5 WebRequest Bridge Credentials</div>
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono flex items-center justify-between gap-2">
-                <span className="truncate text-slate-700">Whitelist URL: {window.location.origin}</span>
-                <button
-                  type="button"
-                  onClick={() => copyText('url', window.location.origin)}
-                  className="text-blue-600 font-sans font-semibold shrink-0 cursor-pointer"
-                >
-                  {copiedField === 'url' ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono flex items-center justify-between gap-2">
-                <span className="truncate text-slate-700">
-                  API Key: {bridgeToken || 'Bind MT5 to generate'}
-                </span>
-                <div className="flex items-center gap-2 shrink-0">
-                  {bridgeToken && (
-                    <button
-                      type="button"
-                      onClick={() => copyText('token', bridgeToken)}
-                      className="text-blue-600 font-sans font-semibold cursor-pointer"
-                    >
-                      {copiedField === 'token' ? 'Copied' : 'Copy'}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handleRotateBridgeToken}
-                    disabled={rotatingToken}
-                    className="text-slate-600 hover:text-slate-950 font-sans font-semibold cursor-pointer"
-                  >
-                    {rotatingToken ? '...' : 'Regenerate'}
-                  </button>
-                </div>
-              </div>
-              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono break-all text-slate-600">
-                Heartbeat Endpoint: {bridgeEndpoint}
-              </div>
-              <button
-                type="button"
-                onClick={handleTestHeartbeat}
-                disabled={testingHeartbeat}
-                className="w-full py-2 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 cursor-pointer"
-              >
-                {testingHeartbeat ? 'Pinging Bridge...' : 'Test MQL5 Bridge Heartbeat'}
-              </button>
             </div>
           </div>
 
           {/* Setup Guide & Live Telemetry Feed */}
           <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-            <h4 className="text-sm font-bold text-slate-950">MT5 Terminal Connection Steps</h4>
+            <h4 className="text-sm font-bold text-slate-950">MetaApi Cloud Connection Flow</h4>
             <ol className="space-y-1.5 text-xs text-slate-600 list-decimal list-inside">
-              <li>
-                <span className="font-semibold text-slate-800">MtApi5 API (Recommended):</span> Install{' '}
-                <span className="font-mono">MtApi5Installer_x64.msi</span> from{' '}
-                <a
-                  href="https://github.com/vdemydiuk/mtapi/releases"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-600 hover:underline font-medium"
-                >
-                  github.com/vdemydiuk/mtapi/releases
-                </a>
-                , attach <span className="font-mono">MtApi5</span> EA to an MT5 chart (Algo Trading ON), then enter your VPS/tunnel host &amp; port <span className="font-mono">8228</span> above.
-              </li>
-              <li>
-                <span className="font-semibold text-slate-800">Or MQL5 .mq5 Bridge:</span> Copy both <span className="font-mono">.mq5</span> files into <span className="font-mono">MQL5/Experts/Advisors</span>, compile in MetaEditor (<span className="font-mono">F7</span>), and whitelist <span className="font-mono">{window.location.origin}</span> under <span className="font-mono">Tools → Options → Expert Advisors</span>.
-              </li>
-              <li>
-                Press <span className="font-semibold">Connect Client MT5 via MtApi5 API</span> and toggle <span className="font-semibold">Auto-Trading ON</span>.
-              </li>
+              <li>Server reads <span className="font-mono">METAAPI_TOKEN</span>, <span className="font-mono">METAAPI_PROVISIONING_PROFILE_ID</span>, and optional <span className="font-mono">METAAPI_REGION</span> strictly on the backend.</li>
+              <li>Enter your client&apos;s MT5 Login ID, Broker Server, and MT5 Password above and click <span className="font-semibold">Connect Client MT5 via MetaApi Cloud</span>.</li>
+              <li>Toggle <span className="font-semibold">Enable MT5 Auto-Trading</span> to route live orders and monitor Balance/Equity.</li>
             </ol>
 
             {commands.length > 0 && (

@@ -42,17 +42,11 @@ import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
 import { getTradingViewLiveQuotes } from './tradingViewFeed.ts';
 import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
-  DEFAULT_MTAPI5_PORT,
-  buildMtApi5WsUrl,
-  closeAllMtApi5Positions,
-  executeMtApi5Order,
+  closeAllMt5Positions,
   executeMt5TradeOrder,
-  fetchMtApi5AccountSnapshot,
   fetchMt5AccountState,
-  getMtApi5DefaultHost,
-  getMtApi5DefaultPort,
+  isMetaApiProfileConfigured,
   isMt5ApiConfigured,
-  isMtApi5DefaultConfigured,
   provisionAndDeployMt5Account,
 } from './mt5Api.ts';
 
@@ -164,9 +158,6 @@ interface DbUser {
   mt5_active_bot?: string | null;
   mt5_risk_percent?: number | null;
   mt5_connection_mode?: string | null;
-  mt5_mtapi_host?: string | null;
-  mt5_mtapi_port?: number | null;
-  mt5_mtapi_expert_handle?: number | null;
   is_suspended: number;
   created_at: string;
   last_login_at: string | null;
@@ -178,15 +169,7 @@ interface AuthedRequest extends Request {
 
 function serializeUser(u: DbUser) {
   const apiReady = isMt5ApiConfigured();
-  const mtapi5ServerDefaultConfigured = isMtApi5DefaultConfigured();
-  const usesMtApi5 =
-    u.mt5_connection_mode === 'mtapi5' && Boolean(u.mt5_mtapi_host || getMtApi5DefaultHost());
-  const usesMetaApi = u.mt5_connection_mode === 'metaapi' && Boolean(u.mt5_metaapi_account_id);
-  const connectionMode: 'mtapi5' | 'metaapi' | 'bridge' = usesMtApi5
-    ? 'mtapi5'
-    : usesMetaApi
-    ? 'metaapi'
-    : 'bridge';
+  const profileReady = isMetaApiProfileConfigured();
 
   return {
     id: u.id,
@@ -213,12 +196,9 @@ function serializeUser(u: DbUser) {
     mt5AutoTrade: Boolean(u.mt5_auto_trade),
     mt5ActiveBot: (u.mt5_active_bot as 'silverbullet' | 'orderblock' | 'both') || 'both',
     mt5RiskPercent: typeof u.mt5_risk_percent === 'number' ? u.mt5_risk_percent : 1.0,
-    mt5ConnectionMode: connectionMode,
-    mt5MtapiHost: u.mt5_mtapi_host || (mtapi5ServerDefaultConfigured ? getMtApi5DefaultHost() : null),
-    mt5MtapiPort: u.mt5_mtapi_port || getMtApi5DefaultPort(),
-    mt5MtapiExpertHandle: typeof u.mt5_mtapi_expert_handle === 'number' ? u.mt5_mtapi_expert_handle : null,
-    mt5ApiConfigured: apiReady || mtapi5ServerDefaultConfigured,
-    mt5Mtapi5DefaultConfigured: mtapi5ServerDefaultConfigured,
+    mt5ConnectionMode: 'metaapi' as const,
+    mt5ApiConfigured: apiReady,
+    mt5ProvisioningProfileConfigured: profileReady,
     isSuspended: Boolean(u.is_suspended),
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
@@ -1907,7 +1887,8 @@ app.get('/api/ea/mt5/status', requireAuth, (req: AuthedRequest, res) => {
     user: serializeUser(refreshed),
     events,
     commands,
-    mt5ApiConfigured: isMt5ApiConfigured() || isMtApi5DefaultConfigured(),
+    mt5ApiConfigured: isMt5ApiConfigured(),
+    mt5ProvisioningProfileConfigured: isMetaApiProfileConfigured(),
   });
 });
 
@@ -1918,21 +1899,16 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
     return;
   }
 
-  const requestedModeRaw = sanitizeText(req.body?.connectionMode || '', 20).toLowerCase();
-  const mtapiHostInput = sanitizeText(req.body?.mtapiHost || '', 160);
-  const rawMtapiPort = Number(req.body?.mtapiPort);
-  const resolvedDefaultHost = getMtApi5DefaultHost();
-  const effectiveMtapiHost = mtapiHostInput || user.mt5_mtapi_host || resolvedDefaultHost;
-  const effectiveMtapiPort =
-    Number.isInteger(rawMtapiPort) && rawMtapiPort > 0 && rawMtapiPort <= 65535
-      ? rawMtapiPort
-      : user.mt5_mtapi_port || getMtApi5DefaultPort() || DEFAULT_MTAPI5_PORT;
+  if (!isMt5ApiConfigured()) {
+    res.status(503).json({
+      error:
+        'MetaApi Cloud is not configured on the backend yet. Add METAAPI_TOKEN and METAAPI_PROVISIONING_PROFILE_ID to your server environment variables.',
+    });
+    return;
+  }
 
-  const wantsMtApi5 =
-    requestedModeRaw === 'mtapi5' || (requestedModeRaw === '' && Boolean(mtapiHostInput));
-
-  let mt5Login = sanitizeText(req.body?.mt5Login, 32);
-  let mt5Server = sanitizeText(req.body?.mt5Server, 64);
+  const mt5Login = sanitizeText(req.body?.mt5Login, 32);
+  const mt5Server = sanitizeText(req.body?.mt5Server, 64);
   const mt5Password = typeof req.body?.mt5Password === 'string' ? req.body.mt5Password.trim() : '';
   const autoTrade = req.body?.autoTrade !== undefined ? Boolean(req.body.autoTrade) : true;
   const activeBotRaw = sanitizeText(req.body?.activeBot || 'both', 24).toLowerCase();
@@ -1940,105 +1916,55 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
   const riskNum = Number(req.body?.riskPercent);
   const riskPercent = Number.isFinite(riskNum) ? Math.min(5, Math.max(0.1, Number(riskNum.toFixed(2)))) : 1.0;
 
+  if (!mt5Login || !mt5Server || !mt5Password) {
+    res.status(400).json({
+      error: 'Enter your client MT5 Login ID, Broker Server (e.g. Exness-MT5Real), and MT5 Trading Password.',
+    });
+    return;
+  }
+
   const token = ensureUserBridgeToken(user);
-  let connectionMode: 'mtapi5' | 'metaapi' | 'bridge' = 'bridge';
-  let storedMtapiHost: string | null = user.mt5_mtapi_host || null;
-  let storedMtapiPort: number = effectiveMtapiPort;
-  let storedExpertHandle: number | null = user.mt5_mtapi_expert_handle ?? null;
-  let metaApiAccountId: string | null = user.mt5_metaapi_account_id || null;
-  let metaApiRegion: string | null = user.mt5_metaapi_region || null;
+  let metaApiAccountId = '';
+  let metaApiRegion = '';
   let liveBalance: number | null = user.mt5_balance ?? null;
   let liveEquity: number | null = user.mt5_equity ?? null;
   let openPositions = user.mt5_open_positions ?? 0;
-  let mt5Status = autoTrade ? 'AUTO_TRADING_READY' : 'BOUND_READY';
-  let connectionNote = '';
+  let mt5Status = 'METAAPI_DEPLOYED';
 
-  if (wantsMtApi5) {
-    if (!effectiveMtapiHost) {
-      res.status(400).json({
-        error:
-          'Enter your MtApi5 Host / VPS Address (e.g. 127.0.0.1 or your VPS IP / wss:// tunnel running MtApi5Installer_x64 on port 8228).',
-      });
-      return;
+  try {
+    const provisioned = await provisionAndDeployMt5Account({
+      login: mt5Login,
+      password: mt5Password,
+      server: mt5Server,
+      name: `GRIDPIPs ${user.name} (${mt5Login})`,
+    });
+    metaApiAccountId = provisioned.accountId;
+    metaApiRegion = provisioned.region;
+    mt5Status = provisioned.connectionStatus === 'CONNECTED' ? 'METAAPI_CONNECTED' : 'METAAPI_DEPLOYED';
+
+    const liveState = await fetchMt5AccountState({
+      accountId: provisioned.accountId,
+      region: provisioned.region,
+    }).catch(() => null);
+
+    if (liveState) {
+      liveBalance = liveState.balance;
+      liveEquity = liveState.equity;
+      openPositions = liveState.openPositions;
+      metaApiRegion = liveState.region || metaApiRegion;
+      mt5Status = 'METAAPI_LIVE_SYNCED';
     }
-
-    try {
-      const normalized = buildMtApi5WsUrl(effectiveMtapiHost, effectiveMtapiPort);
-      const snapshot = await fetchMtApi5AccountSnapshot({
-        host: effectiveMtapiHost,
-        port: effectiveMtapiPort,
-      });
-
-      connectionMode = 'mtapi5';
-      storedMtapiHost = normalized.cleanHost;
-      storedMtapiPort = normalized.cleanPort;
-      storedExpertHandle = snapshot.expertHandle;
-      if (snapshot.login) mt5Login = snapshot.login;
-      if (snapshot.server) mt5Server = snapshot.server;
-      liveBalance = snapshot.balance;
-      liveEquity = snapshot.equity;
-      openPositions = snapshot.openPositions;
-      mt5Status = snapshot.tradeExpert
-        ? 'MTAPI5_LIVE_CONNECTED'
-        : 'MTAPI5_ALGO_DISABLED_IN_MT5';
-      connectionNote = `Connected to MT5 #${mt5Login || 'Terminal'} (${mt5Server || 'Broker'}) via MtApi5 WebSocket API (${normalized.wsUrl}, Expert #${snapshot.expertHandle}). Balance: $${snapshot.balance.toFixed(2)}.`;
-    } catch (err) {
-      res.status(502).json({
-        error:
-          err instanceof Error
-            ? err.message
-            : 'Unable to connect to MtApi5 Service. Ensure MtApi5 is running on port 8228 and attached to an MT5 chart.',
-      });
-      return;
-    }
-  } else {
-    if (!mt5Login || !mt5Server) {
-      res.status(400).json({
-        error: 'Provide both your client MT5 Login ID and Broker Server (e.g. Exness-MT5Real).',
-      });
-      return;
-    }
-
-    connectionNote = `Client MT5 account ${mt5Login} (${mt5Server}) linked with Auto-Trading ${
-      autoTrade ? 'enabled' : 'standby'
-    }.`;
-
-    if (requestedModeRaw === 'metaapi' || (isMt5ApiConfigured() && mt5Password)) {
-      try {
-        const provisioned = await provisionAndDeployMt5Account({
-          login: mt5Login,
-          password: mt5Password,
-          server: mt5Server,
-          name: `GRIDPIPs ${user.name} (${mt5Login})`,
-        });
-        connectionMode = 'metaapi';
-        metaApiAccountId = provisioned.accountId;
-        metaApiRegion = provisioned.region;
-        mt5Status = provisioned.connectionStatus === 'CONNECTED' ? 'API_CONNECTED' : 'API_DEPLOYED';
-
-        const liveState = await fetchMt5AccountState({
-          accountId: provisioned.accountId,
-          region: provisioned.region,
-        }).catch(() => null);
-
-        if (liveState) {
-          liveBalance = liveState.balance;
-          liveEquity = liveState.equity;
-          openPositions = liveState.openPositions;
-          mt5Status = 'API_LIVE_SYNCED';
-        }
-        connectionNote = `Client MT5 account ${mt5Login} (${mt5Server}) connected via MetaTrader 5 Cloud API (${mt5Status}).`;
-      } catch (err) {
-        res.status(502).json({
-          error:
-            err instanceof Error
-              ? err.message
-              : 'MetaTrader 5 API could not connect with the supplied MT5 login, password, and broker server.',
-        });
-        return;
-      }
-    }
+  } catch (err) {
+    res.status(502).json({
+      error:
+        err instanceof Error
+          ? err.message
+          : 'MetaApi Cloud could not provision or connect with the supplied MT5 login, password, and broker server.',
+    });
+    return;
   }
+
+  const connectionNote = `Client MT5 account ${mt5Login} (${mt5Server}) connected via MetaApi Cloud (${mt5Status}).`;
 
   db.prepare(
     `UPDATE users SET
@@ -2047,12 +1973,9 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
       mt5_bridge_token = ?,
       mt5_connected = 1,
       mt5_status = ?,
-      mt5_metaapi_account_id = COALESCE(?, mt5_metaapi_account_id),
-      mt5_metaapi_region = COALESCE(?, mt5_metaapi_region),
-      mt5_mtapi_host = ?,
-      mt5_mtapi_port = ?,
-      mt5_mtapi_expert_handle = ?,
-      mt5_connection_mode = ?,
+      mt5_metaapi_account_id = ?,
+      mt5_metaapi_region = ?,
+      mt5_connection_mode = 'metaapi',
       mt5_auto_trade = ?,
       mt5_active_bot = ?,
       mt5_risk_percent = ?,
@@ -2062,16 +1985,12 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
       mt5_last_sync = datetime('now')
      WHERE id = ?`
   ).run(
-    mt5Login || user.mt5_login || '',
-    mt5Server || user.mt5_server || '',
+    mt5Login,
+    mt5Server,
     token,
     mt5Status,
     metaApiAccountId,
     metaApiRegion,
-    storedMtapiHost,
-    storedMtapiPort,
-    storedExpertHandle,
-    connectionMode,
     autoTrade ? 1 : 0,
     activeBot,
     riskPercent,
@@ -2085,11 +2004,7 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
     'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
   ).run(
     user.id,
-    connectionMode === 'mtapi5'
-      ? 'MtApi5 Socket API'
-      : connectionMode === 'metaapi'
-      ? 'MetaTrader 5 API'
-      : 'MT5 Terminal Bridge',
+    'MetaApi Cloud MT5',
     'MULTI',
     mt5Status,
     liveBalance ?? 0,
@@ -2099,7 +2014,7 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
 
   await sendAutomatedEmail({
     to: user.email,
-    subject: 'GRIDPIPs MT5 Account Connected for Auto-Trading',
+    subject: 'GRIDPIPs MT5 Account Connected via MetaApi Cloud',
     category: 'mt5_bridge',
     textPreview: connectionNote,
     html: `<p>${connectionNote}</p>`,
@@ -2108,7 +2023,7 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
   res.json({
     user: serializeUser(updated),
-    connectionMode,
+    connectionMode: 'metaapi',
     bridgeToken: updated.mt5_bridge_token,
     message: connectionNote,
   });
@@ -2126,7 +2041,7 @@ app.post('/api/ea/mt5/rotate-token', requireAuth, (req: AuthedRequest, res) => {
   res.json({
     user: serializeUser(updated),
     bridgeToken: freshToken,
-    message: 'Generated and connected a fresh MT5 EA Bridge API key. Re-download your .mq5 files or update InpBridgeToken in MT5.',
+    message: 'Generated a fresh EA token.',
   });
 });
 
@@ -2153,7 +2068,7 @@ app.post('/api/ea/mt5/auto-trade', requireAuth, (req: AuthedRequest, res) => {
     enabled ? 1 : 0,
     activeBot,
     riskPercent,
-    enabled ? 'AUTO_TRADING_ACTIVE' : 'AUTO_TRADING_PAUSED',
+    enabled ? 'METAAPI_AUTO_TRADING_ACTIVE' : 'METAAPI_AUTO_TRADING_PAUSED',
     user.id
   );
 
@@ -2184,62 +2099,7 @@ app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
     return;
   }
 
-  const mtapiHost = user.mt5_mtapi_host || getMtApi5DefaultHost();
-  const mtapiPort = user.mt5_mtapi_port || getMtApi5DefaultPort();
-
-  if (user.mt5_connection_mode === 'mtapi5' && mtapiHost) {
-    try {
-      const snapshot = await fetchMtApi5AccountSnapshot({
-        host: mtapiHost,
-        port: mtapiPort,
-        preferredHandle: user.mt5_mtapi_expert_handle,
-      });
-
-      const status = snapshot.tradeExpert
-        ? 'MTAPI5_LIVE_SYNCED'
-        : 'MTAPI5_ALGO_DISABLED_IN_MT5';
-
-      db.prepare(
-        `UPDATE users SET
-          mt5_connected = 1,
-          mt5_login = COALESCE(NULLIF(?, ''), mt5_login),
-          mt5_server = COALESCE(NULLIF(?, ''), mt5_server),
-          mt5_balance = ?,
-          mt5_equity = ?,
-          mt5_open_positions = ?,
-          mt5_mtapi_expert_handle = ?,
-          mt5_status = ?,
-          mt5_last_sync = datetime('now')
-         WHERE id = ?`
-      ).run(
-        snapshot.login,
-        snapshot.server,
-        snapshot.balance,
-        snapshot.equity,
-        snapshot.openPositions,
-        snapshot.expertHandle,
-        status,
-        user.id
-      );
-
-      db.prepare(
-        'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(
-        user.id,
-        'MtApi5 Socket API',
-        'MULTI',
-        status,
-        snapshot.balance,
-        snapshot.equity,
-        snapshot.openPositions
-      );
-    } catch (err) {
-      res.status(502).json({
-        error: err instanceof Error ? err.message : 'Unable to sync live MT5 terminal via MtApi5.',
-      });
-      return;
-    }
-  } else if (user.mt5_connection_mode === 'metaapi' && user.mt5_metaapi_account_id && isMt5ApiConfigured()) {
+  if (user.mt5_metaapi_account_id && isMt5ApiConfigured()) {
     try {
       const liveState = await fetchMt5AccountState({
         accountId: user.mt5_metaapi_account_id,
@@ -2248,14 +2108,17 @@ app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
       db.prepare(
         `UPDATE users SET
           mt5_connected = 1,
+          mt5_connection_mode = 'metaapi',
+          mt5_metaapi_region = COALESCE(NULLIF(?, ''), mt5_metaapi_region),
           mt5_balance = COALESCE(?, mt5_balance),
           mt5_equity = COALESCE(?, mt5_equity),
           mt5_open_positions = ?,
           mt5_server = COALESCE(NULLIF(?, ''), mt5_server),
-          mt5_status = 'API_LIVE_SYNCED',
+          mt5_status = 'METAAPI_LIVE_SYNCED',
           mt5_last_sync = datetime('now')
          WHERE id = ?`
       ).run(
+        liveState.region,
         liveState.balance,
         liveState.equity,
         liveState.openPositions,
@@ -2267,16 +2130,16 @@ app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
         'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
       ).run(
         user.id,
-        'MetaTrader 5 API Sync',
+        'MetaApi Cloud Sync',
         'MULTI',
-        'API_LIVE_SYNCED',
+        'METAAPI_LIVE_SYNCED',
         liveState.balance ?? 0,
         liveState.equity ?? 0,
         liveState.openPositions
       );
     } catch (err) {
       res.status(502).json({
-        error: err instanceof Error ? err.message : 'Unable to sync live MT5 account telemetry.',
+        error: err instanceof Error ? err.message : 'Unable to sync live MT5 account via MetaApi Cloud.',
       });
       return;
     }
@@ -2303,8 +2166,15 @@ app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => 
     res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
     return;
   }
-  if (!user.mt5_connected) {
-    res.status(400).json({ error: 'Connect a client MT5 account first before sending auto-trade orders.' });
+  if (!isMt5ApiConfigured()) {
+    res.status(503).json({
+      error:
+        'MetaApi Cloud is not configured on the backend yet. Add METAAPI_TOKEN and METAAPI_PROVISIONING_PROFILE_ID to your server environment variables.',
+    });
+    return;
+  }
+  if (!user.mt5_connected || !user.mt5_metaapi_account_id) {
+    res.status(400).json({ error: 'Connect a client MT5 account via MetaApi Cloud first before executing orders.' });
     return;
   }
   if (!user.mt5_auto_trade) {
@@ -2321,141 +2191,56 @@ app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => 
   const takeProfit = Number.isFinite(Number(req.body?.takeProfit)) && Number(req.body?.takeProfit) > 0 ? Number(req.body.takeProfit) : null;
   const sourceEa = sanitizeText(req.body?.sourceEa || 'GRIDPIPs Auto-Trade EA', 60);
 
-  const mtapiHost = user.mt5_mtapi_host || getMtApi5DefaultHost();
-  const mtapiPort = user.mt5_mtapi_port || getMtApi5DefaultPort();
+  try {
+    const execRes = await executeMt5TradeOrder({
+      accountId: user.mt5_metaapi_account_id,
+      region: user.mt5_metaapi_region,
+      symbol,
+      side,
+      volume,
+      stopLoss,
+      takeProfit,
+      comment: sourceEa,
+    });
 
-  if (user.mt5_connection_mode === 'mtapi5' && mtapiHost) {
-    try {
-      const execRes = await executeMtApi5Order({
-        host: mtapiHost,
-        port: mtapiPort,
-        preferredHandle: user.mt5_mtapi_expert_handle,
-        symbol,
-        side,
-        volume,
-        stopLoss,
-        takeProfit,
-        comment: sourceEa,
-      });
+    const info = db
+      .prepare(
+        `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, external_order_id, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'metaapi', 'executed', ?, datetime('now'))`
+      )
+      .run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, execRes.orderId);
 
-      const info = db
-        .prepare(
-          `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, external_order_id, executed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'mtapi5', 'executed', ?, datetime('now'))`
-        )
-        .run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, execRes.orderId);
+    db.prepare(
+      "UPDATE users SET mt5_open_positions = COALESCE(mt5_open_positions, 0) + 1, mt5_last_sync = datetime('now') WHERE id = ?"
+    ).run(user.id);
 
-      db.prepare('UPDATE users SET mt5_open_positions = COALESCE(mt5_open_positions, 0) + 1, mt5_last_sync = datetime(\'now\') WHERE id = ?').run(user.id);
+    db.prepare(
+      'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(
+      user.id,
+      sourceEa,
+      symbol,
+      `${side}_EXECUTED_METAAPI`,
+      user.mt5_balance ?? 0,
+      user.mt5_equity ?? 0,
+      (user.mt5_open_positions ?? 0) + 1
+    );
 
-      db.prepare(
-        'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(
-        user.id,
-        sourceEa,
-        symbol,
-        `${side}_EXECUTED_MTAPI5`,
-        user.mt5_balance ?? 0,
-        user.mt5_equity ?? 0,
-        (user.mt5_open_positions ?? 0) + 1
-      );
-
-      res.json({
-        ok: true,
-        mode: 'mtapi5',
-        commandId: Number(info.lastInsertRowid),
-        orderId: execRes.orderId,
-        price: execRes.price,
-        message: `${side} ${execRes.volume} ${symbol} executed via MtApi5 on MT5 #${user.mt5_login || 'Terminal'} (Order #${execRes.orderId}${execRes.price ? ` @ ${execRes.price}` : ''}).`,
-      });
-      return;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'MtApi5 execution failed.';
-      db.prepare(
-        `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'mtapi5', 'failed', ?)`
-      ).run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, msg);
-      res.status(502).json({ error: msg });
-      return;
-    }
+    res.json({
+      ok: true,
+      mode: 'metaapi',
+      commandId: Number(info.lastInsertRowid),
+      orderId: execRes.orderId,
+      message: `${side} ${volume} ${symbol} executed on client MT5 ${user.mt5_login || ''} via MetaApi Cloud (Order #${execRes.orderId}).`,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'MetaApi Cloud trade execution failed.';
+    db.prepare(
+      `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, error_message)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'metaapi', 'failed', ?)`
+    ).run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, msg);
+    res.status(502).json({ error: msg });
   }
-
-  if (user.mt5_connection_mode === 'metaapi' && user.mt5_metaapi_account_id && isMt5ApiConfigured()) {
-    try {
-      const execRes = await executeMt5TradeOrder({
-        accountId: user.mt5_metaapi_account_id,
-        region: user.mt5_metaapi_region,
-        symbol,
-        side,
-        volume,
-        stopLoss,
-        takeProfit,
-        comment: sourceEa,
-      });
-
-      const info = db
-        .prepare(
-          `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, external_order_id, executed_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, 'metaapi', 'executed', ?, datetime('now'))`
-        )
-        .run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, execRes.orderId);
-
-      db.prepare(
-        'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(
-        user.id,
-        sourceEa,
-        symbol,
-        `${side}_EXECUTED_API`,
-        user.mt5_balance ?? 0,
-        user.mt5_equity ?? 0,
-        (user.mt5_open_positions ?? 0) + 1
-      );
-
-      res.json({
-        ok: true,
-        mode: 'metaapi',
-        commandId: Number(info.lastInsertRowid),
-        orderId: execRes.orderId,
-        message: `${side} ${volume} ${symbol} executed directly on client MT5 ${user.mt5_login} (Order #${execRes.orderId}).`,
-      });
-      return;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'MT5 API execution failed.';
-      db.prepare(
-        `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, error_message)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'metaapi', 'failed', ?)`
-      ).run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, msg);
-      res.status(502).json({ error: msg });
-      return;
-    }
-  }
-
-  // Queue command for the client's live running .mq5 EA on MT5 WebRequest Bridge
-  const info = db
-    .prepare(
-      `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'bridge', 'queued')`
-    )
-    .run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa);
-
-  db.prepare(
-    'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
-  ).run(
-    user.id,
-    sourceEa,
-    symbol,
-    `${side}_QUEUED_FOR_EA`,
-    user.mt5_balance ?? 0,
-    user.mt5_equity ?? 0,
-    user.mt5_open_positions ?? 0
-  );
-
-  res.json({
-    ok: true,
-    mode: 'bridge',
-    commandId: Number(info.lastInsertRowid),
-    message: `${side} ${volume} ${symbol} queued for immediate execution on client MT5 ${user.mt5_login || 'terminal'} via attached EA.`,
-  });
 });
 
 app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) => {
@@ -2464,28 +2249,24 @@ app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) =
     res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
     return;
   }
-  const mtapiHost = user.mt5_mtapi_host || getMtApi5DefaultHost();
-  const mtapiPort = user.mt5_mtapi_port || getMtApi5DefaultPort();
-
-  if (user.mt5_connection_mode !== 'mtapi5' || !mtapiHost) {
+  if (!isMt5ApiConfigured() || !user.mt5_metaapi_account_id) {
     res.status(400).json({
-      error: 'Emergency Close-All requires an active MtApi5 (vdemydiuk/mtapi) Socket API connection.',
+      error: 'Connect a client MT5 account via MetaApi Cloud first.',
     });
     return;
   }
 
   try {
-    const result = await closeAllMtApi5Positions({
-      host: mtapiHost,
-      port: mtapiPort,
-      preferredHandle: user.mt5_mtapi_expert_handle,
+    const result = await closeAllMt5Positions({
+      accountId: user.mt5_metaapi_account_id,
+      region: user.mt5_metaapi_region,
     });
     db.prepare("UPDATE users SET mt5_open_positions = 0, mt5_last_sync = datetime('now') WHERE id = ?").run(user.id);
     db.prepare(
       'INSERT INTO mt5_telemetry_events (user_id, ea_name, symbol, status, balance, equity, open_positions) VALUES (?, ?, ?, ?, ?, ?, ?)'
     ).run(
       user.id,
-      'MtApi5 Socket API',
+      'MetaApi Cloud MT5',
       'ALL',
       `CLOSED_${result.closedCount}_POSITIONS`,
       user.mt5_balance ?? 0,
@@ -2495,11 +2276,11 @@ app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) =
     res.json({
       ok: true,
       closedCount: result.closedCount,
-      message: `Closed ${result.closedCount} open MT5 position(s) via MtApi5 (PositionCloseAll).`,
+      message: `Closed ${result.closedCount} open MT5 position(s) via MetaApi Cloud.`,
     });
   } catch (err) {
     res.status(502).json({
-      error: err instanceof Error ? err.message : 'Unable to close open MT5 positions via MtApi5.',
+      error: err instanceof Error ? err.message : 'Unable to close open MT5 positions via MetaApi Cloud.',
     });
   }
 });

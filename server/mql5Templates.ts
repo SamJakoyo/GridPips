@@ -650,20 +650,7 @@ STEP 2: ENABLE MT5 BRIDGE CONNECTION (REQUIRED FOR LIVE SYNC)
 6. Ensure the "Algo Trading" button at the top of MT5 is GREEN.
 
 --------------------------------------------------------------------
-STEP 3: OPTION B — MTAPI5 SOCKET API (https://github.com/vdemydiuk/mtapi)
---------------------------------------------------------------------
-For direct WebSocket API control (live Balance/Equity & instant BUY/SELL):
-1. Download the latest MtApi5Installer_x64.msi from:
-   https://github.com/vdemydiuk/mtapi/releases
-2. Run the installer on your trading PC or Windows Forex VPS (this installs
-   MtApi5 Service on default port 8228 plus MtApi5.ex5 in MetaTrader 5).
-3. Open MetaTrader 5 -> Navigator -> Expert Advisors -> attach MtApi5 EA
-   to any chart and ensure "Algo Trading" is GREEN.
-4. In your GRIDPIPs MQL5 EA Bots tab, select "MtApi5 Socket API (vdemydiuk/mtapi)",
-   enter your VPS/tunnel Host and Port 8228, and press "Connect Client MT5 Account".
-
---------------------------------------------------------------------
-STEP 4: RECOMMENDED EXNESS MT5 SETTINGS
+STEP 3: RECOMMENDED EXNESS MT5 SETTINGS
 --------------------------------------------------------------------
 - Recommended Broker: Exness (Raw Spread or Pro account via IB link)
 - Best Pairs: EURUSD, GBPUSD, XAUUSD, NAS100, US30

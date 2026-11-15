@@ -1,19 +1,7 @@
 import crypto from 'node:crypto';
-export {
-  DEFAULT_MTAPI5_PORT,
-  buildMtApi5WsUrl,
-  closeAllMtApi5Positions,
-  executeMtApi5Order,
-  fetchMtApi5AccountSnapshot,
-  getMtApi5DefaultHost,
-  getMtApi5DefaultPort,
-  isMtApi5DefaultConfigured,
-  type MtApi5AccountSnapshot,
-  type MtApi5OrderExecutionResult,
-} from './mtApi5Ws.ts';
 
 const DEFAULT_PROVISIONING_URL = 'https://mt-provisioning-api-v1.agiliumtrade.ai';
-const DEFAULT_REGION = 'london';
+const FALLBACK_CLIENT_REGION = 'london';
 
 export function getMt5ApiToken(): string {
   return (
@@ -24,25 +12,39 @@ export function getMt5ApiToken(): string {
   ).trim();
 }
 
+export function getMetaApiProvisioningProfileId(): string {
+  return (process.env.METAAPI_PROVISIONING_PROFILE_ID || '').trim();
+}
+
+export function getOptionalMetaApiRegion(): string {
+  const raw = (process.env.METAAPI_REGION || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  return raw;
+}
+
 export function isMt5ApiConfigured(): boolean {
   return getMt5ApiToken().length >= 16;
 }
 
+export function isMetaApiProfileConfigured(): boolean {
+  return getMetaApiProvisioningProfileId().length >= 8;
+}
+
 function getProvisioningUrl(): string {
-  return (process.env.METAAPI_PROVISIONING_URL || DEFAULT_PROVISIONING_URL).replace(/\/+$/, '');
+  return DEFAULT_PROVISIONING_URL;
 }
 
 function getClientApiBaseUrl(region?: string | null): string {
-  const cleanRegion = (region || process.env.METAAPI_REGION || DEFAULT_REGION)
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '') || DEFAULT_REGION;
+  const cleanRegion =
+    (region || getOptionalMetaApiRegion() || FALLBACK_CLIENT_REGION)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '') || FALLBACK_CLIENT_REGION;
   return `https://mt-client-api-v1.${cleanRegion}.agiliumtrade.ai`;
 }
 
 async function metaApiFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
   const token = getMt5ApiToken();
   if (!token) {
-    throw new Error('METAAPI_TOKEN is not configured on the server.');
+    throw new Error('METAAPI_TOKEN is not configured on the backend server.');
   }
 
   const headers = new Headers(init.headers);
@@ -54,7 +56,7 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}): Promise<T> 
   const resp = await fetch(url, {
     ...init,
     headers,
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(20000),
   });
 
   const text = await resp.text();
@@ -66,9 +68,9 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}): Promise<T> 
   }
 
   if (!resp.ok) {
-    const errObj = parsed as { message?: string; error?: string } | null;
+    const errObj = parsed as { message?: string; error?: string; details?: unknown } | null;
     const detail = errObj?.message || errObj?.error || text || `HTTP ${resp.status}`;
-    throw new Error(`MT5 API Error (${resp.status}): ${detail}`);
+    throw new Error(`MetaApi Error (${resp.status}): ${detail}`);
   }
 
   return parsed as T;
@@ -84,6 +86,20 @@ interface MetaApiAccountListItem {
   region?: string;
 }
 
+async function resolveAccountRegion(accountId: string, knownRegion?: string | null): Promise<{
+  region: string;
+  detail: MetaApiAccountListItem | null;
+}> {
+  const provBase = getProvisioningUrl();
+  const detail = await metaApiFetch<MetaApiAccountListItem>(
+    `${provBase}/users/current/accounts/${encodeURIComponent(accountId)}`
+  ).catch(() => null);
+
+  const resolved =
+    detail?.region || knownRegion || getOptionalMetaApiRegion() || FALLBACK_CLIENT_REGION;
+  return { region: resolved, detail };
+}
+
 export async function provisionAndDeployMt5Account(params: {
   login: string;
   password: string;
@@ -96,8 +112,10 @@ export async function provisionAndDeployMt5Account(params: {
   connectionStatus: string;
 }> {
   const baseUrl = getProvisioningUrl();
+  const profileId = getMetaApiProvisioningProfileId();
+  const optionalRegion = getOptionalMetaApiRegion();
 
-  // Check if this MT5 login + server is already provisioned under the platform key
+  // Check if this MT5 login + server is already provisioned under our MetaApi token
   const existingAccounts = await metaApiFetch<MetaApiAccountListItem[]>(
     `${baseUrl}/users/current/accounts`
   ).catch(() => []);
@@ -111,11 +129,29 @@ export async function provisionAndDeployMt5Account(params: {
     : undefined;
 
   let accountId = matched?._id || '';
-  let region = matched?.region || process.env.METAAPI_REGION || DEFAULT_REGION;
+  let region = matched?.region || optionalRegion || '';
   let state = matched?.state || 'CREATED';
   let connectionStatus = matched?.connectionStatus || 'DISCONNECTED';
 
   if (!accountId) {
+    const createPayload: Record<string, unknown> = {
+      login: params.login,
+      password: params.password,
+      name: params.name,
+      server: params.server,
+      platform: 'mt5',
+      magic: 20260525,
+      type: 'cloud',
+      reliability: 'regular',
+    };
+
+    if (profileId) {
+      createPayload.provisioningProfileId = profileId;
+    }
+    if (optionalRegion) {
+      createPayload.region = optionalRegion;
+    }
+
     const created = await metaApiFetch<{ id: string; state?: string }>(
       `${baseUrl}/users/current/accounts`,
       {
@@ -123,16 +159,7 @@ export async function provisionAndDeployMt5Account(params: {
         headers: {
           'transaction-id': crypto.randomBytes(16).toString('hex'),
         },
-        body: JSON.stringify({
-          login: params.login,
-          password: params.password,
-          name: params.name,
-          server: params.server,
-          platform: 'mt5',
-          magic: 20260525,
-          type: 'cloud',
-          reliability: 'regular',
-        }),
+        body: JSON.stringify(createPayload),
       }
     );
     accountId = created.id;
@@ -140,19 +167,17 @@ export async function provisionAndDeployMt5Account(params: {
   }
 
   if (accountId && state !== 'DEPLOYED') {
-    await metaApiFetch<unknown>(`${baseUrl}/users/current/accounts/${encodeURIComponent(accountId)}/deploy`, {
-      method: 'POST',
-    }).catch(() => {});
+    await metaApiFetch<unknown>(
+      `${baseUrl}/users/current/accounts/${encodeURIComponent(accountId)}/deploy`,
+      { method: 'POST' }
+    ).catch(() => {});
   }
 
-  const accountDetail = await metaApiFetch<MetaApiAccountListItem>(
-    `${baseUrl}/users/current/accounts/${encodeURIComponent(accountId)}`
-  ).catch(() => null);
-
-  if (accountDetail) {
-    region = accountDetail.region || region;
-    state = accountDetail.state || state;
-    connectionStatus = accountDetail.connectionStatus || connectionStatus;
+  const resolved = await resolveAccountRegion(accountId, region);
+  region = resolved.region;
+  if (resolved.detail) {
+    state = resolved.detail.state || state;
+    connectionStatus = resolved.detail.connectionStatus || connectionStatus;
   }
 
   return {
@@ -172,17 +197,11 @@ export async function fetchMt5AccountState(params: {
   openPositions: number;
   server: string | null;
   currency: string | null;
+  region: string;
   connectionStatus: string;
 }> {
-  const clientBase = getClientApiBaseUrl(params.region);
-  const provBase = getProvisioningUrl();
-
-  const detail = await metaApiFetch<MetaApiAccountListItem>(
-    `${provBase}/users/current/accounts/${encodeURIComponent(params.accountId)}`
-  ).catch(() => null);
-
-  const region = detail?.region || params.region || DEFAULT_REGION;
-  const resolvedClientBase = getClientApiBaseUrl(region) || clientBase;
+  const { region, detail } = await resolveAccountRegion(params.accountId, params.region);
+  const clientBase = getClientApiBaseUrl(region);
 
   const [info, positions] = await Promise.all([
     metaApiFetch<{
@@ -190,9 +209,11 @@ export async function fetchMt5AccountState(params: {
       equity?: number;
       server?: string;
       currency?: string;
-    }>(`${resolvedClientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/account-information`),
+    }>(
+      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/account-information`
+    ),
     metaApiFetch<Array<{ id?: string }>>(
-      `${resolvedClientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/positions`
+      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/positions`
     ).catch(() => []),
   ]);
 
@@ -202,6 +223,7 @@ export async function fetchMt5AccountState(params: {
     openPositions: Array.isArray(positions) ? positions.length : 0,
     server: info.server || detail?.server || null,
     currency: info.currency || 'USD',
+    region,
     connectionStatus: detail?.connectionStatus || 'CONNECTED',
   };
 }
@@ -221,7 +243,9 @@ export async function executeMt5TradeOrder(params: {
   stringCode: string;
   message: string;
 }> {
-  const clientBase = getClientApiBaseUrl(params.region);
+  const { region } = await resolveAccountRegion(params.accountId, params.region);
+  const clientBase = getClientApiBaseUrl(region);
+
   const payload: Record<string, unknown> = {
     actionType: params.side === 'BUY' ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL',
     symbol: params.symbol,
@@ -249,6 +273,40 @@ export async function executeMt5TradeOrder(params: {
     orderId: String(res.orderId || res.positionId || `MT5-${Date.now()}`),
     positionId: res.positionId ? String(res.positionId) : undefined,
     stringCode: String(res.stringCode || 'TRADE_RETCODE_DONE'),
-    message: String(res.message || 'Trade executed on MetaTrader 5 account.'),
+    message: String(res.message || 'Trade executed on MetaTrader 5 account via MetaApi.'),
   };
+}
+
+export async function closeAllMt5Positions(params: {
+  accountId: string;
+  region?: string | null;
+}): Promise<{ closedCount: number }> {
+  const { region } = await resolveAccountRegion(params.accountId, params.region);
+  const clientBase = getClientApiBaseUrl(region);
+
+  const positions = await metaApiFetch<Array<{ id?: string }>>(
+    `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/positions`
+  );
+
+  if (!Array.isArray(positions) || positions.length === 0) {
+    return { closedCount: 0 };
+  }
+
+  let closedCount = 0;
+  for (const pos of positions) {
+    if (!pos?.id) continue;
+    await metaApiFetch<unknown>(
+      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/trade`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          actionType: 'POSITION_CLOSE_ID',
+          positionId: pos.id,
+        }),
+      }
+    );
+    closedCount += 1;
+  }
+
+  return { closedCount };
 }

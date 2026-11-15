@@ -23,12 +23,9 @@ export interface User {
   mt5AutoTrade?: boolean;
   mt5ActiveBot?: 'silverbullet' | 'orderblock' | 'both' | string;
   mt5RiskPercent?: number;
-  mt5ConnectionMode?: 'mtapi5' | 'metaapi' | 'bridge';
-  mt5MtapiHost?: string | null;
-  mt5MtapiPort?: number | null;
-  mt5MtapiExpertHandle?: number | null;
+  mt5ConnectionMode?: 'metaapi';
   mt5ApiConfigured?: boolean;
-  mt5Mtapi5DefaultConfigured?: boolean;
+  mt5ProvisioningProfileConfigured?: boolean;
   isSuspended: boolean;
   createdAt: string;
   lastLoginAt?: string | null;

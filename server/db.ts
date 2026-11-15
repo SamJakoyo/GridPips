@@ -236,10 +236,7 @@ export function initDatabase(): void {
   if (!userCols.includes('mt5_auto_trade')) db.exec('ALTER TABLE users ADD COLUMN mt5_auto_trade INTEGER NOT NULL DEFAULT 0');
   if (!userCols.includes('mt5_active_bot')) db.exec("ALTER TABLE users ADD COLUMN mt5_active_bot TEXT DEFAULT 'both'");
   if (!userCols.includes('mt5_risk_percent')) db.exec('ALTER TABLE users ADD COLUMN mt5_risk_percent REAL DEFAULT 1.0');
-  if (!userCols.includes('mt5_connection_mode')) db.exec("ALTER TABLE users ADD COLUMN mt5_connection_mode TEXT DEFAULT 'bridge'");
-  if (!userCols.includes('mt5_mtapi_host')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_host TEXT');
-  if (!userCols.includes('mt5_mtapi_port')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_port INTEGER DEFAULT 8228');
-  if (!userCols.includes('mt5_mtapi_expert_handle')) db.exec('ALTER TABLE users ADD COLUMN mt5_mtapi_expert_handle INTEGER');
+  if (!userCols.includes('mt5_connection_mode')) db.exec("ALTER TABLE users ADD COLUMN mt5_connection_mode TEXT DEFAULT 'metaapi'");
 
   const orderCols = (db.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');
