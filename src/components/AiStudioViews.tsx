@@ -14,12 +14,15 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
-import { auth } from '../lib/firebase';
-import {
-  logMediaCreationToFirestore,
-  subscribeMediaCreations,
-  type FirestoreMediaCreation,
-} from '../lib/firestoreStore';
+
+interface MediaCreationItem {
+  id: string;
+  kind: 'image' | 'video';
+  model: string;
+  prompt: string;
+  aspectRatio: string;
+  createdAt?: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -352,14 +355,20 @@ export const MediaStudioView: React.FC = () => {
   const [vidLoading, setVidLoading] = useState(false);
   const [vidError, setVidError] = useState('');
 
-  // Firestore history
-  const [history, setHistory] = useState<FirestoreMediaCreation[]>([]);
+  // Supabase history
+  const [history, setHistory] = useState<MediaCreationItem[]>([]);
+
+  async function loadMediaHistory() {
+    try {
+      const res = await apiFetch<{ items: MediaCreationItem[] }>('/api/supabase/media');
+      setHistory(res.items || []);
+    } catch {
+      // ignore if offline
+    }
+  }
 
   useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
-    const unsub = subscribeMediaCreations(uid, setHistory);
-    return () => unsub();
+    void loadMediaHistory();
   }, []);
 
   async function handleGenerateImage(e: React.FormEvent) {
@@ -380,14 +389,16 @@ export const MediaStudioView: React.FC = () => {
       setGeneratedImageUrl(res.imageDataUrl);
       setImageCaption(res.caption);
 
-      if (auth.currentUser) {
-        await logMediaCreationToFirestore(auth.currentUser.uid, {
+      await apiFetch('/api/supabase/media', {
+        method: 'POST',
+        body: JSON.stringify({
           kind: 'image',
           model: res.model,
           prompt: imgPrompt,
           aspectRatio,
-        });
-      }
+        }),
+      }).catch(() => {});
+      void loadMediaHistory();
     } catch (err) {
       setImgError(err instanceof Error ? err.message : 'Image generation failed.');
     } finally {
@@ -418,14 +429,16 @@ export const MediaStudioView: React.FC = () => {
       );
       setGeneratedVideoUrl(res.videoDataUrl);
 
-      if (auth.currentUser) {
-        await logMediaCreationToFirestore(auth.currentUser.uid, {
+      await apiFetch('/api/supabase/media', {
+        method: 'POST',
+        body: JSON.stringify({
           kind: 'video',
           model: res.model,
           prompt: videoPrompt,
           aspectRatio: res.aspectRatio,
-        });
-      }
+        }),
+      }).catch(() => {});
+      void loadMediaHistory();
     } catch (err) {
       setVidError(err instanceof Error ? err.message : 'Video animation failed.');
     } finally {
@@ -715,7 +728,7 @@ export const MediaStudioView: React.FC = () => {
 
       {history.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="text-sm font-bold text-slate-950 mb-3">Cloud Synced Creation Log (Firestore)</h3>
+          <h3 className="text-sm font-bold text-slate-950 mb-3">Cloud Synced Creation Log (Supabase)</h3>
           <div className="divide-y divide-slate-100">
             {history.slice(0, 6).map((item) => (
               <div key={item.id} className="py-2.5 flex items-center justify-between gap-4 text-xs">

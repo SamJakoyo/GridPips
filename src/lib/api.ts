@@ -1,5 +1,3 @@
-import { auth } from './firebase';
-
 const TOKEN_STORAGE_KEY = 'gridpips_auth_token';
 let memorySessionToken: string | null = null;
 
@@ -55,31 +53,33 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
     headers,
   });
 
-  const data = await res.json().catch(() => ({}));
+  const rawText = await res.text().catch(() => '');
+  let data: Record<string, unknown> = {};
+  if (rawText) {
+    try {
+      const parsed = JSON.parse(rawText);
+      if (parsed && typeof parsed === 'object') {
+        data = parsed as Record<string, unknown>;
+      }
+    } catch {
+      // non-JSON response (e.g. HTML/plain-text 500 from serverless host)
+    }
+  }
+
   if (res.status === 401 && url !== '/api/auth/login' && url !== '/api/auth/register') {
     if (!extraHeaders.Authorization && !extraHeaders.authorization) {
       clearSessionToken();
     }
   }
   if (!res.ok) {
-    throw new Error((data as { error?: string }).error || `Request failed (${res.status})`);
+    const serverMessage =
+      (typeof data.error === 'string' && data.error.trim()) ||
+      (typeof data.message === 'string' && data.message.trim()) ||
+      (typeof data.details === 'string' && data.details.trim()) ||
+      (rawText.trim() ? rawText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 280) : '');
+    throw new Error(serverMessage || `Request failed (${res.status})`);
   }
   return data as T;
-}
-
-export async function firebaseApiFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const currentUser = auth.currentUser;
-  if (!currentUser) {
-    throw new Error('Sign in with Google to sync cloud playbooks.');
-  }
-  const token = await currentUser.getIdToken();
-  return apiFetch<T>(url, {
-    ...options,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...((options.headers as Record<string, string> | undefined) || {}),
-    },
-  });
 }
 
 export interface MarketSymbolQuote {

@@ -23,9 +23,7 @@ import {
   Film,
   Box,
 } from 'lucide-react';
-import { signOut } from 'firebase/auth';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
-import { auth } from './lib/firebase';
 import { getSupabaseClient } from './lib/supabase';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
 import { LandingPage } from './components/LandingPage';
@@ -226,7 +224,6 @@ export default function App() {
   async function handleLogout() {
     clearSessionToken();
     await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    await signOut(auth).catch(() => {});
     const sb = getSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
     if (sb) {
       await sb.auth.signOut().catch(() => {});

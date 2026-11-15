@@ -43,6 +43,7 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 
 export interface SessionPayload {
   uid: number;
+  sub?: string;
   email: string;
   role: 'user' | 'influencer' | 'admin';
   exp: number;

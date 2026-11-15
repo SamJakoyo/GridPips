@@ -17,9 +17,22 @@ import {
 } from './security.ts';
 import {
   checkSupabaseHealth,
+  createSupabaseMediaCreation,
+  createSupabasePlaybook,
+  createSupabaseSavedSetup,
+  deleteSupabasePlaybook,
+  deleteSupabaseSavedSetup,
+  fetchSupabaseProfileByEmail,
+  fetchSupabaseProfileById,
+  getServerSupabaseAdminClient,
   getServerSupabaseClient,
   getSupabaseEnvConfig,
+  listSupabaseMediaCreations,
+  listSupabasePlaybooks,
+  listSupabaseSavedSetups,
+  upsertSupabaseProfile,
   verifySupabaseAccessToken,
+  type SupabaseProfileRecord,
 } from './supabaseAuth.ts';
 import { sendAutomatedEmail } from './email.ts';
 import {
@@ -36,15 +49,12 @@ import {
   type ChatRoleKey,
   type GeminiChatModel,
 } from './gemini.ts';
-import { requireFirebaseAuth, type FirebaseAuthRequest } from '../src/middleware/firebaseAuth.ts';
-import {
-  createSqlStrategy,
-  deleteSqlStrategyByUid,
-  getOrCreateSqlUser,
-  listSqlStrategiesByUid,
-} from '../src/db/users.ts';
 
-initDatabase();
+try {
+  initDatabase();
+} catch (err) {
+  console.error('SQLite initialization error:', err);
+}
 
 export const app = express();
 const COOKIE_NAME = 'gridpips_session';
@@ -69,11 +79,6 @@ app.use(
           "'unsafe-eval'",
           'https://s3.tradingview.com',
           'https://www.tradingview.com',
-          'https://apis.google.com',
-          'https://www.gstatic.com',
-          'https://accounts.google.com',
-          'https://*.firebaseapp.com',
-          'https://*.googleusercontent.com',
         ],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
@@ -85,16 +90,10 @@ app.use(
           'https://www.tradingview.com',
           'https://www.youtube.com',
           'https://www.youtube-nocookie.com',
-          'https://accounts.google.com',
-          'https://www.gstatic.com',
-          'https://*.firebaseapp.com',
-          'https://*.googleusercontent.com',
           'https://*.supabase.co',
         ],
         formAction: [
           "'self'",
-          'https://accounts.google.com',
-          'https://*.firebaseapp.com',
           'https://*.supabase.co',
         ],
         frameAncestors: ["'self'", 'https://aistudio.google.com', 'https://*.google.com', 'https://*.run.app', 'https://*.vercel.app'],
@@ -130,6 +129,7 @@ app.use('/api', apiLimiter);
 
 interface DbUser {
   id: number;
+  supabase_uid: string | null;
   name: string;
   email: string;
   password_hash: string;
@@ -198,28 +198,149 @@ function extractSessionToken(req: Request): string | undefined {
   return undefined;
 }
 
-function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): void {
-  const token = extractSessionToken(req);
+function getServerEnvDiagnostics() {
+  const sb = getSupabaseEnvConfig();
+  const missingSessionSecret =
+    !process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16 ? ['SESSION_SECRET'] : [];
+
+  return {
+    missingSupabaseEnvVars: sb.missingEnvVars,
+    missingSessionSecret,
+    hasSecretKeyMisplacedInUrl: sb.hasSecretKeyMisplacedInUrl,
+  };
+}
+
+function getSupabaseConfigBlockError(): { status: number; error: string; missingEnvVars: string[] } | null {
+  const sb = getSupabaseEnvConfig();
+  const isVercel = Boolean(process.env.VERCEL);
+  const hasPartialSupabase =
+    sb.status !== 'not_configured' || sb.hasSecretKeyMisplacedInUrl || Boolean(sb.serviceRoleKey) || Boolean(sb.anonKey);
+
+  if ((isVercel || hasPartialSupabase) && sb.missingEnvVars.length > 0) {
+    const extraHint = sb.hasSecretKeyMisplacedInUrl
+      ? ' Note: SUPABASE_URL / VITE_SUPABASE_URL currently holds a secret key instead of https://<project-ref>.supabase.co.'
+      : '';
+    return {
+      status: 500,
+      error: `Missing required Supabase environment variable(s): ${sb.missingEnvVars.join(', ')}.${extraHint}`,
+      missingEnvVars: sb.missingEnvVars,
+    };
+  }
+  return null;
+}
+
+function upsertLocalMirrorUserFromProfile(profile: SupabaseProfileRecord, referredById: number | null = null): DbUser {
+  const email = profile.email.toLowerCase();
+  const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
+  const exnessId = profile.exness_account_id || 'EXN-PENDING';
+  const refCode =
+    profile.referral_code ||
+    `${profile.full_name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER'}${Math.floor(100 + Math.random() * 899)}`;
+
+  if (!existing) {
+    const info = db
+      .prepare(
+        `INSERT INTO users (supabase_uid, name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, has_analyzer, has_ea_bots, mt5_bridge_token, last_login_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+      )
+      .run(
+        profile.id,
+        profile.full_name || email.split('@')[0] || 'Trader',
+        email,
+        hashPassword(generateSecureToken(24)),
+        profile.role || 'user',
+        exnessId,
+        email,
+        profile.exness_verified ? 1 : 0,
+        refCode,
+        referredById,
+        profile.has_analyzer ? 1 : 0,
+        profile.has_ea_bots ? 1 : 0,
+        generateSecureToken(16)
+      );
+    const userId = Number(info.lastInsertRowid);
+    db.prepare('INSERT OR IGNORE INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
+    db.prepare('INSERT OR IGNORE INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
+      userId,
+      JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
+    );
+    return db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
+  }
+
+  db.prepare(
+    `UPDATE users
+     SET supabase_uid = ?, name = ?, role = ?, exness_account_id = ?, exness_verified = ?, has_analyzer = ?, has_ea_bots = ?, last_login_at = datetime('now')
+     WHERE id = ?`
+  ).run(
+    profile.id,
+    profile.full_name || existing.name,
+    profile.role || existing.role,
+    exnessId,
+    profile.exness_verified ? 1 : 0,
+    profile.has_analyzer ? 1 : 0,
+    profile.has_ea_bots ? 1 : 0,
+    existing.id
+  );
+  db.prepare('INSERT OR IGNORE INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(existing.id);
+  return db.prepare('SELECT * FROM users WHERE id = ?').get(existing.id) as DbUser;
+}
+
+async function resolveAuthenticatedUser(token: string | undefined): Promise<DbUser | null> {
   const payload = verifySessionToken(token);
-  if (!payload) {
-    res.status(401).json({ error: 'Authentication required. Please log in.' });
-    return;
-  }
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid) as DbUser | undefined;
+  if (!payload) return null;
+
+  let user = db.prepare('SELECT * FROM users WHERE id = ? AND email = ?').get(payload.uid, payload.email) as
+    | DbUser
+    | undefined;
   if (!user) {
-    res.status(401).json({ error: 'Account not found.' });
-    return;
+    user = db.prepare('SELECT * FROM users WHERE email = ?').get(payload.email) as DbUser | undefined;
   }
-  if (user.is_suspended) {
-    res.status(403).json({ error: 'Account is suspended. Contact support.' });
-    return;
+  if (user && payload.sub && !user.supabase_uid) {
+    db.prepare('UPDATE users SET supabase_uid = ? WHERE id = ?').run(payload.sub, user.id);
+    user.supabase_uid = payload.sub;
   }
-  req.currentUser = user;
-  next();
+  if (!user && getSupabaseEnvConfig().configured) {
+    const byId = payload.sub ? await fetchSupabaseProfileById(payload.sub) : { profile: null, error: null };
+    const resolved = byId.profile ? byId : await fetchSupabaseProfileByEmail(payload.email);
+    if (resolved.profile) {
+      user = upsertLocalMirrorUserFromProfile(resolved.profile);
+    }
+  }
+  return user || null;
+}
+
+async function resolveUserSupabaseUid(user: DbUser): Promise<string | null> {
+  if (user.supabase_uid) return user.supabase_uid;
+  const { profile } = await fetchSupabaseProfileByEmail(user.email);
+  if (profile?.id) {
+    db.prepare('UPDATE users SET supabase_uid = ? WHERE id = ?').run(profile.id, user.id);
+    return profile.id;
+  }
+  return null;
+}
+
+async function requireAuth(req: AuthedRequest, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const token = extractSessionToken(req);
+    const user = await resolveAuthenticatedUser(token);
+    if (!user) {
+      res.status(401).json({ error: 'Authentication required. Please log in.' });
+      return;
+    }
+    if (user.is_suspended) {
+      res.status(403).json({ error: 'Account is suspended. Contact support.' });
+      return;
+    }
+    req.currentUser = user;
+    next();
+  } catch (err) {
+    console.error('Authentication middleware error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Session verification error.' });
+  }
 }
 
 function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction): void {
-  requireAuth(req, res, () => {
+  void requireAuth(req, res, () => {
     if (req.currentUser?.role !== 'admin') {
       logSecurityEvent(
         'UNAUTHORIZED_ADMIN_ACCESS',
@@ -235,8 +356,8 @@ function requireAdmin(req: AuthedRequest, res: Response, next: NextFunction): vo
   });
 }
 
-function setSessionCookie(req: Request, res: Response, user: DbUser): string {
-  const token = signSessionToken({ uid: user.id, email: user.email, role: user.role });
+function setSessionCookie(req: Request, res: Response, user: DbUser, sub?: string): string {
+  const token = signSessionToken({ uid: user.id, sub, email: user.email, role: user.role });
   const https = isHttpsRequest(req);
   res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
@@ -250,12 +371,24 @@ function setSessionCookie(req: Request, res: Response, user: DbUser): string {
 
 // ---------------- Public & Config ----------------
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'GRIDPIPs' });
+  res.json({
+    status: 'ok',
+    service: 'GRIDPIPs',
+    envDiagnostics: getServerEnvDiagnostics(),
+  });
 });
 
 app.get('/api/health/supabase', async (_req, res) => {
-  const health = await checkSupabaseHealth();
-  res.json(health);
+  try {
+    const health = await checkSupabaseHealth();
+    res.json({
+      ...health,
+      envDiagnostics: getServerEnvDiagnostics(),
+    });
+  } catch (err) {
+    console.error('Health check error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Supabase health check failed.' });
+  }
 });
 
 app.get('/api/config/public', (_req, res) => {
@@ -288,9 +421,19 @@ app.get('/api/config/public', (_req, res) => {
   });
 });
 
-// ---------------- Auth (Exness IB Gate + Rate Limiting) ----------------
+// ---------------- Auth (Exness IB Gate + Rate Limiting + Supabase Single Source of Truth) ----------------
 app.post('/api/auth/register', authLimiter, async (req, res) => {
   try {
+    const configBlock = getSupabaseConfigBlockError();
+    if (configBlock) {
+      console.error('Registration blocked by missing env vars:', configBlock.missingEnvVars);
+      res.status(configBlock.status).json({
+        error: configBlock.error,
+        missingEnvVars: configBlock.missingEnvVars,
+      });
+      return;
+    }
+
     const name = sanitizeText(req.body?.name, 80);
     const email = sanitizeText(req.body?.email, 120).toLowerCase();
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
@@ -313,12 +456,6 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       return;
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
-    if (existing) {
-      res.status(409).json({ error: 'An account with this email already exists.' });
-      return;
-    }
-
     let referredById: number | null = null;
     if (referralCodeUsed) {
       const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
@@ -329,15 +466,110 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
     const baseCode = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
     const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
-    const bridgeToken = generateSecureToken(16);
     const ip = getClientIp(req);
+    const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();
+    const assignedRole: 'user' | 'admin' = email === adminEmail ? 'admin' : 'user';
 
+    const sbAdmin = getServerSupabaseAdminClient();
+    const sbCfg = getSupabaseEnvConfig();
+
+    if (sbCfg.url && sbAdmin) {
+      const { data: createdAuth, error: createErr } = await sbAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: name,
+          exness_account_id: exnessAccountId,
+          exness_verified: true,
+          referral_code: uniqueRefCode,
+          referred_by_code: referralCodeUsed || undefined,
+        },
+      });
+
+      if (createErr || !createdAuth.user) {
+        console.error('Supabase auth.admin.createUser error:', createErr);
+        const msg = createErr?.message || 'Supabase user registration failed.';
+        const isDuplicate = /already\s+(been\s+)?registered|exists/i.test(msg);
+        res.status(isDuplicate ? 409 : createErr?.status || 400).json({
+          error: isDuplicate
+            ? 'An account with this email already exists. Please use Existing Member Login.'
+            : `Supabase Auth error: ${msg}`,
+        });
+        return;
+      }
+
+      const { profile, error: profileErr } = await upsertSupabaseProfile({
+        id: createdAuth.user.id,
+        email,
+        full_name: name,
+        role: assignedRole,
+        exness_account_id: exnessAccountId,
+        exness_verified: true,
+        referral_code: uniqueRefCode,
+        has_analyzer: assignedRole === 'admin',
+        has_ea_bots: assignedRole === 'admin',
+      });
+
+      if (profileErr || !profile) {
+        console.error('Supabase profiles upsert error during registration:', profileErr);
+        await sbAdmin.auth.admin.deleteUser(createdAuth.user.id).catch((delErr) => {
+          console.error('Failed to rollback partial Supabase auth user:', delErr);
+        });
+        res.status(500).json({
+          error: profileErr || 'Failed to save user profile to Supabase public.profiles table.',
+        });
+        return;
+      }
+
+      const user = upsertLocalMirrorUserFromProfile(profile, referredById);
+      const sessionToken = setSessionCookie(req, res, user, createdAuth.user.id);
+
+      try {
+        logSecurityEvent('USER_REGISTERED', 'info', ip, email, `Supabase + Exness ID: ${exnessAccountId}`);
+        const settings = getSettingsMap();
+        await sendAutomatedEmail({
+          to: email,
+          subject: 'Welcome to Grid Pips — Exness Workspace Activated',
+          category: 'welcome',
+          textPreview: `Welcome ${name}! Your Exness ID (${exnessAccountId}) is linked. Access free tools, ICT/SMC education, and join ${settings.telegram_url}.`,
+          html: `<h2>Welcome to Grid Pips, ${name}</h2>
+            <p>Your free trading workspace is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
+            <p>Your Referral Code: <strong>${uniqueRefCode}</strong></p>
+            <p>Join our live trading desk on Telegram: <a href="${settings.telegram_url}">${settings.telegram_url}</a></p>`,
+        });
+      } catch (noticeErr) {
+        console.warn('Non-fatal notification log warning during registration:', noticeErr);
+      }
+
+      res.status(201).json({ user: serializeUser(user), profile, sessionToken });
+      return;
+    }
+
+    // Offline/Local Dev SQLite fallback (only when Supabase is completely unconfigured locally)
+    const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+    if (existing) {
+      res.status(409).json({ error: 'An account with this email already exists.' });
+      return;
+    }
+
+    const bridgeToken = generateSecureToken(16);
     const info = db
       .prepare(
         `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
-         VALUES (?, ?, ?, 'user', ?, ?, 1, ?, ?, ?, datetime('now'))`
+         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
       )
-      .run(name, email, hashPassword(password), exnessAccountId, email, uniqueRefCode, referredById, bridgeToken);
+      .run(
+        name,
+        email,
+        hashPassword(password),
+        assignedRole,
+        exnessAccountId,
+        email,
+        uniqueRefCode,
+        referredById,
+        bridgeToken
+      );
 
     const userId = Number(info.lastInsertRowid);
     db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
@@ -366,16 +598,128 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     res.status(201).json({ user: serializeUser(user), sessionToken });
   } catch (err) {
     console.error('Register error:', err);
-    res.status(500).json({ error: 'Registration failed. Please try again.' });
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Registration failed. Please check server logs.',
+    });
   }
 });
 
 app.post('/api/auth/login', authLimiter, async (req, res) => {
   try {
+    const configBlock = getSupabaseConfigBlockError();
+    if (configBlock) {
+      console.error('Login blocked by missing env vars:', configBlock.missingEnvVars);
+      res.status(configBlock.status).json({
+        error: configBlock.error,
+        missingEnvVars: configBlock.missingEnvVars,
+      });
+      return;
+    }
+
     const email = sanitizeText(req.body?.email, 120).toLowerCase();
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
     const ip = getClientIp(req);
 
+    if (!email || !password) {
+      res.status(400).json({ error: 'Email and password are required.' });
+      return;
+    }
+
+    const sbClient = getServerSupabaseClient();
+    const sbCfg = getSupabaseEnvConfig();
+
+    if (sbCfg.url && sbClient) {
+      const { data: authData, error: signInErr } = await sbClient.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInErr || !authData.user) {
+        console.error('Supabase login error:', signInErr);
+        const msg = signInErr?.message || 'Invalid email or password.';
+        res.status(401).json({ error: msg });
+        return;
+      }
+
+      const accessToken = authData.session?.access_token;
+      const { profile: existingProfile, error: selectErr } = await fetchSupabaseProfileById(
+        authData.user.id,
+        accessToken
+      );
+
+      if (selectErr) {
+        console.error('Supabase profiles read error on login:', selectErr);
+        res.status(500).json({ error: selectErr });
+        return;
+      }
+
+      let profile = existingProfile;
+      if (!profile) {
+        const meta = (authData.user.user_metadata || {}) as Record<string, unknown>;
+        const metaExness = typeof meta.exness_account_id === 'string' ? meta.exness_account_id : '';
+        const metaName =
+          (typeof meta.full_name === 'string' && meta.full_name) || email.split('@')[0] || 'Trader';
+        if (metaExness.length < 4) {
+          res.status(409).json({
+            needsExnessOnboarding: true,
+            error: 'Complete your Exness Account ID verification to activate your profile.',
+          });
+          return;
+        }
+        const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();
+        const role: 'user' | 'admin' = email === adminEmail ? 'admin' : 'user';
+        const refCode =
+          (typeof meta.referral_code === 'string' && meta.referral_code) ||
+          `${metaName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER'}${Math.floor(100 + Math.random() * 899)}`;
+
+        const upserted = await upsertSupabaseProfile(
+          {
+            id: authData.user.id,
+            email,
+            full_name: metaName,
+            role,
+            exness_account_id: metaExness.toUpperCase(),
+            exness_verified: true,
+            referral_code: refCode.toUpperCase(),
+            has_analyzer: role === 'admin',
+            has_ea_bots: role === 'admin',
+          },
+          accessToken
+        );
+        if (upserted.error || !upserted.profile) {
+          console.error('Supabase profile auto-sync failed on login:', upserted.error);
+          res.status(500).json({ error: upserted.error || 'Unable to load or create Supabase profile.' });
+          return;
+        }
+        profile = upserted.profile;
+      }
+
+      const user = upsertLocalMirrorUserFromProfile(profile);
+      if (user.is_suspended) {
+        logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended user login attempt');
+        res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+        return;
+      }
+
+      const sessionToken = setSessionCookie(req, res, user, authData.user.id);
+      try {
+        logSecurityEvent('LOGIN_SUCCESS', 'info', ip, email, `Supabase Role: ${user.role}`);
+        await sendAutomatedEmail({
+          to: email,
+          subject: 'Grid Pips Security Notice — New Sign-In Detected',
+          category: 'security_alert',
+          textPreview: `A new sign-in to your Grid Pips workspace occurred from IP ${ip}. If this was not you, reset your password immediately.`,
+          html: `<p>Hello ${user.name},</p><p>A new sign-in to your Grid Pips account was recorded from IP <code>${ip}</code>.</p>`,
+        });
+      } catch (noticeErr) {
+        console.warn('Login notification warning:', noticeErr);
+      }
+
+      res.json({ user: serializeUser(user), profile, sessionToken });
+      return;
+    }
+
+    // Offline/Local Dev SQLite fallback
     const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
     if (!user || !verifyPassword(password, user.password_hash)) {
       logSecurityEvent('LOGIN_FAILED', 'warning', ip, email || null, 'Invalid credentials submitted');
@@ -404,7 +748,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
     res.json({ user: serializeUser(refreshed), sessionToken });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed.' });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Login failed.' });
   }
 });
 
@@ -415,130 +759,32 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/auth/me', (req: AuthedRequest, res) => {
-  const token = extractSessionToken(req);
-  const payload = verifySessionToken(token);
-  if (!payload) {
-    res.json({ user: null });
-    return;
-  }
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.uid) as DbUser | undefined;
-  if (!user || user.is_suspended) {
-    const https = isHttpsRequest(req);
-    res.clearCookie(COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
-    res.clearCookie(LEGACY_COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
-    res.json({ user: null });
-    return;
-  }
-  res.json({ user: serializeUser(user) });
-});
-
-app.post('/api/auth/firebase-session', authLimiter, requireFirebaseAuth, async (req: FirebaseAuthRequest, res) => {
+app.get('/api/auth/me', async (req: AuthedRequest, res) => {
   try {
-    const fbUser = req.firebaseUser!;
-    const email = sanitizeText(fbUser.email || '', 120).toLowerCase();
-    const displayName = sanitizeText(fbUser.name || email.split('@')[0] || 'Trader', 80);
-    const ip = getClientIp(req);
-
-    if (!email || !email.includes('@')) {
-      res.status(400).json({ error: 'Verified Google email is required.' });
+    const token = extractSessionToken(req);
+    const user = await resolveAuthenticatedUser(token);
+    if (!user || user.is_suspended) {
+      if (token) {
+        const https = isHttpsRequest(req);
+        res.clearCookie(COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
+        res.clearCookie(LEGACY_COOKIE_NAME, { path: '/', sameSite: https ? 'none' : 'lax', secure: https });
+      }
+      res.json({ user: null });
       return;
     }
-
-    let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
-
-    if (!user) {
-      const exnessAccountId = sanitizeText(req.body?.exnessAccountId, 40).toUpperCase();
-      const exnessConfirmed = Boolean(req.body?.exnessConfirmed);
-      const referralCodeUsed = sanitizeText(req.body?.referralCode, 30).toUpperCase();
-
-      if (!exnessConfirmed || exnessAccountId.length < 4) {
-        res.status(409).json({
-          needsExnessOnboarding: true,
-          email,
-          name: displayName,
-          error: 'Link your Exness Partner Account ID to activate your GRIDPIPs workspace.',
-        });
-        return;
-      }
-
-      let referredById: number | null = null;
-      if (referralCodeUsed) {
-        const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
-          | { id: number }
-          | undefined;
-        if (refUser) referredById = refUser.id;
-      }
-
-      const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
-      const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
-      const bridgeToken = generateSecureToken(16);
-      const randomPassword = generateSecureToken(24);
-      const role = email === 'samjakoyo26@gmail.com' ? 'admin' : 'user';
-
-      const info = db
-        .prepare(
-          `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
-           VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
-        )
-        .run(
-          displayName,
-          email,
-          hashPassword(randomPassword),
-          role,
-          exnessAccountId,
-          email,
-          uniqueRefCode,
-          referredById,
-          bridgeToken
-        );
-
-      const userId = Number(info.lastInsertRowid);
-      db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
-      db.prepare('INSERT INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
-        userId,
-        JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
-      );
-      user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
-
-      logSecurityEvent('USER_REGISTERED_FIREBASE', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
-
-      const settings = getSettingsMap();
-      await sendAutomatedEmail({
-        to: email,
-        subject: 'Welcome to GRIDPIPs — Google & Exness Workspace Activated',
-        category: 'welcome',
-        textPreview: `Welcome ${displayName}! Your Google Sign-In and Exness ID (${exnessAccountId}) are linked. Join ${settings.telegram_url}.`,
-        html: `<h2>Welcome to GRIDPIPs, ${displayName}</h2><p>Your Exness Account ID <strong>${exnessAccountId}</strong> and Google Sign-In are active.</p>`,
-      });
-    } else {
-      if (user.is_suspended) {
-        logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Firebase user attempt');
-        res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
-        return;
-      }
-      db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
-      logSecurityEvent('LOGIN_FIREBASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
-    }
-
-    const sessionToken = setSessionCookie(req, res, user);
-
-    void getOrCreateSqlUser(fbUser.uid, email, user.name, user.exness_account_id).catch((sqlErr) => {
-      console.error('Cloud SQL user sync warning:', sqlErr);
-    });
-
-    const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
-    res.json({ user: serializeUser(refreshed), sessionToken });
+    res.json({ user: serializeUser(user) });
   } catch (err) {
-    console.error('Firebase session error:', err);
-    res.status(500).json({ error: 'Failed to establish Firebase session.' });
+    console.error('Session /api/auth/me error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to load current user.' });
   }
 });
+
 
 async function bridgeSupabaseUserToSession(params: {
   req: Request;
   res: Response;
   sbUser: { id: string; email?: string; user_metadata?: Record<string, unknown> };
+  accessToken?: string;
   overrideName?: string;
   overrideExnessId?: string;
   overrideExnessConfirmed?: boolean;
@@ -559,106 +805,107 @@ async function bridgeSupabaseUserToSession(params: {
   const displayName = sanitizeText(params.overrideName || metaName, 80);
   const ip = getClientIp(req);
 
-  let user = db.prepare('SELECT * FROM users WHERE email = ?').get(email) as DbUser | undefined;
-
-  if (!user) {
-    const metaExnessId =
-      typeof sbUser.user_metadata?.exness_account_id === 'string'
-        ? sbUser.user_metadata.exness_account_id
-        : '';
-    const exnessAccountId = sanitizeText(params.overrideExnessId || metaExnessId, 40).toUpperCase();
-    const exnessConfirmed = Boolean(params.overrideExnessConfirmed || metaExnessId.length >= 4);
-    const referralCodeUsed = sanitizeText(
-      params.overrideReferralCode ||
-        (typeof sbUser.user_metadata?.referral_code === 'string' ? sbUser.user_metadata.referral_code : ''),
-      30
-    ).toUpperCase();
-
-    if (!exnessConfirmed || exnessAccountId.length < 4) {
-      res.status(409).json({
-        needsExnessOnboarding: true,
-        email,
-        name: displayName,
-        error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
-      });
-      return;
-    }
-
-    let referredById: number | null = null;
-    if (referralCodeUsed) {
-      const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
-        | { id: number }
-        | undefined;
-      if (refUser) referredById = refUser.id;
-    }
-
-    const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
-    const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
-    const bridgeToken = generateSecureToken(16);
-    const randomPassword = generateSecureToken(24);
-    const role = email === 'samjakoyo26@gmail.com' ? 'admin' : 'user';
-
-    const info = db
-      .prepare(
-        `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
-      )
-      .run(
-        displayName,
-        email,
-        hashPassword(randomPassword),
-        role,
-        exnessAccountId,
-        email,
-        uniqueRefCode,
-        referredById,
-        bridgeToken
-      );
-
-    const userId = Number(info.lastInsertRowid);
-    db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(userId);
-    db.prepare('INSERT INTO watchlists (user_id, symbols_json) VALUES (?, ?)').run(
-      userId,
-      JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
-    );
-    user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
-
-    logSecurityEvent('USER_REGISTERED_SUPABASE', 'info', ip, email, `Exness ID: ${exnessAccountId}`);
-
-    const settings = getSettingsMap();
-    await sendAutomatedEmail({
-      to: email,
-      subject: 'Welcome to Grid Pips — Supabase & Exness Workspace Activated',
-      category: 'welcome',
-      textPreview: `Welcome ${displayName}! Your Supabase Auth account and Exness ID (${exnessAccountId}) are linked. Join ${settings.telegram_url}.`,
-      html: `<h2>Welcome to Grid Pips, ${displayName}</h2><p>Your Exness Account ID <strong>${exnessAccountId}</strong> and Supabase Auth account are active.</p>`,
-    });
-  } else {
-    if (user.is_suspended) {
-      logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
-      res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
-      return;
-    }
-    db.prepare("UPDATE users SET last_login_at = datetime('now') WHERE id = ?").run(user.id);
-    logSecurityEvent('LOGIN_SUPABASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
+  const existingProfileResult = await fetchSupabaseProfileById(sbUser.id, params.accessToken);
+  if (existingProfileResult.error) {
+    console.error('Supabase profile read error in bridge:', existingProfileResult.error);
+    res.status(500).json({ error: existingProfileResult.error });
+    return;
   }
 
-  const sessionToken = setSessionCookie(req, res, user);
+  let profile = existingProfileResult.profile;
+  const metaExnessId =
+    typeof sbUser.user_metadata?.exness_account_id === 'string'
+      ? sbUser.user_metadata.exness_account_id
+      : '';
+  const exnessAccountId = sanitizeText(
+    params.overrideExnessId || profile?.exness_account_id || metaExnessId,
+    40
+  ).toUpperCase();
+  const exnessConfirmed = Boolean(
+    params.overrideExnessConfirmed || profile?.exness_verified || metaExnessId.length >= 4
+  );
 
-  void getOrCreateSqlUser(sbUser.id, email, user.name, user.exness_account_id).catch((sqlErr) => {
-    console.error('Cloud SQL user sync warning (Supabase):', sqlErr);
-  });
+  if (!exnessConfirmed || exnessAccountId.length < 4) {
+    res.status(409).json({
+      needsExnessOnboarding: true,
+      email,
+      name: displayName,
+      error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
+    });
+    return;
+  }
 
-  const refreshed = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
-  res.json({ user: serializeUser(refreshed), sessionToken });
+  const referralCodeUsed = sanitizeText(
+    params.overrideReferralCode ||
+      (typeof sbUser.user_metadata?.referral_code === 'string' ? sbUser.user_metadata.referral_code : ''),
+    30
+  ).toUpperCase();
+
+  let referredById: number | null = null;
+  if (referralCodeUsed) {
+    const refUser = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCodeUsed) as
+      | { id: number }
+      | undefined;
+    if (refUser) referredById = refUser.id;
+  }
+
+  if (!profile) {
+    const baseCode = displayName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
+    const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
+    const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();
+    const role: 'user' | 'admin' = email === adminEmail ? 'admin' : 'user';
+
+    const upserted = await upsertSupabaseProfile(
+      {
+        id: sbUser.id,
+        email,
+        full_name: displayName,
+        role,
+        exness_account_id: exnessAccountId,
+        exness_verified: true,
+        referral_code: uniqueRefCode,
+        has_analyzer: role === 'admin',
+        has_ea_bots: role === 'admin',
+      },
+      params.accessToken
+    );
+
+    if (upserted.error || !upserted.profile) {
+      console.error('Supabase profiles upsert error in bridge:', upserted.error);
+      res.status(500).json({ error: upserted.error || 'Failed to save user profile to Supabase.' });
+      return;
+    }
+    profile = upserted.profile;
+  }
+
+  const user = upsertLocalMirrorUserFromProfile(profile, referredById);
+  if (user.is_suspended) {
+    logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
+    res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
+    return;
+  }
+
+  const sessionToken = setSessionCookie(req, res, user, sbUser.id);
+  logSecurityEvent('LOGIN_SUPABASE_SUCCESS', 'info', ip, email, `Role: ${user.role}`);
+
+  res.json({ user: serializeUser(user), profile, sessionToken });
 }
 
 app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
   try {
+    const configBlock = getSupabaseConfigBlockError();
+    if (configBlock) {
+      res.status(configBlock.status).json({
+        error: configBlock.error,
+        missingEnvVars: configBlock.missingEnvVars,
+      });
+      return;
+    }
+
     const sbConfig = getSupabaseEnvConfig();
     if (!sbConfig.configured && !sbConfig.serviceRoleKey) {
       res.status(503).json({
-        error: 'Supabase is not configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY to connect.',
+        error: `Supabase is not configured. Missing env variable(s): ${sbConfig.missingEnvVars.join(', ')}`,
       });
       return;
     }
@@ -679,6 +926,7 @@ app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
       req,
       res,
       sbUser,
+      accessToken,
       overrideName: req.body?.name,
       overrideExnessId: req.body?.exnessAccountId,
       overrideExnessConfirmed: Boolean(req.body?.exnessConfirmed),
@@ -686,17 +934,28 @@ app.post('/api/auth/supabase-session', authLimiter, async (req, res) => {
     });
   } catch (err) {
     console.error('Supabase session error:', err);
-    res.status(500).json({ error: 'Failed to establish Supabase session.' });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to establish Supabase session.' });
   }
 });
 
 app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
   try {
-    const sb = getServerSupabaseClient();
-    if (!sb) {
-      res.status(503).json({ error: 'Supabase is not configured on the server.' });
+    const sbConfig = getSupabaseEnvConfig();
+    if (sbConfig.missingEnvVars.length > 0) {
+      console.error('Supabase signup missing env vars:', sbConfig.missingEnvVars);
+      res.status(500).json({
+        error: `Missing required Supabase environment variable(s): ${sbConfig.missingEnvVars.join(', ')}`,
+        missingEnvVars: sbConfig.missingEnvVars,
+      });
       return;
     }
+
+    const sbAdmin = getServerSupabaseAdminClient();
+    if (!sbAdmin) {
+      res.status(500).json({ error: 'Supabase admin client unavailable. Check SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.' });
+      return;
+    }
+
     const name = sanitizeText(req.body?.name, 80);
     const email = sanitizeText(req.body?.email, 120).toLowerCase();
     const password = typeof req.body?.password === 'string' ? req.body.password : '';
@@ -713,45 +972,66 @@ app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
       return;
     }
 
-    const { data, error } = await sb.auth.signUp({
+    const baseCode = name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 6).toUpperCase() || 'TRADER';
+    const uniqueRefCode = `${baseCode}${Math.floor(100 + Math.random() * 899)}`;
+    const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();
+    const role: 'user' | 'admin' = email === adminEmail ? 'admin' : 'user';
+
+    const { data, error } = await sbAdmin.auth.admin.createUser({
       email,
       password,
-      options: {
-        data: {
-          full_name: name,
-          exness_account_id: exnessAccountId,
-          referral_code: referralCode || undefined,
-        },
+      email_confirm: true,
+      user_metadata: {
+        full_name: name,
+        exness_account_id: exnessAccountId,
+        exness_verified: true,
+        referral_code: uniqueRefCode,
+        referred_by_code: referralCode || undefined,
       },
     });
-    if (error) {
-      res.status(400).json({ error: error.message });
+    if (error || !data.user) {
+      console.error('Supabase signup error:', error);
+      res.status(error?.status || 400).json({ error: error?.message || 'Supabase registration failed.' });
       return;
     }
-    if (data.session && data.user) {
-      await bridgeSupabaseUserToSession({
-        req,
-        res,
-        sbUser: data.user,
-        overrideName: name,
-        overrideExnessId: exnessAccountId,
-        overrideExnessConfirmed: exnessConfirmed,
-        overrideReferralCode: referralCode,
-      });
-      return;
-    }
-    res.status(202).json({
-      needsEmailConfirmation: true,
-      message: 'Account created in Supabase! Check your email inbox to confirm your address, then sign in.',
+
+    const { profile, error: profileErr } = await upsertSupabaseProfile({
+      id: data.user.id,
+      email,
+      full_name: name,
+      role,
+      exness_account_id: exnessAccountId,
+      exness_verified: true,
+      referral_code: uniqueRefCode,
+      has_analyzer: role === 'admin',
+      has_ea_bots: role === 'admin',
     });
+    if (profileErr || !profile) {
+      console.error('Supabase profiles upsert error:', profileErr);
+      await sbAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
+      res.status(500).json({ error: profileErr || 'Failed to save user profile to Supabase.' });
+      return;
+    }
+
+    const user = upsertLocalMirrorUserFromProfile(profile);
+    const sessionToken = setSessionCookie(req, res, user, data.user.id);
+    res.status(201).json({ user: serializeUser(user), profile, sessionToken });
   } catch (err) {
     console.error('Supabase signup error:', err);
-    res.status(500).json({ error: 'Supabase registration failed.' });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Supabase registration failed.' });
   }
 });
 
 app.post('/api/auth/supabase/login', authLimiter, async (req, res) => {
   try {
+    const sbConfig = getSupabaseEnvConfig();
+    if (sbConfig.missingEnvVars.length > 0) {
+      res.status(500).json({
+        error: `Missing required Supabase environment variable(s): ${sbConfig.missingEnvVars.join(', ')}`,
+        missingEnvVars: sbConfig.missingEnvVars,
+      });
+      return;
+    }
     const sb = getServerSupabaseClient();
     if (!sb) {
       res.status(503).json({ error: 'Supabase is not configured on the server.' });
@@ -766,6 +1046,7 @@ app.post('/api/auth/supabase/login', authLimiter, async (req, res) => {
 
     const { data, error } = await sb.auth.signInWithPassword({ email, password });
     if (error || !data.user) {
+      console.error('Supabase login error:', error);
       res.status(401).json({ error: error?.message || 'Invalid email or password.' });
       return;
     }
@@ -774,13 +1055,14 @@ app.post('/api/auth/supabase/login', authLimiter, async (req, res) => {
       req,
       res,
       sbUser: data.user,
+      accessToken: data.session?.access_token,
       overrideExnessId: req.body?.exnessAccountId,
       overrideExnessConfirmed: Boolean(req.body?.exnessConfirmed),
       overrideReferralCode: req.body?.referralCode,
     });
   } catch (err) {
     console.error('Supabase login error:', err);
-    res.status(500).json({ error: 'Supabase sign-in failed.' });
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Supabase sign-in failed.' });
   }
 });
 
@@ -791,21 +1073,229 @@ app.get('/api/notifications/emails', requireAuth, (req: AuthedRequest, res) => {
   res.json({ emails: rows });
 });
 
-// ---------------- Cloud SQL Strategy Playbooks (Firebase Auth Verified) ----------------
-app.get('/api/sql/strategies', requireFirebaseAuth, async (req: FirebaseAuthRequest, res) => {
+// ---------------- Supabase Saved Setups, Playbooks & Media History ----------------
+app.get('/api/supabase/setups', requireAuth, async (req: AuthedRequest, res) => {
   try {
-    const fb = req.firebaseUser!;
-    await getOrCreateSqlUser(fb.uid, fb.email || '', fb.name || 'Trader');
-    const strategies = await listSqlStrategiesByUid(fb.uid);
-    res.json({ strategies });
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { setups, error } = await listSupabaseSavedSetups(uid);
+      if (error) {
+        res.status(500).json({ error });
+        return;
+      }
+      res.json({
+        setups: setups.map((s) => ({
+          id: s.id,
+          symbol: s.symbol,
+          timeframe: s.timeframe,
+          bias: s.bias,
+          entryZone: s.entry_zone,
+          stopLoss: Number(s.stop_loss),
+          tp1: Number(s.tp1),
+          notes: s.notes,
+          createdAt: s.created_at,
+        })),
+      });
+      return;
+    }
+
+    const rows = db
+      .prepare('SELECT * FROM saved_setups WHERE user_id = ? ORDER BY id DESC LIMIT 30')
+      .all(req.currentUser!.id) as Array<{
+      id: number;
+      symbol: string;
+      timeframe: 'M15' | 'H1' | 'H4' | 'D1';
+      bias: 'Bullish' | 'Bearish';
+      entry_zone: string;
+      stop_loss: number;
+      tp1: number;
+      notes: string;
+      created_at: string;
+    }>;
+
+    res.json({
+      setups: rows.map((r) => ({
+        id: String(r.id),
+        symbol: r.symbol,
+        timeframe: r.timeframe,
+        bias: r.bias,
+        entryZone: r.entry_zone,
+        stopLoss: Number(r.stop_loss),
+        tp1: Number(r.tp1),
+        notes: r.notes,
+        createdAt: r.created_at,
+      })),
+    });
   } catch (err) {
+    console.error('Load saved setups error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load saved setups.' });
+  }
+});
+
+app.post('/api/supabase/setups', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const symbol = sanitizeText(req.body?.symbol || 'EURUSD', 16).toUpperCase();
+    const timeframe = (['M15', 'H1', 'H4', 'D1'].includes(req.body?.timeframe) ? req.body.timeframe : 'M15') as
+      | 'M15'
+      | 'H1'
+      | 'H4'
+      | 'D1';
+    const bias = req.body?.bias === 'Bearish' ? 'Bearish' : 'Bullish';
+    const entryZone = sanitizeText(req.body?.entryZone || 'Market', 64);
+    const stopLoss = Number(req.body?.stopLoss || 0);
+    const tp1 = Number(req.body?.tp1 || 0);
+    const notes = sanitizeText(req.body?.notes || '', 500);
+
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { setup, error } = await createSupabaseSavedSetup({
+        user_id: uid,
+        symbol,
+        timeframe,
+        bias,
+        entry_zone: entryZone,
+        stop_loss: stopLoss,
+        tp1,
+        notes,
+      });
+      if (error || !setup) {
+        res.status(500).json({ error: error || 'Unable to save setup to Supabase.' });
+        return;
+      }
+      res.status(201).json({
+        setup: {
+          id: setup.id,
+          symbol: setup.symbol,
+          timeframe: setup.timeframe,
+          bias: setup.bias,
+          entryZone: setup.entry_zone,
+          stopLoss: Number(setup.stop_loss),
+          tp1: Number(setup.tp1),
+          notes: setup.notes,
+          createdAt: setup.created_at,
+        },
+      });
+      return;
+    }
+
+    const info = db
+      .prepare(
+        `INSERT INTO saved_setups (user_id, symbol, timeframe, bias, entry_zone, stop_loss, tp1, notes)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+      )
+      .run(req.currentUser!.id, symbol, timeframe, bias, entryZone, stopLoss, tp1, notes);
+    const row = db.prepare('SELECT * FROM saved_setups WHERE id = ?').get(info.lastInsertRowid) as {
+      id: number;
+      symbol: string;
+      timeframe: 'M15' | 'H1' | 'H4' | 'D1';
+      bias: 'Bullish' | 'Bearish';
+      entry_zone: string;
+      stop_loss: number;
+      tp1: number;
+      notes: string;
+      created_at: string;
+    };
+
+    res.status(201).json({
+      setup: {
+        id: String(row.id),
+        symbol: row.symbol,
+        timeframe: row.timeframe,
+        bias: row.bias,
+        entryZone: row.entry_zone,
+        stopLoss: Number(row.stop_loss),
+        tp1: Number(row.tp1),
+        notes: row.notes,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('Create saved setup error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to save setup.' });
+  }
+});
+
+app.delete('/api/supabase/setups/:id', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const setupId = sanitizeText(req.params.id, 80);
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { error } = await deleteSupabaseSavedSetup(setupId, uid);
+      if (error) {
+        res.status(500).json({ error });
+        return;
+      }
+      res.json({ ok: true });
+      return;
+    }
+
+    db.prepare('DELETE FROM saved_setups WHERE id = ? AND user_id = ?').run(Number(setupId), req.currentUser!.id);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete saved setup error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to delete setup.' });
+  }
+});
+
+app.get('/api/supabase/playbooks', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { playbooks, error } = await listSupabasePlaybooks(uid);
+      if (error) {
+        res.status(500).json({ error });
+        return;
+      }
+      res.json({
+        playbooks: playbooks.map((p) => ({
+          id: p.id,
+          title: p.title,
+          pair: p.pair,
+          timeframe: p.timeframe,
+          rulesSummary: p.rules_summary,
+          createdAt: p.created_at,
+        })),
+      });
+      return;
+    }
+
+    const rows = db
+      .prepare('SELECT * FROM strategy_playbooks WHERE user_id = ? ORDER BY id DESC LIMIT 40')
+      .all(req.currentUser!.id) as Array<{
+      id: number;
+      title: string;
+      pair: string;
+      timeframe: string;
+      rules_summary: string;
+      created_at: string;
+    }>;
+
+    res.json({
+      playbooks: rows.map((p) => ({
+        id: String(p.id),
+        title: p.title,
+        pair: p.pair,
+        timeframe: p.timeframe,
+        rulesSummary: p.rules_summary,
+        createdAt: p.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('Load playbooks error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load playbooks.' });
   }
 });
 
-app.post('/api/sql/strategies', requireFirebaseAuth, async (req: FirebaseAuthRequest, res) => {
+app.post('/api/supabase/playbooks', requireAuth, async (req: AuthedRequest, res) => {
   try {
-    const fb = req.firebaseUser!;
     const title = sanitizeText(req.body?.title, 80);
     const pair = sanitizeText(req.body?.pair || 'EURUSD', 16).toUpperCase();
     const timeframe = sanitizeText(req.body?.timeframe || 'M15', 8).toUpperCase();
@@ -816,25 +1306,206 @@ app.post('/api/sql/strategies', requireFirebaseAuth, async (req: FirebaseAuthReq
       return;
     }
 
-    const sqlUser = await getOrCreateSqlUser(fb.uid, fb.email || '', fb.name || 'Trader');
-    const strategy = await createSqlStrategy(sqlUser.id, title, pair, timeframe, rulesSummary);
-    res.status(201).json({ strategy });
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { playbook, error } = await createSupabasePlaybook({
+        user_id: uid,
+        title,
+        pair,
+        timeframe,
+        rules_summary: rulesSummary,
+      });
+      if (error || !playbook) {
+        res.status(500).json({ error: error || 'Unable to save playbook to Supabase.' });
+        return;
+      }
+      res.status(201).json({
+        playbook: {
+          id: playbook.id,
+          title: playbook.title,
+          pair: playbook.pair,
+          timeframe: playbook.timeframe,
+          rulesSummary: playbook.rules_summary,
+          createdAt: playbook.created_at,
+        },
+      });
+      return;
+    }
+
+    const info = db
+      .prepare(
+        `INSERT INTO strategy_playbooks (user_id, title, pair, timeframe, rules_summary)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(req.currentUser!.id, title, pair, timeframe, rulesSummary);
+    const row = db.prepare('SELECT * FROM strategy_playbooks WHERE id = ?').get(info.lastInsertRowid) as {
+      id: number;
+      title: string;
+      pair: string;
+      timeframe: string;
+      rules_summary: string;
+      created_at: string;
+    };
+
+    res.status(201).json({
+      playbook: {
+        id: String(row.id),
+        title: row.title,
+        pair: row.pair,
+        timeframe: row.timeframe,
+        rulesSummary: row.rules_summary,
+        createdAt: row.created_at,
+      },
+    });
   } catch (err) {
+    console.error('Create playbook error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to save playbook.' });
   }
 });
 
-app.delete('/api/sql/strategies/:id', requireFirebaseAuth, async (req: FirebaseAuthRequest, res) => {
+app.delete('/api/supabase/playbooks/:id', requireAuth, async (req: AuthedRequest, res) => {
   try {
-    const fb = req.firebaseUser!;
-    const removed = await deleteSqlStrategyByUid(Number(req.params.id), fb.uid);
-    if (!removed) {
-      res.status(404).json({ error: 'Strategy not found.' });
+    const playbookId = sanitizeText(req.params.id, 80);
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { error } = await deleteSupabasePlaybook(playbookId, uid);
+      if (error) {
+        res.status(500).json({ error });
+        return;
+      }
+      res.json({ ok: true });
       return;
     }
+
+    db.prepare('DELETE FROM strategy_playbooks WHERE id = ? AND user_id = ?').run(
+      Number(playbookId),
+      req.currentUser!.id
+    );
     res.json({ ok: true });
   } catch (err) {
+    console.error('Delete playbook error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to delete playbook.' });
+  }
+});
+
+app.get('/api/supabase/media', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { items, error } = await listSupabaseMediaCreations(uid);
+      if (error) {
+        res.status(500).json({ error });
+        return;
+      }
+      res.json({
+        items: items.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          model: m.model,
+          prompt: m.prompt,
+          aspectRatio: m.aspect_ratio,
+          createdAt: m.created_at,
+        })),
+      });
+      return;
+    }
+
+    const rows = db
+      .prepare('SELECT * FROM media_creations WHERE user_id = ? ORDER BY id DESC LIMIT 25')
+      .all(req.currentUser!.id) as Array<{
+      id: number;
+      kind: 'image' | 'video';
+      model: string;
+      prompt: string;
+      aspect_ratio: string;
+      created_at: string;
+    }>;
+
+    res.json({
+      items: rows.map((m) => ({
+        id: String(m.id),
+        kind: m.kind,
+        model: m.model,
+        prompt: m.prompt,
+        aspectRatio: m.aspect_ratio,
+        createdAt: m.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('Load media history error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load media history.' });
+  }
+});
+
+app.post('/api/supabase/media', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const kind = req.body?.kind === 'video' ? 'video' : 'image';
+    const model = sanitizeText(req.body?.model || 'gemini-nano-banana-2.1', 64);
+    const prompt = sanitizeText(req.body?.prompt || 'Media creation', 600);
+    const aspectRatio = sanitizeText(req.body?.aspectRatio || '1:1', 12);
+
+    const sbAdmin = getServerSupabaseAdminClient();
+    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
+
+    if (sbAdmin && uid) {
+      const { item, error } = await createSupabaseMediaCreation({
+        user_id: uid,
+        kind,
+        model,
+        prompt,
+        aspect_ratio: aspectRatio,
+      });
+      if (error || !item) {
+        res.status(500).json({ error: error || 'Unable to save media creation log to Supabase.' });
+        return;
+      }
+      res.status(201).json({
+        item: {
+          id: item.id,
+          kind: item.kind,
+          model: item.model,
+          prompt: item.prompt,
+          aspectRatio: item.aspect_ratio,
+          createdAt: item.created_at,
+        },
+      });
+      return;
+    }
+
+    const info = db
+      .prepare(
+        `INSERT INTO media_creations (user_id, kind, model, prompt, aspect_ratio)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .run(req.currentUser!.id, kind, model, prompt, aspectRatio);
+    const row = db.prepare('SELECT * FROM media_creations WHERE id = ?').get(info.lastInsertRowid) as {
+      id: number;
+      kind: 'image' | 'video';
+      model: string;
+      prompt: string;
+      aspect_ratio: string;
+      created_at: string;
+    };
+
+    res.status(201).json({
+      item: {
+        id: String(row.id),
+        kind: row.kind,
+        model: row.model,
+        prompt: row.prompt,
+        aspectRatio: row.aspect_ratio,
+        createdAt: row.created_at,
+      },
+    });
+  } catch (err) {
+    console.error('Save media log error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to save media log.' });
   }
 });
 
@@ -1610,6 +2281,13 @@ app.post('/api/admin/settings', requireAdmin, (req: AuthedRequest, res) => {
   }
   logSecurityEvent('ADMIN_SETTINGS_UPDATE', 'info', getClientIp(req), req.currentUser!.email, 'Updated site settings');
   res.json({ settings: getSettingsMap() });
+});
+
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('Unhandled Express API error:', err);
+  if (res.headersSent) return;
+  const message = err instanceof Error ? err.message : 'Internal server error.';
+  res.status(500).json({ error: message });
 });
 
 export default app;

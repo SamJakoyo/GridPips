@@ -61,9 +61,15 @@ function normalizePublicKey(raw?: string): string {
 }
 
 export function getSupabaseClient(runtimeUrl?: string, runtimeAnonKey?: string): SupabaseClient | null {
-  const url = normalizeSupabaseUrl(runtimeUrl) || normalizeSupabaseUrl(import.meta.env.VITE_SUPABASE_URL);
+  const clientEnv = import.meta.env as Record<string, string | undefined>;
+  const url =
+    normalizeSupabaseUrl(runtimeUrl) ||
+    normalizeSupabaseUrl(clientEnv.VITE_SUPABASE_URL) ||
+    normalizeSupabaseUrl(clientEnv.NEXT_PUBLIC_SUPABASE_URL);
   const anonKey =
-    normalizePublicKey(runtimeAnonKey) || normalizePublicKey(import.meta.env.VITE_SUPABASE_ANON_KEY);
+    normalizePublicKey(runtimeAnonKey) ||
+    normalizePublicKey(clientEnv.VITE_SUPABASE_ANON_KEY) ||
+    normalizePublicKey(clientEnv.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
   if (!url || !anonKey) {
     return null;

@@ -1,15 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, Lock, ArrowUpRight, CheckCircle2, BookmarkPlus, Trash2, BookMarked } from 'lucide-react';
-import { signInWithPopup } from 'firebase/auth';
-import { apiFetch, firebaseApiFetch } from '../lib/api';
-import { auth, googleProvider } from '../lib/firebase';
-import {
-  deleteSavedSetupFromFirestore,
-  saveIctSetupToFirestore,
-  subscribeSavedSetups,
-  syncFirestoreTraderProfile,
-  type SavedFirestoreSetup,
-} from '../lib/firestoreStore';
+import { apiFetch } from '../lib/api';
 import type { IctAnalysisResult, PublicConfig, User } from '../types';
 
 interface IctAnalyzerViewProps {
@@ -18,8 +9,19 @@ interface IctAnalyzerViewProps {
   onUnlockClick: () => void;
 }
 
-interface SqlStrategyItem {
-  id: number;
+interface SavedSetupItem {
+  id: string;
+  symbol: string;
+  timeframe: 'M15' | 'H1' | 'H4' | 'D1';
+  bias: 'Bullish' | 'Bearish';
+  entryZone: string;
+  stopLoss: number;
+  tp1: number;
+  notes: string;
+}
+
+interface PlaybookItem {
+  id: string;
   title: string;
   pair: string;
   timeframe: string;
@@ -40,41 +42,31 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Cloud Sync (Firestore Saved Setups + Cloud SQL Playbooks)
-  const [fbUid, setFbUid] = useState<string | null>(() => auth.currentUser?.uid || null);
-  const [savedSetups, setSavedSetups] = useState<SavedFirestoreSetup[]>([]);
-  const [playbooks, setPlaybooks] = useState<SqlStrategyItem[]>([]);
+  // Supabase Cloud Sync (Saved Setups + Strategy Playbooks)
+  const [savedSetups, setSavedSetups] = useState<SavedSetupItem[]>([]);
+  const [playbooks, setPlaybooks] = useState<PlaybookItem[]>([]);
   const [playbookTitle, setPlaybookTitle] = useState('');
   const [playbookRules, setPlaybookRules] = useState('');
   const [cloudNotice, setCloudNotice] = useState('');
 
-  const loadPlaybooks = useCallback(async () => {
-    if (!auth.currentUser) return;
+  const loadCloudData = useCallback(async () => {
     try {
-      const res = await firebaseApiFetch<{ strategies: SqlStrategyItem[] }>('/api/sql/strategies');
-      setPlaybooks(res.strategies || []);
-    } catch {
-      // ignore when not Google signed in
+      const [setupsRes, playbooksRes] = await Promise.all([
+        apiFetch<{ setups: SavedSetupItem[] }>('/api/supabase/setups'),
+        apiFetch<{ playbooks: PlaybookItem[] }>('/api/supabase/playbooks'),
+      ]);
+      setSavedSetups(setupsRes.setups || []);
+      setPlaybooks(playbooksRes.playbooks || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to load saved setups and playbooks.');
     }
   }, []);
 
   useEffect(() => {
-    const unsubAuth = auth.onAuthStateChanged((fbUser) => {
-      setFbUid(fbUser?.uid || null);
-    });
-    return () => unsubAuth();
-  }, []);
-
-  useEffect(() => {
-    if (!fbUid) {
-      setSavedSetups([]);
-      setPlaybooks([]);
-      return;
+    if (user.hasAnalyzer) {
+      loadCloudData();
     }
-    const unsub = subscribeSavedSetups(fbUid, setSavedSetups);
-    loadPlaybooks();
-    return () => unsub();
-  }, [fbUid, loadPlaybooks]);
+  }, [user.hasAnalyzer, loadCloudData]);
 
   const runScan = useCallback(async () => {
     if (!user.hasAnalyzer) return;
@@ -96,45 +88,47 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
     runScan();
   }, [runScan]);
 
-  async function ensureGoogleLinked() {
-    if (auth.currentUser) return auth.currentUser;
-    const cred = await signInWithPopup(auth, googleProvider);
-    await syncFirestoreTraderProfile({
-      uid: cred.user.uid,
-      displayName: user.name,
-      email: cred.user.email || user.email,
-      exnessAccountId: user.exnessAccountId,
-    });
-    setFbUid(cred.user.uid);
-    return cred.user;
-  }
-
   async function handleSaveSetup() {
     if (!analysis) return;
+    setError('');
     setCloudNotice('');
     try {
-      const fbUser = await ensureGoogleLinked();
-      await saveIctSetupToFirestore(fbUser.uid, {
-        symbol: analysis.symbol,
-        timeframe: analysis.timeframe as 'M15' | 'H1' | 'H4' | 'D1',
-        bias: analysis.dailyBias,
-        entryZone: analysis.setup.entryZone,
-        stopLoss: analysis.setup.stopLoss,
-        tp1: analysis.setup.tp1,
-        notes: `${analysis.structureShift} · ${analysis.activeKillzone}`,
+      await apiFetch('/api/supabase/setups', {
+        method: 'POST',
+        body: JSON.stringify({
+          symbol: analysis.symbol,
+          timeframe: analysis.timeframe,
+          bias: analysis.dailyBias,
+          entryZone: analysis.setup.entryZone,
+          stopLoss: analysis.setup.stopLoss,
+          tp1: analysis.setup.tp1,
+          notes: `${analysis.structureShift} · ${analysis.activeKillzone}`,
+        }),
       });
-      setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to cloud.`);
+      setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to Supabase.`);
+      await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save setup.');
+    }
+  }
+
+  async function handleDeleteSetup(id: string) {
+    setError('');
+    try {
+      await apiFetch(`/api/supabase/setups/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await loadCloudData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove saved setup.');
     }
   }
 
   async function handleCreatePlaybook(e: React.FormEvent) {
     e.preventDefault();
     if (!playbookTitle.trim() || !playbookRules.trim()) return;
+    setError('');
+    setCloudNotice('');
     try {
-      await ensureGoogleLinked();
-      await firebaseApiFetch('/api/sql/strategies', {
+      await apiFetch('/api/supabase/playbooks', {
         method: 'POST',
         body: JSON.stringify({
           title: playbookTitle,
@@ -145,16 +139,18 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       });
       setPlaybookTitle('');
       setPlaybookRules('');
-      loadPlaybooks();
+      setCloudNotice('Strategy playbook saved to Supabase.');
+      await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save playbook.');
     }
   }
 
-  async function handleDeletePlaybook(id: number) {
+  async function handleDeletePlaybook(id: string) {
+    setError('');
     try {
-      await firebaseApiFetch(`/api/sql/strategies/${id}`, { method: 'DELETE' });
-      loadPlaybooks();
+      await apiFetch(`/api/supabase/playbooks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      await loadCloudData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove playbook.');
     }
@@ -390,7 +386,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         </>
       )}
 
-      {/* Cloud Synced Setups & Strategy Playbooks */}
+      {/* Supabase Synced Setups & Strategy Playbooks */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
@@ -398,19 +394,11 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               <BookmarkPlus className="w-4 h-4 text-blue-600" />
               Saved ICT Setups
             </h3>
-            {!fbUid && (
-              <button
-                type="button"
-                onClick={() => ensureGoogleLinked()}
-                className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
-              >
-                Link Google Account to Sync
-              </button>
-            )}
+            <span className="text-[11px] font-medium text-emerald-700">Synced with Supabase</span>
           </div>
           {savedSetups.length === 0 ? (
             <p className="text-xs text-slate-500 py-4">
-              {fbUid ? 'No saved setups yet. Click "Save Setup" on any scan.' : 'Connect your Google account to save setups across devices.'}
+              No saved setups yet. Click &quot;Save Setup&quot; on any scan to save it to your account.
             </p>
           ) : (
             <div className="divide-y divide-slate-100">
@@ -427,7 +415,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => fbUid && deleteSavedSetupFromFirestore(fbUid, s.id)}
+                    onClick={() => handleDeleteSetup(s.id)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 cursor-pointer"
                     aria-label="Delete setup"
                   >
@@ -445,15 +433,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               <BookMarked className="w-4 h-4 text-blue-600" />
               Strategy Playbooks
             </h3>
-            {!fbUid && (
-              <button
-                type="button"
-                onClick={() => ensureGoogleLinked()}
-                className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
-              >
-                Link Google Account
-              </button>
-            )}
+            <span className="text-[11px] font-medium text-emerald-700">Synced with Supabase</span>
           </div>
 
           <form onSubmit={handleCreatePlaybook} className="space-y-2.5">

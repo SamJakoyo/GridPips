@@ -9,6 +9,21 @@ export interface SupabaseEnvConfig {
   anonKey: string;
   serviceRoleKey: string;
   hasSecretKeyMisplacedInUrl: boolean;
+  missingEnvVars: string[];
+}
+
+export interface SupabaseProfileRecord {
+  id: string;
+  email: string;
+  full_name: string;
+  role: 'user' | 'influencer' | 'admin';
+  exness_account_id: string;
+  exness_verified: boolean;
+  referral_code: string;
+  has_analyzer: boolean;
+  has_ea_bots: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 function normalizeSupabaseUrl(raw?: string): string {
@@ -18,13 +33,11 @@ function normalizeSupabaseUrl(raw?: string): string {
     return '';
   }
 
-  // Extract project ref from Supabase Dashboard URL
   const dashMatch = val.match(/supabase\.com\/dashboard\/project\/([a-z0-9]{16,32})/i);
   if (dashMatch) {
     return `https://${dashMatch[1]}.supabase.co`;
   }
 
-  // Extract project ref from direct DB host or pooler Postgres URI
   const dbHostMatch = val.match(/db\.([a-z0-9]{16,32})\.supabase\.co/i);
   if (dbHostMatch) {
     return `https://${dbHostMatch[1]}.supabase.co`;
@@ -35,7 +48,6 @@ function normalizeSupabaseUrl(raw?: string): string {
     return `https://${poolerUserMatch[1]}.supabase.co`;
   }
 
-  // Allow bare project ref ID
   if (/^[a-z0-9]{16,32}$/i.test(val)) {
     val = `https://${val}.supabase.co`;
   } else if (!/^https?:\/\//i.test(val) && val.includes('.supabase.')) {
@@ -136,6 +148,11 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
       .find((v) => isSecretSupabaseKey(v)) ||
     '';
 
+  const missingEnvVars: string[] = [];
+  if (!url) missingEnvVars.push('SUPABASE_URL');
+  if (!anonKey) missingEnvVars.push('SUPABASE_ANON_KEY');
+  if (!serviceRoleKey) missingEnvVars.push('SUPABASE_SERVICE_ROLE_KEY');
+
   const hasAnyKey = Boolean(anonKey || serviceRoleKey);
   let status: SupabaseConfigStatus = 'not_configured';
   if (url && anonKey) {
@@ -153,6 +170,7 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
     anonKey,
     serviceRoleKey,
     hasSecretKeyMisplacedInUrl,
+    missingEnvVars,
   };
 }
 
@@ -178,7 +196,7 @@ export function getServerSupabaseClient(): SupabaseClient | null {
       });
       serverPublicSig = sig;
     } catch (err) {
-      console.warn('Server Supabase client skipped due to invalid configuration:', err);
+      console.error('Server Supabase client initialization failed:', err);
       return null;
     }
   }
@@ -200,11 +218,330 @@ export function getServerSupabaseAdminClient(): SupabaseClient | null {
       });
       serverAdminSig = sig;
     } catch (err) {
-      console.warn('Server Supabase admin client skipped:', err);
+      console.error('Server Supabase admin client initialization failed:', err);
       return null;
     }
   }
   return serverAdminClient;
+}
+
+function getScopedUserSupabaseClient(accessToken: string): SupabaseClient | null {
+  const { url, anonKey } = getSupabaseEnvConfig();
+  if (!url || !anonKey || !accessToken) return null;
+  return createClient(url, anonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
+
+export async function upsertSupabaseProfile(
+  profile: Omit<SupabaseProfileRecord, 'created_at' | 'updated_at'>,
+  userAccessToken?: string
+): Promise<{ profile: SupabaseProfileRecord | null; error: string | null }> {
+  const client =
+    getServerSupabaseAdminClient() ||
+    (userAccessToken ? getScopedUserSupabaseClient(userAccessToken) : null);
+
+  if (!client) {
+    const cfg = getSupabaseEnvConfig();
+    const missing = cfg.missingEnvVars.join(', ') || 'SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY';
+    return {
+      profile: null,
+      error: `Cannot write to Supabase profiles table. Missing server env variable(s): ${missing}`,
+    };
+  }
+
+  const { data, error } = await client
+    .from('profiles')
+    .upsert(
+      {
+        ...profile,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' }
+    )
+    .select('*')
+    .single();
+
+  if (error) {
+    console.error('Supabase profiles upsert error:', error);
+    return {
+      profile: null,
+      error: `Supabase profiles error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+
+  return { profile: data as SupabaseProfileRecord, error: null };
+}
+
+export async function fetchSupabaseProfileById(
+  userId: string,
+  userAccessToken?: string
+): Promise<{ profile: SupabaseProfileRecord | null; error: string | null }> {
+  const client =
+    getServerSupabaseAdminClient() ||
+    (userAccessToken ? getScopedUserSupabaseClient(userAccessToken) : null);
+
+  if (!client) {
+    return { profile: null, error: 'Supabase server client not configured.' };
+  }
+
+  const { data, error } = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) {
+    console.error('Supabase profiles select error:', error);
+    return {
+      profile: null,
+      error: `Supabase profiles query error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+
+  return { profile: (data as SupabaseProfileRecord | null) || null, error: null };
+}
+
+export async function fetchSupabaseProfileByEmail(
+  email: string
+): Promise<{ profile: SupabaseProfileRecord | null; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { profile: null, error: 'Supabase admin client not configured.' };
+  }
+
+  const { data, error } = await client
+    .from('profiles')
+    .select('*')
+    .eq('email', email.toLowerCase())
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase profiles select by email error:', error);
+    return {
+      profile: null,
+      error: `Supabase profiles query error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+
+  return { profile: (data as SupabaseProfileRecord | null) || null, error: null };
+}
+
+export interface SupabaseSavedSetupRecord {
+  id: string;
+  user_id: string;
+  symbol: string;
+  timeframe: 'M15' | 'H1' | 'H4' | 'D1';
+  bias: 'Bullish' | 'Bearish';
+  entry_zone: string;
+  stop_loss: number;
+  tp1: number;
+  notes: string;
+  created_at: string;
+}
+
+export interface SupabasePlaybookRecord {
+  id: string;
+  user_id: string;
+  title: string;
+  pair: string;
+  timeframe: string;
+  rules_summary: string;
+  created_at: string;
+}
+
+export interface SupabaseMediaCreationRecord {
+  id: string;
+  user_id: string;
+  kind: 'image' | 'video';
+  model: string;
+  prompt: string;
+  aspect_ratio: string;
+  created_at: string;
+}
+
+export async function listSupabaseSavedSetups(
+  userId: string
+): Promise<{ setups: SupabaseSavedSetupRecord[]; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { setups: [], error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('saved_setups')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) {
+    console.error('Supabase saved_setups select error:', error);
+    return {
+      setups: [],
+      error: `Supabase saved_setups error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { setups: (data as SupabaseSavedSetupRecord[]) || [], error: null };
+}
+
+export async function createSupabaseSavedSetup(
+  record: Omit<SupabaseSavedSetupRecord, 'id' | 'created_at'>
+): Promise<{ setup: SupabaseSavedSetupRecord | null; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { setup: null, error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('saved_setups')
+    .insert(record)
+    .select('*')
+    .single();
+  if (error) {
+    console.error('Supabase saved_setups insert error:', error);
+    return {
+      setup: null,
+      error: `Supabase saved_setups insert error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { setup: data as SupabaseSavedSetupRecord, error: null };
+}
+
+export async function deleteSupabaseSavedSetup(
+  setupId: string,
+  userId: string
+): Promise<{ deleted: boolean; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { deleted: false, error: 'Supabase admin client not configured.' };
+  }
+  const { error } = await client
+    .from('saved_setups')
+    .delete()
+    .eq('id', setupId)
+    .eq('user_id', userId);
+  if (error) {
+    console.error('Supabase saved_setups delete error:', error);
+    return {
+      deleted: false,
+      error: `Supabase saved_setups delete error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { deleted: true, error: null };
+}
+
+export async function listSupabasePlaybooks(
+  userId: string
+): Promise<{ playbooks: SupabasePlaybookRecord[]; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { playbooks: [], error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('strategy_playbooks')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(40);
+  if (error) {
+    console.error('Supabase strategy_playbooks select error:', error);
+    return {
+      playbooks: [],
+      error: `Supabase strategy_playbooks error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { playbooks: (data as SupabasePlaybookRecord[]) || [], error: null };
+}
+
+export async function createSupabasePlaybook(
+  record: Omit<SupabasePlaybookRecord, 'id' | 'created_at'>
+): Promise<{ playbook: SupabasePlaybookRecord | null; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { playbook: null, error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('strategy_playbooks')
+    .insert(record)
+    .select('*')
+    .single();
+  if (error) {
+    console.error('Supabase strategy_playbooks insert error:', error);
+    return {
+      playbook: null,
+      error: `Supabase strategy_playbooks insert error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { playbook: data as SupabasePlaybookRecord, error: null };
+}
+
+export async function deleteSupabasePlaybook(
+  playbookId: string,
+  userId: string
+): Promise<{ deleted: boolean; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { deleted: false, error: 'Supabase admin client not configured.' };
+  }
+  const { error } = await client
+    .from('strategy_playbooks')
+    .delete()
+    .eq('id', playbookId)
+    .eq('user_id', userId);
+  if (error) {
+    console.error('Supabase strategy_playbooks delete error:', error);
+    return {
+      deleted: false,
+      error: `Supabase strategy_playbooks delete error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { deleted: true, error: null };
+}
+
+export async function listSupabaseMediaCreations(
+  userId: string
+): Promise<{ items: SupabaseMediaCreationRecord[]; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { items: [], error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('media_creations')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(25);
+  if (error) {
+    console.error('Supabase media_creations select error:', error);
+    return {
+      items: [],
+      error: `Supabase media_creations error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { items: (data as SupabaseMediaCreationRecord[]) || [], error: null };
+}
+
+export async function createSupabaseMediaCreation(
+  record: Omit<SupabaseMediaCreationRecord, 'id' | 'created_at'>
+): Promise<{ item: SupabaseMediaCreationRecord | null; error: string | null }> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { item: null, error: 'Supabase admin client not configured.' };
+  }
+  const { data, error } = await client
+    .from('media_creations')
+    .insert(record)
+    .select('*')
+    .single();
+  if (error) {
+    console.error('Supabase media_creations insert error:', error);
+    return {
+      item: null,
+      error: `Supabase media_creations insert error (${error.code || 'DB_ERROR'}): ${error.message}`,
+    };
+  }
+  return { item: data as SupabaseMediaCreationRecord, error: null };
 }
 
 export async function verifySupabaseAccessToken(accessToken: string): Promise<SupabaseAuthUser | null> {
@@ -216,8 +553,8 @@ export async function verifySupabaseAccessToken(accessToken: string): Promise<Su
       if (!error && data.user) {
         return data.user;
       }
-    } catch {
-      // fall through to direct REST lookup
+    } catch (err) {
+      console.error('Supabase getUser exception:', err);
     }
   }
 
@@ -235,7 +572,8 @@ export async function verifySupabaseAccessToken(accessToken: string): Promise<Su
     if (!resp.ok) return null;
     const user = (await resp.json()) as SupabaseAuthUser;
     return user && user.id ? user : null;
-  } catch {
+  } catch (err) {
+    console.error('Supabase REST user lookup failed:', err);
     return null;
   }
 }
@@ -244,6 +582,7 @@ export async function checkSupabaseHealth(): Promise<{
   status: SupabaseConfigStatus;
   configured: boolean;
   reachable: boolean;
+  missingEnvVars: string[];
   providers: { email?: boolean; google?: boolean };
   message: string;
 }> {
@@ -253,10 +592,11 @@ export async function checkSupabaseHealth(): Promise<{
       status: cfg.status,
       configured: false,
       reachable: false,
+      missingEnvVars: cfg.missingEnvVars,
       providers: {},
       message: cfg.hasSecretKeyMisplacedInUrl
         ? 'SUPABASE_URL / VITE_SUPABASE_URL contains a secret key instead of your https://<project-ref>.supabase.co Project URL.'
-        : 'SUPABASE_URL and VITE_SUPABASE_URL are not configured yet.',
+        : `Missing Supabase env variable(s): ${cfg.missingEnvVars.join(', ')}`,
     };
   }
   const key = cfg.anonKey || cfg.serviceRoleKey;
@@ -265,8 +605,9 @@ export async function checkSupabaseHealth(): Promise<{
       status: cfg.status,
       configured: false,
       reachable: false,
+      missingEnvVars: cfg.missingEnvVars,
       providers: {},
-      message: 'SUPABASE_ANON_KEY / VITE_SUPABASE_ANON_KEY (publishable key) is missing.',
+      message: `Missing Supabase env variable(s): ${cfg.missingEnvVars.join(', ')}`,
     };
   }
 
@@ -279,6 +620,7 @@ export async function checkSupabaseHealth(): Promise<{
         status: cfg.status,
         configured: cfg.configured,
         reachable: false,
+        missingEnvVars: cfg.missingEnvVars,
         providers: {},
         message: `Supabase auth endpoint returned HTTP ${resp.status}.`,
       };
@@ -290,19 +632,21 @@ export async function checkSupabaseHealth(): Promise<{
       status: cfg.status,
       configured: cfg.configured,
       reachable: true,
+      missingEnvVars: cfg.missingEnvVars,
       providers: {
         email: Boolean(settings.external?.email),
         google: Boolean(settings.external?.google),
       },
       message: cfg.configured
         ? 'Supabase connection is active and reachable.'
-        : 'Supabase endpoint reachable, waiting for public publishable/anon key.',
+        : `Missing Supabase env variable(s): ${cfg.missingEnvVars.join(', ')}`,
     };
   } catch (err) {
     return {
       status: cfg.status,
       configured: cfg.configured,
       reachable: false,
+      missingEnvVars: cfg.missingEnvVars,
       providers: {},
       message: err instanceof Error ? err.message : 'Unable to reach Supabase auth service.',
     };

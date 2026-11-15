@@ -6,7 +6,7 @@ import { BrandLogo } from './BrandLogo';
 import type { PublicConfig, User } from '../types';
 
 export interface PendingOAuthUser {
-  provider: 'firebase' | 'supabase';
+  provider: 'supabase';
   uid: string;
   email: string;
   name: string;
@@ -85,27 +85,40 @@ export const AuthView: React.FC<AuthViewProps> = ({
       }),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const rawText = await res.text().catch(() => '');
+    let data: Record<string, unknown> = {};
+    if (rawText) {
+      try {
+        data = JSON.parse(rawText) as Record<string, unknown>;
+      } catch {
+        // non-JSON response
+      }
+    }
+
     if (res.status === 409 && data.needsExnessOnboarding) {
       setPendingOAuth({
         provider: 'supabase',
         uid: params.uid,
-        email: data.email || email,
-        name: data.name || name || 'Trader',
+        email: (typeof data.email === 'string' && data.email) || email,
+        name: (typeof data.name === 'string' && data.name) || name || 'Trader',
         accessToken: params.accessToken,
       });
       setMode('register');
       setInfoNotice(
-        `Google account verified (${data.email || email}). Complete Step 1 and enter your Exness Account ID below to enter.`
+        `Account verified (${(typeof data.email === 'string' && data.email) || email}). Complete Step 1 and enter your Exness Account ID below to enter.`
       );
       return;
     }
 
     if (!res.ok) {
-      throw new Error(data.error || 'Supabase authentication failed.');
+      const serverErr =
+        (typeof data.error === 'string' && data.error.trim()) ||
+        (typeof data.message === 'string' && data.message.trim()) ||
+        (rawText.trim() ? rawText.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 280) : '');
+      throw new Error(serverErr || `Authentication failed (${res.status}).`);
     }
 
-    if (data.sessionToken) {
+    if (typeof data.sessionToken === 'string' && data.sessionToken) {
       setSessionToken(data.sessionToken);
     }
 
@@ -151,120 +164,37 @@ export const AuthView: React.FC<AuthViewProps> = ({
         return;
       }
 
-      // If Supabase is configured, authenticate directly against Supabase Auth first and bridge into Grid Pips
-      if (supabase) {
-        if (mode === 'register') {
-          const { data, error: sbErr } = await supabase.auth.signUp({
-            email: email.trim().toLowerCase(),
-            password,
-            options: {
-              data: {
-                full_name: name.trim(),
-                exness_account_id: exnessAccountId.trim().toUpperCase(),
-                referral_code: referralCode.trim().toUpperCase() || undefined,
-              },
-            },
-          });
-          if (sbErr) throw new Error(sbErr.message);
-
-          if (data.session?.access_token && data.user) {
-            await completeSupabaseSession({
-              uid: data.user.id,
-              accessToken: data.session.access_token,
-              userName: name.trim(),
-              exnessId: exnessAccountId,
-              confirmed: exnessConfirmed,
-            });
-            return;
-          }
-
-          setInfoNotice(
-            'Account created in Supabase! Check your email inbox to confirm your address, then sign in.'
-          );
-          setMode('login');
-          return;
-        } else {
-          const { data, error: sbErr } = await supabase.auth.signInWithPassword({
-            email: email.trim().toLowerCase(),
-            password,
-          });
-          if (!sbErr && data.session?.access_token && data.user) {
-            await completeSupabaseSession({
-              uid: data.user.id,
-              accessToken: data.session.access_token,
-              exnessId: exnessAccountId,
-              confirmed: exnessConfirmed,
-            });
-            return;
-          }
-          // Fall back to server scrypt check for existing pre-Supabase accounts (e.g. admin)
-          if (sbErr && !sbErr.message.toLowerCase().includes('invalid login credentials')) {
-            throw new Error(sbErr.message);
-          }
-        }
-      } else if (config.supabaseConfigured) {
-        if (mode === 'register') {
-          const sbRes = await apiFetch<{
-            user?: User;
-            sessionToken?: string;
-            needsEmailConfirmation?: boolean;
-            message?: string;
-          }>('/api/auth/supabase/signup', {
-            method: 'POST',
-            body: JSON.stringify({
-              name,
-              email,
-              password,
-              exnessAccountId,
-              exnessConfirmed,
-              referralCode,
-            }),
-          });
-          if (sbRes.needsEmailConfirmation) {
-            setInfoNotice(sbRes.message || 'Check your email inbox to confirm your account, then sign in.');
-            setMode('login');
-            return;
-          }
-          if (sbRes.user) {
-            if (sbRes.sessionToken) setSessionToken(sbRes.sessionToken);
-            onSuccess(sbRes.user);
-            return;
-          }
-        } else {
-          try {
-            const sbRes = await apiFetch<{ user?: User; sessionToken?: string }>('/api/auth/supabase/login', {
-              method: 'POST',
-              body: JSON.stringify({ email, password }),
-            });
-            if (sbRes.user) {
-              if (sbRes.sessionToken) setSessionToken(sbRes.sessionToken);
-              onSuccess(sbRes.user);
-              return;
-            }
-          } catch {
-            // Fall through to local credentials check
-          }
-        }
-      }
-
       if (mode === 'register') {
-        const res = await apiFetch<{ user: User; sessionToken?: string }>('/api/auth/register', {
+        const res = await apiFetch<{
+          user?: User;
+          sessionToken?: string;
+          needsEmailConfirmation?: boolean;
+          message?: string;
+        }>('/api/auth/register', {
           method: 'POST',
           body: JSON.stringify({
-            name,
-            email,
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
             password,
-            exnessAccountId,
+            exnessAccountId: exnessAccountId.trim().toUpperCase(),
             exnessConfirmed,
-            referralCode,
+            referralCode: referralCode.trim().toUpperCase(),
           }),
         });
+        if (res.needsEmailConfirmation) {
+          setInfoNotice(res.message || 'Account created! Check your email inbox to confirm your address, then sign in.');
+          setMode('login');
+          return;
+        }
         if (res.sessionToken) setSessionToken(res.sessionToken);
-        onSuccess(res.user);
+        if (res.user) onSuccess(res.user);
       } else {
         const res = await apiFetch<{ user: User; sessionToken?: string }>('/api/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            password,
+          }),
         });
         if (res.sessionToken) setSessionToken(res.sessionToken);
         onSuccess(res.user);
