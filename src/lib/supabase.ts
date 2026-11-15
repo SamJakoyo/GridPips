@@ -6,6 +6,7 @@ let cachedKeySignature = '';
 export function normalizeSupabaseUrl(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   let val = raw.trim().replace(/^['"]+|['"]+$/g, '');
+  val = val.replace(/^(?:NEXT_PUBLIC_|VITE_)?SUPABASE_[A-Z_]*=/i, '').trim().replace(/^['"]+|['"]+$/g, '');
   if (!val || val === 'undefined' || val === 'null' || val.includes('MY_SUPABASE') || val.startsWith('sb_')) {
     return '';
   }
@@ -34,6 +35,9 @@ export function normalizeSupabaseUrl(raw?: string): string {
   try {
     const parsed = new URL(val);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (/\.supabase\.(co|in|net)$/i.test(parsed.hostname)) {
+        return parsed.origin;
+      }
       return parsed.toString().replace(/\/+$/, '');
     }
   } catch {
@@ -60,12 +64,15 @@ function normalizePublicKey(raw?: string): string {
   return val;
 }
 
+export const DEFAULT_SUPABASE_URL = 'https://zxhbqwlnngggpseezcmn.supabase.co';
+
 export function getSupabaseClient(runtimeUrl?: string, runtimeAnonKey?: string): SupabaseClient | null {
   const clientEnv = import.meta.env as Record<string, string | undefined>;
   const url =
     normalizeSupabaseUrl(runtimeUrl) ||
     normalizeSupabaseUrl(clientEnv.VITE_SUPABASE_URL) ||
-    normalizeSupabaseUrl(clientEnv.NEXT_PUBLIC_SUPABASE_URL);
+    normalizeSupabaseUrl(clientEnv.NEXT_PUBLIC_SUPABASE_URL) ||
+    DEFAULT_SUPABASE_URL;
   const anonKey =
     normalizePublicKey(runtimeAnonKey) ||
     normalizePublicKey(clientEnv.VITE_SUPABASE_ANON_KEY) ||

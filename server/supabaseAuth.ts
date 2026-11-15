@@ -29,6 +29,7 @@ export interface SupabaseProfileRecord {
 function normalizeSupabaseUrl(raw?: string): string {
   if (!raw || typeof raw !== 'string') return '';
   let val = raw.trim().replace(/^['"]+|['"]+$/g, '');
+  val = val.replace(/^(?:NEXT_PUBLIC_|VITE_)?SUPABASE_[A-Z_]*=/i, '').trim().replace(/^['"]+|['"]+$/g, '');
   if (!val || val === 'undefined' || val === 'null' || val.includes('MY_SUPABASE') || val.startsWith('sb_')) {
     return '';
   }
@@ -57,6 +58,9 @@ function normalizeSupabaseUrl(raw?: string): string {
   try {
     const parsed = new URL(val);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (/\.supabase\.(co|in|net)$/i.test(parsed.hostname)) {
+        return parsed.origin;
+      }
       return parsed.toString().replace(/\/+$/, '');
     }
   } catch {
@@ -98,17 +102,22 @@ function normalizePublicAnonKey(raw?: string): string {
   return val;
 }
 
+export const DEFAULT_SUPABASE_URL = 'https://zxhbqwlnngggpseezcmn.supabase.co';
+
 export function getSupabaseEnvConfig(): SupabaseEnvConfig {
   const rawUrlCandidates = [
     process.env.SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.VITE_SUPABASE_URL,
+    process.env.STORAGE_SUPABASE_URL,
     process.env.SUPABASE_PROJECT_URL,
     process.env.SUPABASE_PROJECT_REF,
     process.env.SUPABASE_PROJECT_ID,
     process.env.SUPABASE_DB_URL,
     process.env.POSTGRES_URL,
+    process.env.POSTGRES_URL_NON_POOLING,
     process.env.POSTGRES_PRISMA_URL,
+    process.env.DATABASE_URL,
   ];
 
   const hasSecretKeyMisplacedInUrl = rawUrlCandidates.some(
@@ -122,6 +131,9 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
       url = normalized;
       break;
     }
+  }
+  if (!url) {
+    url = DEFAULT_SUPABASE_URL;
   }
 
   const publicKeyCandidates = [
