@@ -19,6 +19,8 @@ import {
   Users,
   X,
   ArrowUpRight,
+  UserCircle,
+  Check,
 } from 'lucide-react';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { getSupabaseClient } from './lib/supabase';
@@ -45,6 +47,7 @@ import {
   ReferralsHubView,
 } from './components/OrdersAndReferralsViews';
 import { AdminDashboardView } from './components/AdminDashboardView';
+import { AccountProfileView } from './components/AccountProfileView';
 import { BrandLogo } from './components/BrandLogo';
 
 type WorkspaceTab =
@@ -60,6 +63,7 @@ type WorkspaceTab =
   | 'plan'
   | 'calendar'
   | 'education'
+  | 'account'
   | 'referrals'
   | 'emails'
   | 'admin';
@@ -313,7 +317,7 @@ export default function App() {
     items: Array<{ id: WorkspaceTab; name: string; icon: React.ReactNode; tag?: string }>;
   }> = [
     {
-      label: 'Trading Desk',
+      label: 'Trading desk',
       items: [
         { id: 'overview', name: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> },
         {
@@ -332,7 +336,7 @@ export default function App() {
       ],
     },
     {
-      label: 'Free Workspace',
+      label: 'Free workspace',
       items: [
         { id: 'charts', name: 'Live Charts', icon: <CandlestickChart className="w-4 h-4" /> },
         { id: 'journal', name: 'Trading Journal', icon: <NotebookPen className="w-4 h-4" /> },
@@ -345,8 +349,9 @@ export default function App() {
       ],
     },
     {
-      label: 'Partner & Account',
+      label: 'Account & partner',
       items: [
+        { id: 'account', name: 'My Information', icon: <UserCircle className="w-4 h-4" /> },
         { id: 'referrals', name: 'Influencer Referrals', icon: <Users className="w-4 h-4" /> },
         { id: 'emails', name: 'Email Inbox', icon: <Mail className="w-4 h-4" /> },
         ...(user.role === 'admin'
@@ -359,24 +364,39 @@ export default function App() {
   const currentTabTitle =
     navGroups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.name || 'Dashboard';
 
+  const firstName = (user.name || user.email || 'Trader').trim().split(/\s+/)[0];
+  const userInitials = (user.name || user.email || 'GP')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('');
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 flex">
+    <div className="min-h-screen bg-[#090909] text-[#F5F2EB] flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white border-r border-slate-200 sticky top-0 h-screen">
-        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between gap-2">
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-[#0C0B09] border-r border-[#221D15] sticky top-0 h-screen shrink-0">
+        <div className="h-16 px-4 border-b border-[#221D15] flex items-center justify-between gap-2">
           <button
             onClick={() => setScreen('landing')}
             className="cursor-pointer shrink-0"
           >
-            <BrandLogo variant="dark" size="sm" />
+            <BrandLogo variant="light" size="sm" />
           </button>
-          <span className="text-[11px] font-mono text-slate-500 truncate">{user.exnessAccountId}</span>
+          <button
+            type="button"
+            onClick={() => setActiveTab('account')}
+            title="View my account information"
+            className="text-[11px] font-mono text-[#9E9789] hover:text-[#E5A93C] truncate cursor-pointer"
+          >
+            {user.exnessAccountId}
+          </button>
         </div>
 
         <nav className="flex-1 overflow-y-auto p-3 space-y-5">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 text-xs font-semibold text-slate-400 mb-1.5">{group.label}</div>
+              <div className="px-3 text-[11px] font-medium text-[#706A5E] mb-1.5">{group.label}</div>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = activeTab === item.id;
@@ -384,24 +404,24 @@ export default function App() {
                     <button
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                         isActive
-                          ? 'bg-slate-950 text-white'
-                          : 'text-slate-700 hover:bg-slate-100'
+                          ? 'bg-[#1B1710] border border-[#2F2719] text-[#FBF9F5]'
+                          : 'border border-transparent text-[#9E9789] hover:text-[#F5F2EB] hover:bg-[#15120D]'
                       }`}
                     >
-                      <span className="flex items-center gap-2.5">
-                        {item.icon}
-                        <span>{item.name}</span>
+                      <span className="flex items-center gap-2.5 min-w-0">
+                        <span className={isActive ? 'text-[#E5A93C]' : 'text-[#847D70]'}>
+                          {item.icon}
+                        </span>
+                        <span className="truncate">{item.name}</span>
                       </span>
                       {item.tag && (
                         <span
-                          className={`font-mono text-[11px] ${
-                            isActive
-                              ? 'text-blue-300'
-                              : item.tag === 'Active'
-                              ? 'text-emerald-700'
-                              : 'text-blue-600'
+                          className={`font-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${
+                            item.tag === 'Active'
+                              ? 'border-[#3A311E] bg-[#16130D] text-[#E5A93C]'
+                              : 'border-[#2E271A] bg-[#14110C] text-[#A69F90]'
                           }`}
                         >
                           {item.tag}
@@ -415,25 +435,25 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-4 border-t border-slate-200 space-y-2">
+        <div className="p-3.5 border-t border-[#221D15] space-y-2">
           <a
             href={config.telegramUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2 px-3 bg-slate-100 text-slate-900 text-xs font-semibold rounded-lg hover:bg-slate-200 flex items-center justify-between"
+            className="w-full py-2.5 px-3 bg-[#13110D] border border-[#272219] hover:border-[#3D3424] text-[#E8E2D6] text-xs font-medium rounded-lg flex items-center justify-between transition-colors"
           >
             <span className="inline-flex items-center gap-2">
-              <Send className="w-3.5 h-3.5 text-blue-600" />
+              <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
               JakoyoFX Telegram
             </span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-[#8E8779]" />
           </a>
           <button
             onClick={handleLogout}
-            className="w-full py-2 px-3 text-xs font-semibold text-slate-600 hover:text-rose-700 flex items-center gap-2 cursor-pointer"
+            className="w-full py-2 px-3 text-xs font-medium text-[#8E8779] hover:text-rose-400 flex items-center gap-2 cursor-pointer transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
-            Sign Out ({user.name.split(' ')[0]})
+            Sign out ({firstName})
           </button>
         </div>
       </aside>
@@ -442,16 +462,16 @@ export default function App() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-slate-950/50"
+            className="fixed inset-0 bg-black/75"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 bg-white h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
+          <div className="relative w-72 bg-[#0C0B09] border-r border-[#221D15] h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
-                <BrandLogo variant="dark" size="sm" />
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#221D15]">
+                <BrandLogo variant="light" size="sm" />
                 <button
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 text-slate-500"
+                  className="p-1.5 text-[#9E9789] hover:text-[#F5F2EB]"
                   aria-label="Close menu"
                 >
                   <X className="w-5 h-5" />
@@ -460,36 +480,43 @@ export default function App() {
               <div className="space-y-4">
                 {navGroups.map((group) => (
                   <div key={group.label}>
-                    <div className="px-2 text-xs font-semibold text-slate-400 mb-1">
+                    <div className="px-2 text-[11px] font-medium text-[#706A5E] mb-1">
                       {group.label}
                     </div>
-                    {group.items.map((item) => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setActiveTab(item.id);
-                          setMobileMenuOpen(false);
-                        }}
-                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-semibold ${
-                          activeTab === item.id ? 'bg-slate-950 text-white' : 'text-slate-700'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2.5">
-                          {item.icon}
-                          <span>{item.name}</span>
-                        </span>
-                        {item.tag && <span className="font-mono">{item.tag}</span>}
-                      </button>
-                    ))}
+                    {group.items.map((item) => {
+                      const isActive = activeTab === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setActiveTab(item.id);
+                            setMobileMenuOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium ${
+                            isActive
+                              ? 'bg-[#1B1710] border border-[#2F2719] text-[#FBF9F5]'
+                              : 'text-[#9E9789] hover:text-[#F5F2EB]'
+                          }`}
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <span className={isActive ? 'text-[#E5A93C]' : 'text-[#847D70]'}>
+                              {item.icon}
+                            </span>
+                            <span>{item.name}</span>
+                          </span>
+                          {item.tag && <span className="font-mono text-[10px] text-[#E5A93C]">{item.tag}</span>}
+                        </button>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="mt-6 w-full py-2.5 border border-slate-200 rounded-lg text-xs font-semibold text-rose-700"
+              className="mt-6 w-full py-2.5 border border-[#2A2318] bg-[#14110C] rounded-lg text-xs font-semibold text-rose-400"
             >
-              Sign Out
+              Sign out
             </button>
           </div>
         </div>
@@ -498,36 +525,54 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Context Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-30 h-16 bg-[#090909]/95 backdrop-blur-sm border-b border-[#201C14] px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-700"
+              className="lg:hidden p-2 -ml-2 text-[#C9C1B0]"
               aria-label="Open navigation"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="text-sm font-semibold text-slate-950 truncate">
-              Workspace / <span className="text-blue-600">{currentTabTitle}</span>
+            <div className="text-sm font-medium text-[#8E8779] truncate">
+              Workspace / <span className="font-semibold text-[#FBF9F5]">{currentTabTitle}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="hidden md:inline-flex items-center px-3 py-1.5 rounded-lg bg-[#12100C] border border-[#262118] text-xs font-medium text-emerald-400 whitespace-nowrap">
+              Markets open
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('account')}
+              title="My Information"
+              className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+                activeTab === 'account'
+                  ? 'bg-[#1B1710] border-[#E5A93C] text-[#FBF9F5]'
+                  : 'bg-[#12100C] border-[#262118] hover:border-[#3D3424] text-[#D8D1C5]'
+              }`}
+            >
+              <span className="w-5 h-5 rounded bg-[#E5A93C] text-[#090806] font-bold text-[10px] flex items-center justify-center">
+                {userInitials || 'GP'}
+              </span>
+              <span>{firstName}</span>
+            </button>
             <a
               href={config.exnessIbUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-xs font-semibold text-slate-800 rounded-lg hover:bg-slate-50 whitespace-nowrap"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#12100C] border border-[#282319] hover:border-[#3F3524] text-xs font-medium text-[#F5F2EB] rounded-lg whitespace-nowrap transition-colors"
             >
               Exness Portal
-              <ArrowUpRight className="w-3.5 h-3.5" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-[#C9C1B0]" />
             </a>
             {!user.hasAnalyzer && (
               <button
                 onClick={() => setCheckoutState({ productKey: 'analyzer' })}
-                className="px-3.5 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 whitespace-nowrap cursor-pointer"
+                className="px-3.5 py-1.5 bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer transition-colors"
               >
-                Unlock ICT ($5.25)
+                Unlock ICT (${config.analyzerPriceUsd.toFixed(2)})
               </button>
             )}
           </div>
@@ -543,6 +588,10 @@ export default function App() {
               orders={orders}
               onNavigate={setActiveTab}
               onUnlock={(productKey) => setCheckoutState({ productKey })}
+              onOpenSymbolChart={(sym) => {
+                setChartSymbol(sym);
+                setActiveTab('charts');
+              }}
             />
           )}
           {activeTab === 'analyzer' && (
@@ -594,6 +643,18 @@ export default function App() {
           {activeTab === 'plan' && <TradingPlanView />}
           {activeTab === 'calendar' && <CalendarAndNewsView />}
           {activeTab === 'education' && <EducationView config={config} />}
+          {activeTab === 'account' && (
+            <AccountProfileView
+              user={user}
+              config={config}
+              orders={orders}
+              journal={journal}
+              watchlist={watchlist}
+              onUserUpdated={(updated) => setUser(updated)}
+              onNavigate={(tab) => setActiveTab(tab)}
+              onUnlock={(productKey) => setCheckoutState({ productKey })}
+            />
+          )}
           {activeTab === 'referrals' && <ReferralsHubView config={config} />}
           {activeTab === 'emails' && <EmailsInboxView />}
           {activeTab === 'admin' && user.role === 'admin' && (
@@ -620,6 +681,82 @@ export default function App() {
   );
 }
 
+function getSparklinePoints(chgPct: number, seed: number): string {
+  const up = chgPct >= 0;
+  const pts: string[] = [];
+  const steps = 8;
+  for (let i = 0; i < steps; i++) {
+    const x = Math.round((i / (steps - 1)) * 74);
+    const wave = Math.sin((i + 1) * (seed + 1.3)) * 2.5;
+    const baseY = up ? 16 - (i / (steps - 1)) * 11 : 5 + (i / (steps - 1)) * 11;
+    const y = Math.max(2, Math.min(18, Number((baseY + wave).toFixed(1))));
+    pts.push(`${x},${y}`);
+  }
+  return pts.join(' ');
+}
+
+function getKillzoneTimelineState() {
+  const now = new Date();
+  const hourStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    hour12: false,
+  }).format(now);
+  const minuteStr = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    minute: '2-digit',
+  }).format(now);
+  const nyTimeFormatted = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(now);
+
+  const nyHour = Number(hourStr) % 24;
+  const nyDec = nyHour + Number(minuteStr) / 60;
+
+  let activeKey: 'asian' | 'london' | 'nyam' | 'close' = 'asian';
+  let detail = 'Asian range accumulation · 20:00 – 00:00';
+
+  if (nyDec >= 2 && nyDec < 5) {
+    activeKey = 'london';
+    detail = 'London Open killzone · 02:00 – 05:00';
+  } else if (nyDec >= 7 && nyDec < 11) {
+    activeKey = 'nyam';
+    detail = nyDec >= 10 ? 'ICT Silver Bullet window · 10:00 – 11:00' : 'New York AM killzone · 07:00 – 10:00';
+  } else if (nyDec >= 13.5 && nyDec < 17) {
+    activeKey = 'close';
+    detail = 'New York PM & London Close · 13:30 – 16:00';
+  } else if (nyDec >= 20 || nyDec < 2) {
+    activeKey = 'asian';
+    detail = 'Asian range accumulation · 20:00 – 00:00';
+  } else if (nyDec >= 5 && nyDec < 7) {
+    activeKey = 'london';
+    detail = 'Pre-NY liquidity build · 05:00 – 07:00';
+  } else {
+    activeKey = 'nyam';
+    detail = 'NY mid-session rebalance · 11:00 – 13:30';
+  }
+
+  return { activeKey, detail, nyTimeFormatted };
+}
+
+const HERO_CANDLES = [
+  { x: 18, yOpen: 112, yClose: 104, yHigh: 96, yLow: 120, up: true },
+  { x: 46, yOpen: 104, yClose: 115, yHigh: 98, yLow: 124, up: false },
+  { x: 74, yOpen: 113, yClose: 99, yHigh: 90, yLow: 118, up: true },
+  { x: 102, yOpen: 99, yClose: 85, yHigh: 78, yLow: 106, up: true },
+  { x: 130, yOpen: 86, yClose: 96, yHigh: 81, yLow: 102, up: false },
+  { x: 158, yOpen: 94, yClose: 74, yHigh: 66, yLow: 98, up: true },
+  { x: 186, yOpen: 75, yClose: 66, yHigh: 56, yLow: 82, up: true },
+  { x: 214, yOpen: 67, yClose: 80, yHigh: 61, yLow: 87, up: false },
+  { x: 242, yOpen: 78, yClose: 55, yHigh: 46, yLow: 83, up: true },
+  { x: 270, yOpen: 55, yClose: 36, yHigh: 25, yLow: 60, up: true },
+  { x: 298, yOpen: 36, yClose: 45, yHigh: 29, yLow: 52, up: false },
+  { x: 326, yOpen: 44, yClose: 22, yHigh: 12, yLow: 49, up: true },
+];
+
 const WorkspaceOverview: React.FC<{
   user: User;
   config: PublicConfig;
@@ -628,123 +765,282 @@ const WorkspaceOverview: React.FC<{
   orders: Order[];
   onNavigate: (tab: WorkspaceTab) => void;
   onUnlock: (productKey: 'analyzer' | 'ea_bots') => void;
-}> = ({ user, config, quotes, journal, orders, onNavigate, onUnlock }) => {
+  onOpenSymbolChart: (sym: string) => void;
+}> = ({ user, config, quotes, journal, orders, onNavigate, onUnlock, onOpenSymbolChart }) => {
   const totalPnl = journal.reduce((acc, t) => acc + Number(t.pnl || 0), 0);
+  const firstName = (user.name || user.email || 'Trader').trim().split(/\s+/)[0];
+  const featuredGold = quotes.find((q) => q.sym === 'XAUUSD') || quotes[0];
+  const featuredUp = (featuredGold?.chgPct ?? 0) >= 0;
+  const killzone = getKillzoneTimelineState();
+
+  let heroSubtext =
+    'Analyze live TradingView liquidity sweeps, automate MT5 execution, and log every setup in one workspace.';
+  if (user.hasAnalyzer && user.hasEaBots) {
+    heroSubtext = 'Your ICT analyzer and EA bots are unlocked. Pick up where you left off.';
+  } else if (user.hasAnalyzer) {
+    heroSubtext = 'Your ICT Strategy Analyzer is unlocked and synced with live TradingView data.';
+  } else if (user.hasEaBots) {
+    heroSubtext = 'Your MQL5 EA Bots Pack is unlocked. Connect your MT5 terminal below.';
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-950">Welcome back, {user.name.split(' ')[0]}</h1>
-          <p className="text-sm text-slate-500">
-            Exness ID: <span className="font-mono text-slate-800">{user.exnessAccountId}</span> · Referral Code:{' '}
-            <span className="font-mono text-blue-600">{user.referralCode}</span>
-          </p>
+    <div className="space-y-5">
+      {/* Warm Obsidian + Gold Hero Banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-[#2A2316] bg-[radial-gradient(ellipse_at_top_left,_rgba(217,119,6,0.16),_#12100C_48%,_#0D0C09_100%)] p-6 sm:p-7">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-7 space-y-4">
+            <h1 className="text-3xl sm:text-4xl font-bold text-[#FBF9F5] tracking-tight leading-[1.12] max-w-md">
+              Welcome back, {firstName}
+            </h1>
+            <p className="text-sm text-[#A69F90] max-w-lg leading-relaxed">{heroSubtext}</p>
+
+            <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => onNavigate('account')}
+                className="px-3 py-1.5 rounded-lg bg-[#17140E] border border-[#2D261A] hover:border-[#4A3D25] text-xs text-[#A69F90] hover:text-[#F5F2EB] transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Exness ID <span className="font-mono font-semibold text-[#E5A93C] ml-1">{user.exnessAccountId}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('account')}
+                className="px-3 py-1.5 rounded-lg bg-[#17140E] border border-[#2D261A] hover:border-[#4A3D25] text-xs text-[#A69F90] hover:text-[#F5F2EB] transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Referral code <span className="font-mono font-semibold text-[#F5F2EB] ml-1">{user.referralCode}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onNavigate('account')}
+                className="px-3 py-1.5 rounded-lg bg-transparent text-xs font-semibold text-[#E5A93C] hover:underline cursor-pointer whitespace-nowrap"
+              >
+                My information →
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
+                className="px-5 py-2.5 rounded-lg bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                {user.hasAnalyzer ? 'Launch ICT Scanner' : `Unlock ICT Analyzer ($${config.analyzerPriceUsd.toFixed(2)})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
+                className="px-5 py-2.5 rounded-lg bg-[#17140F] border border-[#322B1E] hover:border-[#4F432C] text-[#F5F2EB] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+              >
+                {user.hasEaBots ? 'Download .mq5 & Bridge' : `Get MQL5 EA Bots ($${config.eaBotsPriceUsd.toFixed(2)})`}
+              </button>
+            </div>
+          </div>
+
+          {/* Right Live Highlight + Ascending Gold Candlestick Chart */}
+          <div className="lg:col-span-5 flex flex-col items-end">
+            {featuredGold && (
+              <button
+                type="button"
+                onClick={() => onOpenSymbolChart(featuredGold.sym)}
+                className="text-right mb-2 cursor-pointer group"
+              >
+                <div className="text-xs text-[#8E8779] group-hover:text-[#C9C1B0] transition-colors">
+                  {featuredGold.sym} · {featuredGold.sym === 'XAUUSD' ? 'Gold' : featuredGold.name}
+                </div>
+                <div className="flex items-baseline justify-end gap-2 mt-0.5">
+                  <span className="text-xl sm:text-2xl font-mono tabular-nums font-bold text-[#E5A93C]">
+                    {featuredGold.price.toLocaleString(undefined, {
+                      minimumFractionDigits: featuredGold.digits,
+                      maximumFractionDigits: featuredGold.digits,
+                    })}
+                  </span>
+                  <span
+                    className={`text-xs font-mono tabular-nums font-semibold ${
+                      featuredUp ? 'text-emerald-400' : 'text-rose-400'
+                    }`}
+                  >
+                    {featuredUp ? '▲ +' : '▼ '}
+                    {featuredGold.chgPct.toFixed(2)}%
+                  </span>
+                </div>
+              </button>
+            )}
+
+            <div className="w-full max-w-[360px]">
+              <svg viewBox="0 0 344 136" className="w-full h-auto" aria-hidden="true">
+                <defs>
+                  <linearGradient id="heroGoldFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#E5A93C" stopOpacity="0.24" />
+                    <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {[28, 56, 84, 112].map((y) => (
+                  <line key={y} x1="8" y1={y} x2="338" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+                ))}
+                <polygon
+                  points="18,108 46,110 74,104 102,90 130,92 158,82 186,69 214,75 242,60 270,42 298,41 326,27 326,130 18,130"
+                  fill="url(#heroGoldFill)"
+                />
+                <polyline
+                  fill="none"
+                  stroke="#E5A93C"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  points="18,108 46,110 74,104 102,90 130,92 158,82 186,69 214,75 242,60 270,42 298,41 326,27"
+                />
+                {HERO_CANDLES.map((c, idx) => {
+                  const color = c.up ? '#22C55E' : '#EF4444';
+                  const top = Math.min(c.yOpen, c.yClose);
+                  const height = Math.max(5, Math.abs(c.yClose - c.yOpen));
+                  return (
+                    <g key={idx}>
+                      <line x1={c.x} y1={c.yHigh} x2={c.x} y2={c.yLow} stroke={color} strokeWidth="1.5" />
+                      <rect x={c.x - 4.5} y={top} width="9" height={height} rx="1.5" fill={color} />
+                    </g>
+                  );
+                })}
+              </svg>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Top KPI Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">ICT Strategy Analyzer</div>
-          <div className="text-lg font-bold text-slate-950 mt-1">
-            {user.hasAnalyzer ? 'Unlocked & Ready' : `$${config.analyzerPriceUsd.toFixed(2)} Required`}
+      {/* 4-Column KPI Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-[#8E8779]">ICT Strategy Analyzer</span>
+            {user.hasAnalyzer && (
+              <span className="w-5 h-5 rounded-full bg-emerald-950/80 border border-emerald-700/50 flex items-center justify-center">
+                <Check className="w-3 h-3 text-emerald-400" />
+              </span>
+            )}
+          </div>
+          <div className="text-lg font-bold text-[#FBF9F5] mt-1.5">
+            {user.hasAnalyzer ? 'Unlocked and ready' : `$${config.analyzerPriceUsd.toFixed(2)} required`}
           </div>
           <button
+            type="button"
             onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-            className="text-xs font-semibold text-blue-600 hover:underline mt-2 cursor-pointer"
+            className="text-xs font-semibold text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
           >
-            {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto ($5.25) →'}
+            {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">MQL5 EA Bots &amp; MT5</div>
-          <div className="text-lg font-bold text-slate-950 mt-1">
+        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+          <div className="text-xs text-[#8E8779]">MQL5 EA Bots and MT5</div>
+          <div className="text-lg font-bold text-[#FBF9F5] mt-1.5">
             {user.hasEaBots
               ? user.mt5Connected
                 ? `MT5 ${user.mt5Login}`
-                : 'Ready to Connect'
-              : `$${config.eaBotsPriceUsd.toFixed(2)} Required`}
+                : 'Ready to connect'
+              : `$${config.eaBotsPriceUsd.toFixed(2)} required`}
           </div>
           <button
+            type="button"
             onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
-            className="text-xs font-semibold text-blue-600 hover:underline mt-2 cursor-pointer"
+            className="text-xs font-semibold text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
           >
             {user.hasEaBots ? 'Download .mq5 & Bridge →' : 'Buy EA Bots Pack →'}
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Journal Performance</div>
+        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+          <div className="text-xs text-[#8E8779]">Journal performance</div>
           <div
-            className={`text-lg font-bold font-mono tabular-nums mt-1 ${
-              totalPnl >= 0 ? 'text-emerald-700' : 'text-rose-700'
+            className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
+              totalPnl >= 0 ? 'text-[#E5A93C]' : 'text-rose-400'
             }`}
           >
-            {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
+            {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
           </div>
           <button
+            type="button"
             onClick={() => onNavigate('journal')}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2 cursor-pointer"
+            className="text-xs font-semibold text-[#A69F90] hover:text-[#F5F2EB] mt-2.5 cursor-pointer"
           >
-            {journal.length} logged trade(s) →
+            {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Orders &amp; Referrals</div>
-          <div className="text-lg font-bold font-mono tabular-nums text-slate-950 mt-1">
-            {orders.length} Order(s)
+        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+          <div className="text-xs text-[#8E8779]">Orders and referrals</div>
+          <div className="text-lg font-bold font-mono tabular-nums text-[#FBF9F5] mt-1.5">
+            {orders.length} order{orders.length === 1 ? '' : 's'}
           </div>
           <button
+            type="button"
             onClick={() => onNavigate('referrals')}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2 cursor-pointer"
+            className="text-xs font-semibold text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
           >
-            Earn {config.commissionPct}% Commissions →
+            Earn {config.commissionPct}% commissions →
           </button>
         </div>
       </div>
 
-      {/* Market Overview Table & Community */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-bold text-slate-950">Market Overview</h2>
+      {/* Market Overview Table & Right Rail */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        <div className="lg:col-span-8 rounded-2xl bg-[#12100C] border border-[#252118] p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h2 className="text-base font-bold text-[#FBF9F5]">Market overview</h2>
             <button
+              type="button"
               onClick={() => onNavigate('charts')}
-              className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
+              className="text-xs font-semibold text-[#E5A93C] hover:underline cursor-pointer"
             >
-              Open TradingView Charts →
+              Open TradingView charts →
             </button>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
-                  <th className="py-2 pr-4">Symbol</th>
-                  <th className="py-2 pr-4">Instrument</th>
-                  <th className="py-2 pr-4 text-right">Price</th>
-                  <th className="py-2 text-right">24h Change</th>
+                <tr className="border-b border-[#242017] text-xs text-[#7E786B]">
+                  <th className="py-2.5 pr-4 font-medium">Symbol</th>
+                  <th className="py-2.5 pr-4 font-medium">Instrument</th>
+                  <th className="py-2.5 pr-4 text-right font-medium">Price</th>
+                  <th className="py-2.5 pr-4 text-right font-medium">24h</th>
+                  <th className="py-2.5 text-right font-medium">Trend</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
-                {quotes.map((q) => {
+              <tbody className="divide-y divide-[#1E1B14]">
+                {quotes.map((q, idx) => {
                   const up = q.chgPct >= 0;
+                  const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
                   return (
-                    <tr key={q.sym} className="hover:bg-slate-50">
-                      <td className="py-2.5 pr-4 font-mono font-bold text-slate-950">{q.sym}</td>
-                      <td className="py-2.5 pr-4 text-slate-600 text-xs">{q.name}</td>
-                      <td className="py-2.5 pr-4 text-right font-mono tabular-nums font-semibold">
-                        {q.price.toFixed(q.digits)}
+                    <tr
+                      key={q.sym}
+                      onClick={() => onOpenSymbolChart(q.sym)}
+                      className="hover:bg-[#191610] transition-colors cursor-pointer"
+                    >
+                      <td className="py-3 pr-4 font-mono font-bold text-[#FBF9F5] whitespace-nowrap">{q.sym}</td>
+                      <td className="py-3 pr-4 text-[#9D9687] text-xs whitespace-nowrap">{q.name}</td>
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-[#F5F2EB] whitespace-nowrap">
+                        {q.price.toLocaleString(undefined, {
+                          minimumFractionDigits: q.digits,
+                          maximumFractionDigits: q.digits,
+                        })}
                       </td>
                       <td
-                        className={`py-2.5 text-right font-mono tabular-nums font-semibold ${
-                          up ? 'text-emerald-700' : 'text-rose-700'
+                        className={`py-3 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
+                          up ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
                         {up ? '+' : ''}
                         {q.chgPct.toFixed(2)}%
+                      </td>
+                      <td className="py-2.5 text-right">
+                        <svg viewBox="0 0 76 20" className="w-16 h-5 inline-block" aria-hidden="true">
+                          <polyline
+                            fill="none"
+                            stroke={up ? '#22C55E' : '#EF4444'}
+                            strokeWidth="1.6"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            points={sparkPoints}
+                          />
+                        </svg>
                       </td>
                     </tr>
                   );
@@ -754,38 +1050,68 @@ const WorkspaceOverview: React.FC<{
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-4">
-          <div className="bg-slate-950 text-white rounded-xl p-6">
-            <div className="text-xs font-medium text-blue-400 mb-1">JakoyoFX Trading Desk</div>
-            <h3 className="text-lg font-bold mb-2">Join Our Telegram Community</h3>
-            <p className="text-xs text-slate-300 leading-relaxed mb-4">
-              Connect with fellow ICT &amp; SMC traders, review live Killzone setups, and get fast EA setup assistance.
+        <div className="lg:col-span-4 space-y-5">
+          {/* Warm Amber Gold Telegram Card */}
+          <div className="rounded-2xl bg-[#E5A93C] text-[#090806] p-6">
+            <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
+            <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
+            <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
+              Trade alongside fellow ICT and SMC traders, review live killzone setups, and get fast EA setup help.
             </p>
             <a
               href={config.telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 inline-flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 bg-[#0B0A08] text-white text-xs font-semibold rounded-lg hover:bg-[#1A1813] inline-flex items-center justify-center gap-2 transition-colors"
             >
-              <Send className="w-3.5 h-3.5" />
+              <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
               Open t.me/JakoyoFx
             </a>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
-            <h3 className="text-sm font-bold text-slate-950 mb-1">Free ICT &amp; SMC Education</h3>
-            <p className="text-xs text-slate-600 mb-3">
-              Watch ICT channel {config.ictYoutubeChannelId} lessons and Smart Money Concepts modules.
-            </p>
-            <button
-              onClick={() => onNavigate('education')}
-              className="w-full py-2 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 cursor-pointer"
-            >
-              Open Academy
-            </button>
+          {/* Killzones (NY time) Card */}
+          <div className="rounded-2xl bg-[#12100C] border border-[#252118] p-5 space-y-3.5">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-[#FBF9F5]">Killzones (NY time)</h3>
+              <span className="text-xs font-mono tabular-nums text-[#8E8779]">{killzone.nyTimeFormatted} NY</span>
+            </div>
+
+            <div className="grid grid-cols-4 gap-1.5">
+              {(
+                [
+                  { key: 'asian', label: 'Asian' },
+                  { key: 'london', label: 'London' },
+                  { key: 'nyam', label: 'NY AM' },
+                  { key: 'close', label: 'Close' },
+                ] as const
+              ).map((seg) => {
+                const isActive = killzone.activeKey === seg.key;
+                return (
+                  <div key={seg.key} className="space-y-1.5">
+                    <div
+                      className={`h-2 rounded-sm ${
+                        isActive ? 'bg-[#E5A93C]' : 'bg-[#262118]'
+                      }`}
+                    />
+                    <div
+                      className={`text-[11px] font-medium ${
+                        isActive ? 'text-[#F5F2EB]' : 'text-[#7E786B]'
+                      }`}
+                    >
+                      {seg.label}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="text-xs text-[#A69F90] pt-0.5 font-mono tabular-nums">
+              {killzone.detail}
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 };
+

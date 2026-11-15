@@ -783,6 +783,56 @@ app.get('/api/auth/me', async (req: AuthedRequest, res) => {
   }
 });
 
+app.patch('/api/auth/profile', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const user = req.currentUser!;
+    const name = sanitizeText(req.body?.name ?? user.name, 80);
+    const exnessAccountId = sanitizeText(req.body?.exnessAccountId ?? user.exness_account_id, 40).toUpperCase();
+    const rawExnessEmail =
+      req.body?.exnessEmail !== undefined ? sanitizeText(req.body.exnessEmail, 120).toLowerCase() : user.exness_email || '';
+
+    if (!name || name.length < 2) {
+      res.status(400).json({ error: 'Full name must be at least 2 characters.' });
+      return;
+    }
+    if (!exnessAccountId || exnessAccountId.length < 3) {
+      res.status(400).json({ error: 'Exness Account ID must be at least 3 characters.' });
+      return;
+    }
+    if (rawExnessEmail && !rawExnessEmail.includes('@')) {
+      res.status(400).json({ error: 'Please provide a valid Exness email address.' });
+      return;
+    }
+
+    const finalExnessEmail = rawExnessEmail || user.email;
+    db.prepare(
+      'UPDATE users SET name = ?, exness_account_id = ?, exness_email = ? WHERE id = ?'
+    ).run(name, exnessAccountId, finalExnessEmail, user.id);
+
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+
+    const sbUid = await resolveUserSupabaseUid(updated);
+    if (sbUid && getServerSupabaseAdminClient()) {
+      await upsertSupabaseProfile({
+        id: sbUid,
+        email: updated.email,
+        full_name: updated.name,
+        role: updated.role,
+        exness_account_id: updated.exness_account_id,
+        exness_verified: Boolean(updated.exness_verified),
+        referral_code: updated.referral_code,
+        has_analyzer: Boolean(updated.has_analyzer) || updated.role === 'admin',
+        has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
+      });
+    }
+
+    res.json({ user: serializeUser(updated) });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to update account details.' });
+  }
+});
+
 
 async function bridgeSupabaseUserToSession(params: {
   req: Request;
