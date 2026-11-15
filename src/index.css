@@ -128,12 +128,98 @@
   animation-play-state: paused !important;
 }
 
+@keyframes price-flash-up {
+  0% {
+    color: #34d399;
+    text-shadow: 0 0 12px rgba(52, 211, 153, 0.45);
+  }
+  100% {
+    color: inherit;
+    text-shadow: none;
+  }
+}
+
+@keyframes price-flash-down {
+  0% {
+    color: #fb7185;
+    text-shadow: 0 0 12px rgba(251, 113, 133, 0.45);
+  }
+  100% {
+    color: inherit;
+    text-shadow: none;
+  }
+}
+
+@keyframes killzone-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes hero-live-candle {
+  0%, 100% {
+    transform: scaleY(1);
+    opacity: 0.92;
+  }
+  50% {
+    transform: scaleY(1.14);
+    opacity: 1;
+  }
+}
+
+@keyframes hero-ambient-glow {
+  0%, 100% {
+    opacity: 0.45;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translate3d(18px, -10px, 0) scale(1.06);
+  }
+}
+
+.animate-price-up {
+  animation: price-flash-up 750ms ease-out;
+}
+
+.animate-price-down {
+  animation: price-flash-down 750ms ease-out;
+}
+
+.animate-killzone-shimmer {
+  animation: killzone-shimmer 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-hero-live-candle {
+  transform-box: fill-box;
+  transform-origin: bottom center;
+  animation: hero-live-candle 2.4s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.animate-hero-ambient {
+  animation: hero-ambient-glow 9s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-hero-picture,
   .animate-hero-globe,
   .animate-hero-candle,
-  .animate-hero-wave {
+  .animate-hero-wave,
+  .animate-killzone-shimmer,
+  .animate-hero-live-candle,
+  .animate-hero-ambient {
     animation: none;
     transform: none;
   }
+  .animate-price-up,
+  .animate-price-down {
+    animation: none;
+  }
 }
+

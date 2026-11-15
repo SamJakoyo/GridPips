@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import {
   Activity,
   BarChart3,
@@ -579,87 +580,99 @@ export default function App() {
         </header>
 
         <main className="p-6 max-w-7xl w-full mx-auto flex-1">
-          {activeTab === 'overview' && (
-            <WorkspaceOverview
-              user={user}
-              config={config}
-              quotes={quotes}
-              journal={journal}
-              orders={orders}
-              onNavigate={setActiveTab}
-              onUnlock={(productKey) => setCheckoutState({ productKey })}
-              onOpenSymbolChart={(sym) => {
-                setChartSymbol(sym);
-                setActiveTab('charts');
-              }}
-            />
-          )}
-          {activeTab === 'analyzer' && (
-            <IctAnalyzerView
-              user={user}
-              config={config}
-              symbol={chartSymbol}
-              timeframe={chartTimeframe}
-              onSymbolChange={setChartSymbol}
-              onTimeframeChange={setChartTimeframe}
-              onOpenFreeChart={() => setActiveTab('charts')}
-              onUnlockClick={() => setCheckoutState({ productKey: 'analyzer' })}
-            />
-          )}
-          {activeTab === 'eabots' && (
-            <EaBotsView
-              user={user}
-              config={config}
-              onUnlockClick={() => setCheckoutState({ productKey: 'ea_bots' })}
-              onUserUpdated={(updated) => setUser(updated)}
-            />
-          )}
-          {activeTab === 'orders' && (
-            <OrdersDashboardView
-              orders={orders}
-              onResumePayment={(ord) =>
-                setCheckoutState({ productKey: ord.product_key, existingOrder: ord })
-              }
-              onBuyNew={(productKey) => setCheckoutState({ productKey })}
-            />
-          )}
-          {activeTab === 'charts' && (
-            <TradingViewChartsView
-              watchlist={watchlist}
-              symbol={chartSymbol}
-              timeframe={chartTimeframe}
-              onSymbolChange={setChartSymbol}
-              onTimeframeChange={setChartTimeframe}
-              onUpdateWatchlist={handleUpdateWatchlist}
-              onAnalyzeInIct={() => setActiveTab('analyzer')}
-            />
-          )}
-          {activeTab === 'journal' && (
-            <JournalView trades={journal} onRefresh={loadUserWorkspaceData} />
-          )}
-          {activeTab === 'analytics' && <AnalyticsView trades={journal} />}
-          {activeTab === 'calculators' && <CalculatorsView />}
-          {activeTab === 'paper' && <PaperTradingView quotes={quotes} />}
-          {activeTab === 'plan' && <TradingPlanView />}
-          {activeTab === 'calendar' && <CalendarAndNewsView />}
-          {activeTab === 'education' && <EducationView config={config} />}
-          {activeTab === 'account' && (
-            <AccountProfileView
-              user={user}
-              config={config}
-              orders={orders}
-              journal={journal}
-              watchlist={watchlist}
-              onUserUpdated={(updated) => setUser(updated)}
-              onNavigate={(tab) => setActiveTab(tab)}
-              onUnlock={(productKey) => setCheckoutState({ productKey })}
-            />
-          )}
-          {activeTab === 'referrals' && <ReferralsHubView config={config} />}
-          {activeTab === 'emails' && <EmailsInboxView />}
-          {activeTab === 'admin' && user.role === 'admin' && (
-            <AdminDashboardView onConfigSaved={loadConfig} />
-          )}
+          <MotionConfig reducedMotion="user">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {activeTab === 'overview' && (
+                  <WorkspaceOverview
+                    user={user}
+                    config={config}
+                    quotes={quotes}
+                    journal={journal}
+                    orders={orders}
+                    onNavigate={setActiveTab}
+                    onUnlock={(productKey) => setCheckoutState({ productKey })}
+                    onOpenSymbolChart={(sym) => {
+                      setChartSymbol(sym);
+                      setActiveTab('charts');
+                    }}
+                  />
+                )}
+                {activeTab === 'analyzer' && (
+                  <IctAnalyzerView
+                    user={user}
+                    config={config}
+                    symbol={chartSymbol}
+                    timeframe={chartTimeframe}
+                    onSymbolChange={setChartSymbol}
+                    onTimeframeChange={setChartTimeframe}
+                    onOpenFreeChart={() => setActiveTab('charts')}
+                    onUnlockClick={() => setCheckoutState({ productKey: 'analyzer' })}
+                  />
+                )}
+                {activeTab === 'eabots' && (
+                  <EaBotsView
+                    user={user}
+                    config={config}
+                    onUnlockClick={() => setCheckoutState({ productKey: 'ea_bots' })}
+                    onUserUpdated={(updated) => setUser(updated)}
+                  />
+                )}
+                {activeTab === 'orders' && (
+                  <OrdersDashboardView
+                    orders={orders}
+                    onResumePayment={(ord) =>
+                      setCheckoutState({ productKey: ord.product_key, existingOrder: ord })
+                    }
+                    onBuyNew={(productKey) => setCheckoutState({ productKey })}
+                  />
+                )}
+                {activeTab === 'charts' && (
+                  <TradingViewChartsView
+                    watchlist={watchlist}
+                    symbol={chartSymbol}
+                    timeframe={chartTimeframe}
+                    onSymbolChange={setChartSymbol}
+                    onTimeframeChange={setChartTimeframe}
+                    onUpdateWatchlist={handleUpdateWatchlist}
+                    onAnalyzeInIct={() => setActiveTab('analyzer')}
+                  />
+                )}
+                {activeTab === 'journal' && (
+                  <JournalView trades={journal} onRefresh={loadUserWorkspaceData} />
+                )}
+                {activeTab === 'analytics' && <AnalyticsView trades={journal} />}
+                {activeTab === 'calculators' && <CalculatorsView />}
+                {activeTab === 'paper' && <PaperTradingView quotes={quotes} />}
+                {activeTab === 'plan' && <TradingPlanView />}
+                {activeTab === 'calendar' && <CalendarAndNewsView />}
+                {activeTab === 'education' && <EducationView config={config} />}
+                {activeTab === 'account' && (
+                  <AccountProfileView
+                    user={user}
+                    config={config}
+                    orders={orders}
+                    journal={journal}
+                    watchlist={watchlist}
+                    onUserUpdated={(updated) => setUser(updated)}
+                    onNavigate={(tab) => setActiveTab(tab)}
+                    onUnlock={(productKey) => setCheckoutState({ productKey })}
+                  />
+                )}
+                {activeTab === 'referrals' && <ReferralsHubView config={config} />}
+                {activeTab === 'emails' && <EmailsInboxView />}
+                {activeTab === 'admin' && user.role === 'admin' && (
+                  <AdminDashboardView onConfigSaved={loadConfig} />
+                )}
+              </motion.div>
+            </AnimatePresence>
+          </MotionConfig>
         </main>
       </div>
 
@@ -695,8 +708,7 @@ function getSparklinePoints(chgPct: number, seed: number): string {
   return pts.join(' ');
 }
 
-function getKillzoneTimelineState() {
-  const now = new Date();
+function getKillzoneTimelineState(now: Date) {
   const hourStr = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
     hour: '2-digit',
@@ -710,6 +722,7 @@ function getKillzoneTimelineState() {
     timeZone: 'America/New_York',
     hour: '2-digit',
     minute: '2-digit',
+    second: '2-digit',
     hour12: false,
   }).format(now);
 
@@ -757,6 +770,9 @@ const HERO_CANDLES = [
   { x: 326, yOpen: 44, yClose: 22, yHigh: 12, yLow: 49, up: true },
 ];
 
+const HERO_TREND_PATH =
+  'M 18 108 L 46 110 L 74 104 L 102 90 L 130 92 L 158 82 L 186 69 L 214 75 L 242 60 L 270 42 L 298 41 L 326 27';
+
 const WorkspaceOverview: React.FC<{
   user: User;
   config: PublicConfig;
@@ -767,11 +783,41 @@ const WorkspaceOverview: React.FC<{
   onUnlock: (productKey: 'analyzer' | 'ea_bots') => void;
   onOpenSymbolChart: (sym: string) => void;
 }> = ({ user, config, quotes, journal, orders, onNavigate, onUnlock, onOpenSymbolChart }) => {
+  const [nyClock, setNyClock] = useState(() => new Date());
+  const prevQuotesRef = useRef<Record<string, number>>({});
+  const [tickDirs, setTickDirs] = useState<Record<string, 'up' | 'down'>>({});
+  const [tickSeq, setTickSeq] = useState(0);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNyClock(new Date()), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const nextDirs: Record<string, 'up' | 'down'> = {};
+    let changed = false;
+    for (const q of quotes) {
+      const prev = prevQuotesRef.current[q.sym];
+      if (typeof prev === 'number' && prev !== q.price) {
+        nextDirs[q.sym] = q.price > prev ? 'up' : 'down';
+        changed = true;
+      }
+      prevQuotesRef.current[q.sym] = q.price;
+    }
+    if (changed) {
+      setTickDirs(nextDirs);
+      setTickSeq((s) => s + 1);
+      const timer = window.setTimeout(() => setTickDirs({}), 750);
+      return () => window.clearTimeout(timer);
+    }
+  }, [quotes]);
+
   const totalPnl = journal.reduce((acc, t) => acc + Number(t.pnl || 0), 0);
   const firstName = (user.name || user.email || 'Trader').trim().split(/\s+/)[0];
   const featuredGold = quotes.find((q) => q.sym === 'XAUUSD') || quotes[0];
   const featuredUp = (featuredGold?.chgPct ?? 0) >= 0;
-  const killzone = getKillzoneTimelineState();
+  const featuredTickDir = featuredGold ? tickDirs[featuredGold.sym] : undefined;
+  const killzone = getKillzoneTimelineState(nyClock);
 
   let heroSubtext =
     'Analyze live TradingView liquidity sweeps, automate MT5 execution, and log every setup in one workspace.';
@@ -786,15 +832,43 @@ const WorkspaceOverview: React.FC<{
   return (
     <div className="space-y-5">
       {/* Warm Obsidian + Gold Hero Banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-[#2A2316] bg-[radial-gradient(ellipse_at_top_left,_rgba(217,119,6,0.16),_#12100C_48%,_#0D0C09_100%)] p-6 sm:p-7">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          <div className="lg:col-span-7 space-y-4">
-            <h1 className="text-3xl sm:text-4xl font-bold text-[#FBF9F5] tracking-tight leading-[1.12] max-w-md">
-              Welcome back, {firstName}
-            </h1>
-            <p className="text-sm text-[#A69F90] max-w-lg leading-relaxed">{heroSubtext}</p>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl border border-[#2A2316] bg-[radial-gradient(ellipse_at_top_left,_rgba(217,119,6,0.16),_#12100C_48%,_#0D0C09_100%)] p-6 sm:p-7"
+      >
+        {/* Subtle ambient gold drift */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#E5A93C]/10 blur-3xl animate-hero-ambient"
+        />
 
-            <div className="flex flex-wrap items-center gap-2.5 pt-0.5">
+        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+          <div className="lg:col-span-7 space-y-4">
+            <motion.h1
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, delay: 0.05 }}
+              className="text-3xl sm:text-4xl font-bold text-[#FBF9F5] tracking-tight leading-[1.12] max-w-md"
+            >
+              Welcome back, {firstName}
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, delay: 0.1 }}
+              className="text-sm text-[#A69F90] max-w-lg leading-relaxed"
+            >
+              {heroSubtext}
+            </motion.p>
+
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, delay: 0.14 }}
+              className="flex flex-wrap items-center gap-2.5 pt-0.5"
+            >
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
@@ -816,27 +890,36 @@ const WorkspaceOverview: React.FC<{
               >
                 My information →
               </button>
-            </div>
+            </motion.div>
 
-            <div className="flex flex-wrap items-center gap-3 pt-1">
-              <button
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.32, delay: 0.18 }}
+              className="flex flex-wrap items-center gap-3 pt-1"
+            >
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.985 }}
                 onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
                 className="px-5 py-2.5 rounded-lg bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 {user.hasAnalyzer ? 'Launch ICT Scanner' : `Unlock ICT Analyzer ($${config.analyzerPriceUsd.toFixed(2)})`}
-              </button>
-              <button
+              </motion.button>
+              <motion.button
                 type="button"
+                whileHover={{ y: -1 }}
+                whileTap={{ scale: 0.985 }}
                 onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
                 className="px-5 py-2.5 rounded-lg bg-[#17140F] border border-[#322B1E] hover:border-[#4F432C] text-[#F5F2EB] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 {user.hasEaBots ? 'Download .mq5 & Bridge' : `Get MQL5 EA Bots ($${config.eaBotsPriceUsd.toFixed(2)})`}
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
           </div>
 
-          {/* Right Live Highlight + Ascending Gold Candlestick Chart */}
+          {/* Right Live Highlight + Animated Ascending Gold Candlestick Chart */}
           <div className="lg:col-span-5 flex flex-col items-end">
             {featuredGold && (
               <button
@@ -848,12 +931,24 @@ const WorkspaceOverview: React.FC<{
                   {featuredGold.sym} · {featuredGold.sym === 'XAUUSD' ? 'Gold' : featuredGold.name}
                 </div>
                 <div className="flex items-baseline justify-end gap-2 mt-0.5">
-                  <span className="text-xl sm:text-2xl font-mono tabular-nums font-bold text-[#E5A93C]">
+                  <motion.span
+                    key={`${featuredGold.sym}-${featuredGold.price}`}
+                    initial={featuredTickDir ? { scale: 1.04 } : false}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.25 }}
+                    className={`text-xl sm:text-2xl font-mono tabular-nums font-bold text-[#E5A93C] ${
+                      featuredTickDir === 'up'
+                        ? 'animate-price-up'
+                        : featuredTickDir === 'down'
+                        ? 'animate-price-down'
+                        : ''
+                    }`}
+                  >
                     {featuredGold.price.toLocaleString(undefined, {
                       minimumFractionDigits: featuredGold.digits,
                       maximumFractionDigits: featuredGold.digits,
                     })}
-                  </span>
+                  </motion.span>
                   <span
                     className={`text-xs font-mono tabular-nums font-semibold ${
                       featuredUp ? 'text-emerald-400' : 'text-rose-400'
@@ -870,45 +965,91 @@ const WorkspaceOverview: React.FC<{
               <svg viewBox="0 0 344 136" className="w-full h-auto" aria-hidden="true">
                 <defs>
                   <linearGradient id="heroGoldFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#E5A93C" stopOpacity="0.24" />
+                    <stop offset="0%" stopColor="#E5A93C" stopOpacity="0.26" />
                     <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
                   </linearGradient>
+                  <radialGradient id="heroTipGlow" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stopColor="#F5C451" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
+                  </radialGradient>
                 </defs>
                 {[28, 56, 84, 112].map((y) => (
                   <line key={y} x1="8" y1={y} x2="338" y2={y} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
                 ))}
-                <polygon
+                <motion.polygon
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.9, delay: 0.25 }}
                   points="18,108 46,110 74,104 102,90 130,92 158,82 186,69 214,75 242,60 270,42 298,41 326,27 326,130 18,130"
                   fill="url(#heroGoldFill)"
                 />
-                <polyline
+                <motion.path
+                  d={HERO_TREND_PATH}
                   fill="none"
                   stroke="#E5A93C"
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  points="18,108 46,110 74,104 102,90 130,92 158,82 186,69 214,75 242,60 270,42 298,41 326,27"
+                  initial={{ pathLength: 0, opacity: 0.4 }}
+                  animate={{ pathLength: 1, opacity: 1 }}
+                  transition={{ duration: 1.05, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
                 />
                 {HERO_CANDLES.map((c, idx) => {
                   const color = c.up ? '#22C55E' : '#EF4444';
                   const top = Math.min(c.yOpen, c.yClose);
                   const height = Math.max(5, Math.abs(c.yClose - c.yOpen));
+                  const isLast = idx === HERO_CANDLES.length - 1;
                   return (
-                    <g key={idx}>
+                    <motion.g
+                      key={idx}
+                      initial={{ opacity: 0, scaleY: 0.35 }}
+                      animate={{ opacity: 1, scaleY: 1 }}
+                      transition={{
+                        duration: 0.36,
+                        delay: 0.08 + idx * 0.045,
+                        ease: [0.22, 1, 0.36, 1],
+                      }}
+                      style={{ transformOrigin: `${c.x}px ${c.yLow}px` }}
+                    >
                       <line x1={c.x} y1={c.yHigh} x2={c.x} y2={c.yLow} stroke={color} strokeWidth="1.5" />
-                      <rect x={c.x - 4.5} y={top} width="9" height={height} rx="1.5" fill={color} />
-                    </g>
+                      <rect
+                        x={c.x - 4.5}
+                        y={top}
+                        width="9"
+                        height={height}
+                        rx="1.5"
+                        fill={color}
+                        className={isLast ? 'animate-hero-live-candle' : undefined}
+                      />
+                    </motion.g>
                   );
                 })}
+                {/* Live tip halo */}
+                <motion.circle
+                  cx="326"
+                  cy="27"
+                  r="11"
+                  fill="url(#heroTipGlow)"
+                  animate={{ opacity: [0.45, 0.95, 0.45], scale: [0.85, 1.15, 0.85] }}
+                  transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
+                  style={{ transformOrigin: '326px 27px' }}
+                />
+                <circle cx="326" cy="27" r="2.8" fill="#F5C451" />
               </svg>
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* 4-Column KPI Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.08 }}
+          whileHover={{ y: -2 }}
+          className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5"
+        >
           <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-[#8E8779]">ICT Strategy Analyzer</span>
             {user.hasAnalyzer && (
@@ -927,9 +1068,15 @@ const WorkspaceOverview: React.FC<{
           >
             {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
           </button>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.14 }}
+          whileHover={{ y: -2 }}
+          className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5"
+        >
           <div className="text-xs text-[#8E8779]">MQL5 EA Bots and MT5</div>
           <div className="text-lg font-bold text-[#FBF9F5] mt-1.5">
             {user.hasEaBots
@@ -945,9 +1092,15 @@ const WorkspaceOverview: React.FC<{
           >
             {user.hasEaBots ? 'Download .mq5 & Bridge →' : 'Buy EA Bots Pack →'}
           </button>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.2 }}
+          whileHover={{ y: -2 }}
+          className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5"
+        >
           <div className="text-xs text-[#8E8779]">Journal performance</div>
           <div
             className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
@@ -963,9 +1116,15 @@ const WorkspaceOverview: React.FC<{
           >
             {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
           </button>
-        </div>
+        </motion.div>
 
-        <div className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, delay: 0.26 }}
+          whileHover={{ y: -2 }}
+          className="rounded-2xl bg-[#12100C] border border-[#252118] hover:border-[#3A3222] transition-colors p-5"
+        >
           <div className="text-xs text-[#8E8779]">Orders and referrals</div>
           <div className="text-lg font-bold font-mono tabular-nums text-[#FBF9F5] mt-1.5">
             {orders.length} order{orders.length === 1 ? '' : 's'}
@@ -977,12 +1136,17 @@ const WorkspaceOverview: React.FC<{
           >
             Earn {config.commissionPct}% commissions →
           </button>
-        </div>
+        </motion.div>
       </div>
 
       {/* Market Overview Table & Right Rail */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <div className="lg:col-span-8 rounded-2xl bg-[#12100C] border border-[#252118] p-6">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.34, delay: 0.22 }}
+          className="lg:col-span-8 rounded-2xl bg-[#12100C] border border-[#252118] p-6"
+        >
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
             <h2 className="text-base font-bold text-[#FBF9F5]">Market overview</h2>
             <button
@@ -1008,19 +1172,33 @@ const WorkspaceOverview: React.FC<{
                 {quotes.map((q, idx) => {
                   const up = q.chgPct >= 0;
                   const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
+                  const dir = tickDirs[q.sym];
                   return (
                     <tr
                       key={q.sym}
                       onClick={() => onOpenSymbolChart(q.sym)}
-                      className="hover:bg-[#191610] transition-colors cursor-pointer"
+                      className="group hover:bg-[#191610] transition-colors cursor-pointer"
                     >
-                      <td className="py-3 pr-4 font-mono font-bold text-[#FBF9F5] whitespace-nowrap">{q.sym}</td>
+                      <td className="py-3 pr-4 font-mono font-bold text-[#FBF9F5] group-hover:text-[#E5A93C] transition-colors whitespace-nowrap">
+                        {q.sym}
+                      </td>
                       <td className="py-3 pr-4 text-[#9D9687] text-xs whitespace-nowrap">{q.name}</td>
                       <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-[#F5F2EB] whitespace-nowrap">
-                        {q.price.toLocaleString(undefined, {
-                          minimumFractionDigits: q.digits,
-                          maximumFractionDigits: q.digits,
-                        })}
+                        <span
+                          key={dir ? `${q.sym}-${tickSeq}` : q.sym}
+                          className={
+                            dir === 'up'
+                              ? 'inline-block animate-price-up'
+                              : dir === 'down'
+                              ? 'inline-block animate-price-down'
+                              : ''
+                          }
+                        >
+                          {q.price.toLocaleString(undefined, {
+                            minimumFractionDigits: q.digits,
+                            maximumFractionDigits: q.digits,
+                          })}
+                        </span>
                       </td>
                       <td
                         className={`py-3 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
@@ -1031,14 +1209,21 @@ const WorkspaceOverview: React.FC<{
                         {q.chgPct.toFixed(2)}%
                       </td>
                       <td className="py-2.5 text-right">
-                        <svg viewBox="0 0 76 20" className="w-16 h-5 inline-block" aria-hidden="true">
-                          <polyline
+                        <svg
+                          viewBox="0 0 76 20"
+                          className="w-16 h-5 inline-block transition-transform duration-200 group-hover:scale-105"
+                          aria-hidden="true"
+                        >
+                          <motion.polyline
                             fill="none"
                             stroke={up ? '#22C55E' : '#EF4444'}
                             strokeWidth="1.6"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                             points={sparkPoints}
+                            initial={{ pathLength: 0, opacity: 0.4 }}
+                            animate={{ pathLength: 1, opacity: 1 }}
+                            transition={{ duration: 0.65, delay: 0.15 + idx * 0.05 }}
                           />
                         </svg>
                       </td>
@@ -1048,17 +1233,25 @@ const WorkspaceOverview: React.FC<{
               </tbody>
             </table>
           </div>
-        </div>
+        </motion.div>
 
         <div className="lg:col-span-4 space-y-5">
           {/* Warm Amber Gold Telegram Card */}
-          <div className="rounded-2xl bg-[#E5A93C] text-[#090806] p-6">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.34, delay: 0.28 }}
+            whileHover={{ y: -2 }}
+            className="rounded-2xl bg-[#E5A93C] text-[#090806] p-6"
+          >
             <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
             <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
             <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
               Trade alongside fellow ICT and SMC traders, review live killzone setups, and get fast EA setup help.
             </p>
-            <a
+            <motion.a
+              whileHover={{ scale: 1.01 }}
+              whileTap={{ scale: 0.985 }}
               href={config.telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
@@ -1066,14 +1259,19 @@ const WorkspaceOverview: React.FC<{
             >
               <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
               Open t.me/JakoyoFx
-            </a>
-          </div>
+            </motion.a>
+          </motion.div>
 
           {/* Killzones (NY time) Card */}
-          <div className="rounded-2xl bg-[#12100C] border border-[#252118] p-5 space-y-3.5">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.34, delay: 0.34 }}
+            className="rounded-2xl bg-[#12100C] border border-[#252118] p-5 space-y-3.5"
+          >
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold text-[#FBF9F5]">Killzones (NY time)</h3>
-              <span className="text-xs font-mono tabular-nums text-[#8E8779]">{killzone.nyTimeFormatted} NY</span>
+              <span className="text-xs font-mono tabular-nums text-[#E5A93C]">{killzone.nyTimeFormatted} NY</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
@@ -1089,10 +1287,17 @@ const WorkspaceOverview: React.FC<{
                 return (
                   <div key={seg.key} className="space-y-1.5">
                     <div
-                      className={`h-2 rounded-sm ${
+                      className={`relative overflow-hidden h-2 rounded-sm ${
                         isActive ? 'bg-[#E5A93C]' : 'bg-[#262118]'
                       }`}
-                    />
+                    >
+                      {isActive && (
+                        <div
+                          aria-hidden="true"
+                          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/45 to-transparent animate-killzone-shimmer"
+                        />
+                      )}
+                    </div>
                     <div
                       className={`text-[11px] font-medium ${
                         isActive ? 'text-[#F5F2EB]' : 'text-[#7E786B]'
@@ -1108,7 +1313,7 @@ const WorkspaceOverview: React.FC<{
             <div className="text-xs text-[#A69F90] pt-0.5 font-mono tabular-nums">
               {killzone.detail}
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>
