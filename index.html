@@ -12,8 +12,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('gridpips_theme');
+          var mode = t === 'light' || t === 'dark' ? t : 'dark';
+          document.documentElement.classList.add(mode);
+          document.documentElement.setAttribute('data-theme', mode);
+          document.documentElement.style.colorScheme = mode;
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-[#050505] text-white antialiased selection:bg-amber-400 selection:text-black">
+  <body class="antialiased selection:bg-amber-400 selection:text-black">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

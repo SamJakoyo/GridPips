@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import { resolveTradingViewSymbol, toTradingViewInterval } from '../lib/tradingTimeframes';
+import { useTheme } from '../lib/theme';
 
 interface LiveTradingViewChartProps {
   symbol: string;
@@ -12,9 +13,11 @@ interface LiveTradingViewChartProps {
 export const LiveTradingViewChart: React.FC<LiveTradingViewChartProps> = ({
   symbol,
   timeframe,
-  theme = 'dark',
+  theme: propTheme,
   heightClass = 'aspect-[16/9] min-h-[420px] max-h-[78vh]',
 }) => {
+  const { theme: activeTheme } = useTheme();
+  const theme = propTheme ?? activeTheme;
   const containerRef = useRef<HTMLDivElement>(null);
   const [expanded, setExpanded] = useState(false);
 

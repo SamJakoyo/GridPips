@@ -62,10 +62,10 @@ export const TradingViewChartsView: React.FC<{
   return (
     <div className="space-y-4">
       {/* Full-Width Landscape Watchlist & Pair Selector Strip */}
-      <div className="rounded-2xl bg-[#12100C] border border-[#252118] p-4 space-y-3">
+      <div className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-[#8E8779] mr-1">Watchlist</span>
+            <span className="text-xs font-semibold text-slate-500 dark:text-[#8E8779] mr-1">Watchlist</span>
             {list.map((sym) => {
               const active = symbol === sym;
               return (
@@ -74,7 +74,7 @@ export const TradingViewChartsView: React.FC<{
                   className={`inline-flex items-center rounded-lg border text-xs font-mono font-semibold transition-colors ${
                     active
                       ? 'bg-[#E5A93C] border-[#E5A93C] text-[#090806]'
-                      : 'bg-[#17140F] border-[#2C2519] text-[#D8D1C5] hover:border-[#4A3D25] hover:text-[#FBF9F5]'
+                      : 'bg-slate-50 dark:bg-[#17140F] border-slate-200 dark:border-[#2C2519] text-slate-700 dark:text-[#D8D1C5] hover:border-amber-400 dark:hover:border-[#4A3D25] hover:text-slate-950 dark:hover:text-[#FBF9F5]'
                   }`}
                 >
                   <button
@@ -89,7 +89,7 @@ export const TradingViewChartsView: React.FC<{
                       type="button"
                       onClick={() => handleRemoveSymbol(sym)}
                       className={`pr-2 py-1.5 cursor-pointer ${
-                        active ? 'text-[#3F2D0B] hover:text-[#090806]' : 'text-[#7E786B] hover:text-rose-400'
+                        active ? 'text-[#3F2D0B] hover:text-[#090806]' : 'text-slate-400 dark:text-[#7E786B] hover:text-rose-500 dark:hover:text-rose-400'
                       }`}
                       aria-label={`Remove ${sym}`}
                     >
@@ -107,15 +107,15 @@ export const TradingViewChartsView: React.FC<{
               value={newSym}
               onChange={(e) => setNewSym(e.target.value)}
               placeholder="Add pair (e.g. USDJPY)"
-              className="w-40 sm:w-44 px-3 py-1.5 text-xs bg-[#17140F] border border-[#2D271C] focus:border-[#E5A93C] focus:outline-none rounded-lg font-mono uppercase text-[#F5F2EB] placeholder:text-[#7E786B]"
+              className="w-40 sm:w-44 px-3 py-1.5 text-xs bg-white dark:bg-[#17140F] border border-slate-300 dark:border-[#2D271C] focus:border-amber-500 dark:focus:border-[#E5A93C] focus:outline-none rounded-lg font-mono uppercase text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B]"
             />
             <button
               type="submit"
-              className="px-3 py-1.5 bg-[#1B1710] border border-[#322B1E] hover:border-[#E5A93C] text-[#E5A93C] text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+              className="px-3 py-1.5 bg-amber-50 dark:bg-[#1B1710] border border-amber-300 dark:border-[#322B1E] hover:border-amber-500 dark:hover:border-[#E5A93C] text-amber-800 dark:text-[#E5A93C] text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
             >
               + Add
             </button>
-            <span className="hidden sm:inline text-[11px] font-medium text-emerald-400 ml-1 whitespace-nowrap">
+            <span className="hidden sm:inline text-[11px] font-medium text-emerald-600 dark:text-emerald-400 ml-1 whitespace-nowrap">
               {savingWl ? 'Syncing...' : 'Free Chart'}
             </span>
           </form>
@@ -123,19 +123,19 @@ export const TradingViewChartsView: React.FC<{
       </div>
 
       {/* Full-Width 16:9 Landscape TradingView Chart Card */}
-      <div className="rounded-2xl bg-[#12100C] border border-[#252118] p-4 sm:p-5 space-y-3.5">
+      <div className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-bold text-[#FBF9F5] font-mono">
+            <h3 className="text-base font-bold text-slate-950 dark:text-[#FBF9F5] font-mono">
               {symbol} ({activeTimeframe}) · Live Landscape Chart
             </h3>
-            <p className="text-xs text-[#8E8779]">
+            <p className="text-xs text-slate-500 dark:text-[#8E8779]">
               Full-width widescreen TradingView chart synced directly with your ICT Analyzer
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex flex-wrap items-center gap-1 p-1 bg-[#17140F] border border-[#2A2316] rounded-lg">
+            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 dark:bg-[#17140F] border border-slate-200 dark:border-[#2A2316] rounded-lg">
               {ANALYZER_TIMEFRAMES.map((tf) => (
                 <button
                   key={tf}
@@ -144,7 +144,7 @@ export const TradingViewChartsView: React.FC<{
                   className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                     activeTimeframe === tf
                       ? 'bg-[#E5A93C] text-[#090806]'
-                      : 'text-[#A69F90] hover:text-[#FBF9F5]'
+                      : 'text-slate-600 dark:text-[#A69F90] hover:text-slate-950 dark:hover:text-[#FBF9F5]'
                   }`}
                 >
                   {tf}
@@ -168,7 +168,6 @@ export const TradingViewChartsView: React.FC<{
         <LiveTradingViewChart
           symbol={symbol}
           timeframe={activeTimeframe}
-          theme="dark"
           heightClass="aspect-[16/9] min-h-[440px] max-h-[78vh]"
         />
       </div>

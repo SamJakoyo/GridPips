@@ -437,7 +437,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   <LiveTradingViewChart
                     symbol={symbol}
                     timeframe={activeTimeframe}
-                    theme="dark"
                     heightClass={
                       chartViewMode === 'live'
                         ? 'aspect-[16/9] min-h-[460px] max-h-[78vh]'
