@@ -383,7 +383,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Synchronized Live TradingView Chart & ICT Liquidity/FVG Overlay */}
-            <div className="lg:col-span-8 space-y-5">
+            <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -409,7 +409,11 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     symbol={symbol}
                     timeframe={activeTimeframe}
                     theme="dark"
-                    heightClass={chartViewMode === 'live' ? 'h-[540px]' : 'h-[400px]'}
+                    heightClass={
+                      chartViewMode === 'live'
+                        ? 'aspect-[16/9] min-h-[460px] max-h-[78vh]'
+                        : 'aspect-[16/9] min-h-[380px] max-h-[65vh]'
+                    }
                   />
                 </div>
               )}
@@ -444,7 +448,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             </div>
 
             {/* Actionable ICT Setup Card */}
-            <div className="lg:col-span-4 space-y-4">
+            <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-4' : 'lg:col-span-4 space-y-4'}>
               <div className="bg-white border border-slate-200 rounded-xl p-5">
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h3 className="text-base font-bold text-slate-950">Execution Parameters</h3>
