@@ -237,7 +237,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   ? `Signed in (${pendingOAuth.email}). Link your Exness Partner Account ID to enter.`
                   : mode === 'register'
                   ? 'Link your Exness IB account to unlock free tools and paid modules.'
-                  : 'Access your trading workspace, ICT analyzer, and EA bots.'}
+                  : 'Access your trading dashboard, ICT analyzer, and EA bots.'}
               </p>
             </div>
             <Shield className="w-6 h-6 text-amber-600 shrink-0" />
@@ -284,7 +284,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 Step 1. Open your Exness brokerage account
               </div>
               <p className="text-xs text-slate-600 leading-relaxed mb-3">
-                Access to both free workspace tools and $5.25 pro software requires registering your Exness account through our partner link.
+                Access to both free trading tools and $5.25 pro software requires registering your Exness account through our partner link.
               </p>
               <a
                 href={config.exnessIbUrl}
@@ -434,7 +434,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               {loading
                 ? 'Authenticating...'
                 : pendingOAuth
-                ? 'Link Exness & Enter Workspace'
+                ? 'Link Exness & Enter Dashboard'
                 : mode === 'register'
                 ? 'Complete Exness Verification & Enter'
                 : 'Sign In Securely'}

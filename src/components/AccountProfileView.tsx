@@ -369,7 +369,7 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
           <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-3">
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-4 h-4 text-amber-600" />
-              <h3 className="text-base font-bold text-slate-950">Workspace Activity Summary</h3>
+              <h3 className="text-base font-bold text-slate-950">Account Activity Summary</h3>
             </div>
             <div className="divide-y divide-slate-200 text-xs">
               <div className="py-2.5 flex items-center justify-between">

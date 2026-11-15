@@ -274,7 +274,7 @@ export default function App() {
   if (booting) {
     return (
       <div className="min-h-screen bg-[#F7F5F0] flex items-center justify-center text-sm font-mono text-amber-700">
-        Initializing Grid Pips Workspace...
+        Initializing Grid Pips...
       </div>
     );
   }
@@ -351,7 +351,7 @@ export default function App() {
       ],
     },
     {
-      label: 'Free workspace',
+      label: 'Trading tools',
       items: [
         { id: 'charts', name: 'Live Charts', icon: <CandlestickChart className="w-4 h-4" /> },
         { id: 'journal', name: 'Trading Journal', icon: <NotebookPen className="w-4 h-4" /> },
@@ -564,7 +564,7 @@ export default function App() {
               <Menu className="w-5 h-5" />
             </button>
             <div className="text-sm font-medium text-slate-500 truncate">
-              Workspace / <span className="font-semibold text-slate-950">{currentTabTitle}</span>
+              Grid Pips / <span className="font-semibold text-slate-950">{currentTabTitle}</span>
             </div>
           </div>
 
@@ -873,7 +873,7 @@ const WorkspaceOverview: React.FC<{
   const killzone = getKillzoneTimelineState(nyClock);
 
   let heroSubtext =
-    'Analyze live TradingView liquidity sweeps, automate MT5 execution, and log every setup in one workspace.';
+    'Analyze live TradingView liquidity sweeps, automate MT5 execution, and log every setup in one platform.';
   if (user.hasAnalyzer && user.hasEaBots) {
     heroSubtext = 'Your ICT analyzer and EA bots are unlocked. Pick up where you left off.';
   } else if (user.hasAnalyzer) {

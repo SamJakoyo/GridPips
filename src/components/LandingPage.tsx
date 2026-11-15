@@ -138,7 +138,7 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
   terms: {
     title: 'Terms of Service',
     paragraphs: [
-      'Access to the free trading workspace and paid $5.25 pro modules (ICT Strategy Market Analyzer and MQL5 EA Bots Pack) is granted to registered members upon Exness IB onboarding confirmation.',
+      'Access to the free trading tools and paid $5.25 pro modules (ICT Strategy Market Analyzer and MQL5 EA Bots Pack) is granted to registered members upon Exness IB onboarding confirmation.',
       'Paid software licenses grant single-trader personal usage rights to the downloadable MQL5 (.mq5) source files and ICT Analyzer engine. Redistribution, commercial reselling, or unauthorized reverse-engineering is prohibited.',
       'Members agree to maintain accurate account credentials and refrain from automated scraping, credential stuffing, or unauthorized API probing.',
     ],
@@ -146,7 +146,7 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
   privacy: {
     title: 'Privacy Policy & Security',
     paragraphs: [
-      'Grid Pips stores only the account details necessary to operate your trading workspace, journal records, Exness IB verification, order receipts, and referral commissions.',
+      'Grid Pips stores only the account details necessary to operate your trading account, journal records, Exness IB verification, order receipts, and referral commissions.',
       'Passwords are protected with scrypt key derivation and per-user cryptographic salts. Sessions use HMAC-SHA256 signed HTTP-only cookies alongside Helmet security headers and strict rate limiting.',
       'We do not sell personal trader data to third parties. Automated notifications for registrations, payments, MT5 bindings, and payouts are stored securely in your member Email Inbox.',
     ],
@@ -305,7 +305,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
               className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
-              {user ? 'Open Workspace →' : 'Get Started →'}
+              {user ? 'Open Dashboard →' : 'Get Started →'}
             </button>
           </div>
         </div>
@@ -425,7 +425,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h1>
 
               <p className="text-[15px] lg:text-base font-normal text-slate-600 leading-relaxed mb-8 max-w-lg">
-                Join Grid Pips — an institutional ICT market analyzer and MQL5 automation workspace built for Exness traders, analysts, and automators worldwide.
+                Join Grid Pips — an institutional ICT market analyzer and MQL5 automation platform built for Exness traders, analysts, and automators worldwide.
               </p>
 
               <div className="flex flex-wrap items-center gap-4">
@@ -433,7 +433,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
                   className="px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
                 >
-                  {user ? 'Open Workspace →' : 'Start Trading Now →'}
+                  {user ? 'Open Dashboard →' : 'Start Trading Now →'}
                 </button>
                 <button
                   type="button"
@@ -898,10 +898,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="max-w-2xl mb-10">
             <p className="text-xs font-semibold mb-2 text-amber-700">Transparent Access</p>
             <h2 className="text-3xl font-bold tracking-tight text-slate-950">
-              Free workspace for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)} pro modules.
+              Free trading desk for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)} pro modules.
             </h2>
             <p className="text-sm text-slate-600 mt-2">
-              Pay seamlessly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile money checkout inside your workspace.
+              Pay seamlessly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile money checkout inside your dashboard.
             </p>
           </div>
 
@@ -909,7 +909,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="border border-slate-200 rounded-xl p-7 flex flex-col justify-between bg-[#F7F5F0]">
               <div>
                 <div className="text-xs font-medium text-slate-500 mb-1">For All Exness Registered Traders</div>
-                <h3 className="text-lg font-bold text-slate-950">Core Trading Workspace</h3>
+                <h3 className="text-lg font-bold text-slate-950">Core Trading Desk</h3>
                 <div className="text-3xl font-bold font-mono tabular-nums text-slate-950 my-4">$0</div>
                 <ul className="space-y-2.5 text-sm text-slate-700 mb-6">
                   <li>· TradingView Charts &amp; Watchlist</li>
@@ -923,7 +923,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
                 className="w-full py-2.5 bg-white border border-slate-300 hover:border-amber-500 text-slate-950 text-sm font-semibold rounded-full transition-colors cursor-pointer"
               >
-                {user ? 'Open Workspace' : 'Register via Exness IB'}
+                {user ? 'Open Dashboard' : 'Register via Exness IB'}
               </button>
             </div>
 
@@ -993,7 +993,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Open your Exness trading account to access Grid Pips.
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free workspace and $5.25 pro modules.
+                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free trading tools and $5.25 pro modules.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 shrink-0">
@@ -1146,7 +1146,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 }}
                 className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-semibold rounded-full cursor-pointer"
               >
-                {user ? 'Open Workspace →' : 'Start Free with Exness →'}
+                {user ? 'Open Dashboard →' : 'Start Free with Exness →'}
               </button>
             </div>
           </div>

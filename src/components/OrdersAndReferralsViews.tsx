@@ -330,7 +330,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                       <td className="py-2.5 pr-4 text-xs text-slate-600">
                         {[s.has_analyzer ? 'Analyzer' : null, s.has_ea_bots ? 'EA Bots' : null]
                           .filter(Boolean)
-                          .join(' · ') || 'Free Workspace'}
+                          .join(' · ') || 'Free Tier'}
                       </td>
                       <td className="py-2.5 text-right font-mono text-xs text-slate-500">
                         {s.created_at.slice(0, 10)}
