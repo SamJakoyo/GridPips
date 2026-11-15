@@ -22,6 +22,21 @@ export interface TradingViewLiveQuote {
   digits: number;
   name: string;
   assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+  currentSession: string | null;
+  isMarketOpen: boolean | null;
+  marketStatusLabel: string;
+  lastTickIso: string | null;
+  sessionSchedule: string | null;
+  exchangeTimezone: string | null;
+}
+
+export interface TradingViewMarketStatusSummary {
+  traditionalOpen: boolean;
+  cryptoOpen: boolean;
+  openCount: number;
+  totalCount: number;
+  summaryLabel: string;
+  checkedAt: string;
 }
 
 export interface TradingViewSeriesPayload {
@@ -351,6 +366,59 @@ export async function fetchTradingViewChartData(
   return job;
 }
 
+function mapTradingViewSessionState(
+  rawSession?: string | null
+): { currentSession: string | null; isMarketOpen: boolean | null; marketStatusLabel: string } {
+  if (!rawSession || typeof rawSession !== 'string') {
+    return { currentSession: null, isMarketOpen: null, marketStatusLabel: 'Live' };
+  }
+  const normalized = rawSession.trim().toLowerCase();
+  if (normalized === 'market') {
+    return { currentSession: normalized, isMarketOpen: true, marketStatusLabel: 'Open' };
+  }
+  if (normalized === 'pre_market') {
+    return { currentSession: normalized, isMarketOpen: true, marketStatusLabel: 'Pre-market' };
+  }
+  if (normalized === 'post_market') {
+    return { currentSession: normalized, isMarketOpen: true, marketStatusLabel: 'Post-market' };
+  }
+  if (normalized === 'out_of_session') {
+    return { currentSession: normalized, isMarketOpen: false, marketStatusLabel: 'Closed' };
+  }
+  if (normalized === 'holiday') {
+    return { currentSession: normalized, isMarketOpen: false, marketStatusLabel: 'Holiday closed' };
+  }
+  return { currentSession: normalized, isMarketOpen: null, marketStatusLabel: normalized };
+}
+
+export function summarizeTradingViewMarketStatus(
+  quotes: TradingViewLiveQuote[]
+): TradingViewMarketStatusSummary {
+  const traditional = quotes.filter((q) => q.assetClass !== 'crypto');
+  const crypto = quotes.filter((q) => q.assetClass === 'crypto');
+  const openCount = quotes.filter((q) => q.isMarketOpen === true).length;
+  const traditionalOpen = traditional.some((q) => q.isMarketOpen === true);
+  const cryptoOpen = crypto.some((q) => q.isMarketOpen === true);
+
+  let summaryLabel = 'Markets closed';
+  if (traditionalOpen && cryptoOpen) {
+    summaryLabel = 'Markets open';
+  } else if (traditionalOpen) {
+    summaryLabel = 'FX & Indices open';
+  } else if (cryptoOpen) {
+    summaryLabel = 'FX & Indices closed · Crypto open';
+  }
+
+  return {
+    traditionalOpen,
+    cryptoOpen,
+    openCount,
+    totalCount: quotes.length,
+    summaryLabel,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
 async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
   const entries = Object.entries(SYMBOL_METADATA);
   const tvSymbols = entries.map(([, meta]) => meta.tvSymbol);
@@ -358,13 +426,29 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
   return new Promise((resolve, reject) => {
     const ws = openTvWebSocket();
     let settled = false;
-    const bag: Record<string, { lp?: number; chp?: number; bid?: number; ask?: number; open?: number; high?: number; low?: number }> = {};
+    const bag: Record<
+      string,
+      {
+        lp?: number;
+        chp?: number;
+        bid?: number;
+        ask?: number;
+        open?: number;
+        high?: number;
+        low?: number;
+        currentSession?: string;
+        lpTime?: number;
+        sessionDisplay?: string;
+        timezone?: string;
+      }
+    > = {};
 
     const buildOutput = (): TradingViewLiveQuote[] => {
       const out: TradingViewLiveQuote[] = [];
       for (const [sym, meta] of entries) {
         const q = bag[meta.tvSymbol];
         if (!q || typeof q.lp !== 'number' || !Number.isFinite(q.lp)) continue;
+        const sessionState = mapTradingViewSessionState(q.currentSession);
         out.push({
           symbol: sym,
           tvSymbol: meta.tvSymbol,
@@ -378,6 +462,15 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
           open: typeof q.open === 'number' ? Number(q.open.toFixed(meta.quoteDigits)) : null,
           high: typeof q.high === 'number' ? Number(q.high.toFixed(meta.quoteDigits)) : null,
           low: typeof q.low === 'number' ? Number(q.low.toFixed(meta.quoteDigits)) : null,
+          currentSession: sessionState.currentSession,
+          isMarketOpen: sessionState.isMarketOpen,
+          marketStatusLabel: sessionState.marketStatusLabel,
+          lastTickIso:
+            typeof q.lpTime === 'number' && Number.isFinite(q.lpTime)
+              ? new Date(q.lpTime * 1000).toISOString()
+              : null,
+          sessionSchedule: typeof q.sessionDisplay === 'string' ? q.sessionDisplay : null,
+          exchangeTimezone: typeof q.timezone === 'string' ? q.timezone : null,
         });
       }
       return out;
@@ -427,6 +520,10 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
           'open_price',
           'high_price',
           'low_price',
+          'current_session',
+          'lp_time',
+          'session-display',
+          'timezone',
         ])
       );
       ws.send(encodePacket('quote_add_symbols', [qs, ...tvSymbols]));
@@ -454,9 +551,13 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
             if (typeof item.v.open_price === 'number') cur.open = item.v.open_price;
             if (typeof item.v.high_price === 'number') cur.high = item.v.high_price;
             if (typeof item.v.low_price === 'number') cur.low = item.v.low_price;
+            if (typeof item.v.current_session === 'string') cur.currentSession = item.v.current_session;
+            if (typeof item.v.lp_time === 'number') cur.lpTime = item.v.lp_time;
+            if (typeof item.v['session-display'] === 'string') cur.sessionDisplay = item.v['session-display'];
+            if (typeof item.v.timezone === 'string') cur.timezone = item.v.timezone;
             bag[item.n] = cur;
 
-            if (tvSymbols.every((s) => typeof bag[s]?.lp === 'number')) {
+            if (tvSymbols.every((s) => typeof bag[s]?.lp === 'number' && typeof bag[s]?.currentSession === 'string')) {
               finish();
               return;
             }

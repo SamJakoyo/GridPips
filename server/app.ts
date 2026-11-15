@@ -39,7 +39,7 @@ import {
   buildInstallationGuide,
 } from './mql5Templates.ts';
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
-import { getTradingViewLiveQuotes } from './tradingViewFeed.ts';
+import { getTradingViewLiveQuotes, summarizeTradingViewMarketStatus } from './tradingViewFeed.ts';
 import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
   closeAllMt5Positions,
@@ -1753,9 +1753,11 @@ app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
 app.get('/api/market/quotes', async (_req, res) => {
   try {
     const quotes = await getTradingViewLiveQuotes();
+    const marketStatus = summarizeTradingViewMarketStatus(quotes);
     res.json({
       source: 'tradingview.com',
       updatedAt: new Date().toISOString(),
+      marketStatus,
       quotes: quotes.map((q) => ({
         sym: q.symbol,
         tvSymbol: q.tvSymbol,
@@ -1766,6 +1768,12 @@ app.get('/api/market/quotes', async (_req, res) => {
         ask: q.ask,
         digits: q.digits,
         assetClass: q.assetClass,
+        currentSession: q.currentSession,
+        isMarketOpen: q.isMarketOpen,
+        marketStatusLabel: q.marketStatusLabel,
+        lastTickIso: q.lastTickIso,
+        sessionSchedule: q.sessionSchedule,
+        exchangeTimezone: q.exchangeTimezone,
       })),
     });
   } catch (err) {

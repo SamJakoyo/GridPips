@@ -1,22 +1,13 @@
 @import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
   :root {
     --font-display: 'Sora', system-ui, -apple-system, sans-serif;
     --font-body: 'Inter', system-ui, -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+    color-scheme: light;
   }
 
-  html.dark body {
-    font-family: var(--font-body);
-    font-weight: 400;
-    line-height: 1.6;
-    color: #F5F2EB;
-    background-color: #090909;
-  }
-
-  html.light body,
   body {
     font-family: var(--font-body);
     font-weight: 400;
@@ -25,15 +16,9 @@
     background-color: #f8f7f4;
   }
 
-  html.dark input,
-  html.dark textarea,
-  html.dark select {
-    color: #F5F2EB;
-  }
-
-  html.light input,
-  html.light textarea,
-  html.light select {
+  input,
+  textarea,
+  select {
     color: #0f172a;
   }
 
@@ -237,121 +222,5 @@
   .animate-price-down {
     animation: none;
   }
-}
-
-/* Adaptive dark-mode surface & ink tokens for workspace views and modals */
-html.dark .theme-adaptive .bg-white:not([class*="dark:bg-"]) {
-  background-color: #12100C;
-}
-html.dark .theme-adaptive .bg-slate-50:not([class*="dark:bg-"]) {
-  background-color: #17140F;
-}
-html.dark .theme-adaptive .bg-slate-100:not([class*="dark:bg-"]) {
-  background-color: #1D1912;
-}
-html.dark .theme-adaptive .hover\:bg-slate-50:hover:not([class*="dark:hover:bg-"]) {
-  background-color: #1B1710;
-}
-html.dark .theme-adaptive .hover\:bg-slate-100:hover:not([class*="dark:hover:bg-"]) {
-  background-color: #241F16;
-}
-html.dark .theme-adaptive .text-slate-950:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-slate-900:not([class*="dark:text-"]) {
-  color: #FBF9F5;
-}
-html.dark .theme-adaptive .text-slate-800:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-slate-700:not([class*="dark:text-"]) {
-  color: #E8E2D6;
-}
-html.dark .theme-adaptive .text-slate-600:not([class*="dark:text-"]) {
-  color: #B5AEA0;
-}
-html.dark .theme-adaptive .text-slate-500:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-slate-400:not([class*="dark:text-"]) {
-  color: #8E8779;
-}
-html.dark .theme-adaptive .border-slate-200:not([class*="dark:border-"]),
-html.dark .theme-adaptive .border-slate-100:not([class*="dark:border-"]) {
-  border-color: #252118;
-}
-html.dark .theme-adaptive .border-slate-300:not([class*="dark:border-"]) {
-  border-color: #342E21;
-}
-html.dark .theme-adaptive .divide-slate-100 > :not(:last-child),
-html.dark .theme-adaptive .divide-slate-200 > :not(:last-child) {
-  border-color: #221E16;
-}
-html.dark .theme-adaptive input:not([class*="dark:bg-"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]),
-html.dark .theme-adaptive select:not([class*="dark:bg-"]),
-html.dark .theme-adaptive textarea:not([class*="dark:bg-"]) {
-  background-color: #17140F;
-  color: #F5F2EB;
-  border-color: #342E21;
-}
-html.dark .theme-adaptive input::placeholder,
-html.dark .theme-adaptive textarea::placeholder {
-  color: #7E786B;
-}
-html.dark .theme-adaptive .bg-amber-50:not([class*="dark:bg-"]) {
-  background-color: rgba(217, 119, 6, 0.14);
-}
-html.dark .theme-adaptive .border-amber-200:not([class*="dark:border-"]) {
-  border-color: rgba(245, 158, 11, 0.35);
-}
-html.dark .theme-adaptive .text-amber-900:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-amber-800:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-amber-700:not([class*="dark:text-"]) {
-  color: #FCD34D;
-}
-html.dark .theme-adaptive .bg-blue-50:not([class*="dark:bg-"]) {
-  background-color: rgba(37, 99, 235, 0.14);
-}
-html.dark .theme-adaptive .border-blue-200:not([class*="dark:border-"]) {
-  border-color: rgba(59, 130, 246, 0.35);
-}
-html.dark .theme-adaptive .text-blue-900:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-blue-800:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-blue-700:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-blue-600:not([class*="dark:text-"]) {
-  color: #93C5FD;
-}
-html.dark .theme-adaptive .bg-emerald-50:not([class*="dark:bg-"]) {
-  background-color: rgba(16, 185, 129, 0.14);
-}
-html.dark .theme-adaptive .border-emerald-200:not([class*="dark:border-"]) {
-  border-color: rgba(16, 185, 129, 0.35);
-}
-html.dark .theme-adaptive .text-emerald-900:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-emerald-800:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-emerald-700:not([class*="dark:text-"]) {
-  color: #6EE7B7;
-}
-html.dark .theme-adaptive .bg-rose-50:not([class*="dark:bg-"]) {
-  background-color: rgba(244, 63, 94, 0.14);
-}
-html.dark .theme-adaptive .border-rose-200:not([class*="dark:border-"]),
-html.dark .theme-adaptive .border-rose-300:not([class*="dark:border-"]) {
-  border-color: rgba(244, 63, 94, 0.35);
-}
-html.dark .theme-adaptive .text-rose-800:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-rose-700:not([class*="dark:text-"]),
-html.dark .theme-adaptive .text-rose-600:not([class*="dark:text-"]) {
-  color: #FDA4AF;
-}
-html.dark .theme-adaptive .bg-slate-950:not([class*="dark:bg-"]) {
-  background-color: #E5A93C;
-  color: #090806;
-}
-html.dark .theme-adaptive .bg-slate-950:not([class*="dark:bg-"]):hover {
-  background-color: #F0B84D;
-}
-html.dark .theme-adaptive .bg-slate-950.text-white {
-  background-color: #18140D;
-  color: #FBF9F5;
-  border: 1px solid #3A3120;
-}
-html.dark .theme-adaptive .bg-slate-950.text-white:hover {
-  background-color: #221C12;
-  border-color: #E5A93C;
 }
 

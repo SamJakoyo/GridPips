@@ -23,7 +23,14 @@ import {
   UserCircle,
   Check,
 } from 'lucide-react';
-import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
+import {
+  apiFetch,
+  clearSessionToken,
+  setSessionToken,
+  INITIAL_MARKET_QUOTES,
+  type MarketSymbolQuote,
+  type TradingViewMarketStatus,
+} from './lib/api';
 import { getSupabaseClient } from './lib/supabase';
 import type { AnalyzerTimeframe } from './lib/tradingTimeframes';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
@@ -50,8 +57,6 @@ import {
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AccountProfileView } from './components/AccountProfileView';
 import { BrandLogo } from './components/BrandLogo';
-import { ThemeToggle } from './components/ThemeToggle';
-import { useTheme } from './lib/theme';
 
 type WorkspaceTab =
   | 'overview'
@@ -91,7 +96,6 @@ const DEFAULT_CONFIG: PublicConfig = {
 };
 
 export default function App() {
-  const { isDark } = useTheme();
   const [config, setConfig] = useState<PublicConfig>(DEFAULT_CONFIG);
   const [user, setUser] = useState<User | null>(null);
   const [booting, setBooting] = useState(true);
@@ -101,6 +105,7 @@ export default function App() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const [quotes, setQuotes] = useState<MarketSymbolQuote[]>(INITIAL_MARKET_QUOTES);
+  const [marketStatus, setMarketStatus] = useState<TradingViewMarketStatus | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [journal, setJournal] = useState<JournalTrade[]>([]);
   const [watchlist, setWatchlist] = useState<string[]>(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD']);
@@ -209,14 +214,20 @@ export default function App() {
       .finally(() => setBooting(false));
   }, [loadUserWorkspaceData]);
 
-  // Live TradingView market quote polling (no synthetic random ticks)
+  // Live TradingView market quote & session status polling (no synthetic random ticks)
   useEffect(() => {
     let active = true;
     const syncQuotes = async () => {
       try {
-        const res = await apiFetch<{ quotes: MarketSymbolQuote[] }>('/api/market/quotes');
+        const res = await apiFetch<{
+          quotes: MarketSymbolQuote[];
+          marketStatus?: TradingViewMarketStatus;
+        }>('/api/market/quotes');
         if (active && Array.isArray(res.quotes) && res.quotes.length > 0) {
           setQuotes(res.quotes);
+          if (res.marketStatus) {
+            setMarketStatus(res.marketStatus);
+          }
         }
       } catch {
         // retain last verified TradingView quotes if temporarily offline
@@ -262,7 +273,7 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="min-h-screen bg-[#F7F5F0] dark:bg-[#050505] flex items-center justify-center text-sm font-mono text-amber-700 dark:text-amber-400">
+      <div className="min-h-screen bg-[#F7F5F0] flex items-center justify-center text-sm font-mono text-amber-700">
         Initializing Grid Pips Workspace...
       </div>
     );
@@ -376,22 +387,36 @@ export default function App() {
     .map((p) => p[0]?.toUpperCase() || '')
     .join('');
 
+  const marketStatusTooltip = marketStatus
+    ? `TradingView Live: ${quotes
+        .map((q) => `${q.sym} ${q.marketStatusLabel || (q.isMarketOpen ? 'Open' : 'Closed')}`)
+        .join(' · ')}`
+    : 'Checking live TradingView market sessions...';
+
+  const marketStatusStyle = !marketStatus
+    ? 'bg-slate-50 border-slate-200 text-slate-600'
+    : marketStatus.traditionalOpen
+    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    : marketStatus.cryptoOpen
+    ? 'bg-amber-50 border-amber-200 text-amber-800'
+    : 'bg-rose-50 border-rose-200 text-rose-700';
+
   return (
-    <div className="min-h-screen bg-[#F7F5F0] dark:bg-[#090909] text-slate-900 dark:text-[#F5F2EB] flex transition-colors duration-200">
+    <div className="min-h-screen bg-[#F7F5F0] text-slate-900 flex">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white dark:bg-[#0C0B09] border-r border-slate-200 dark:border-[#221D15] sticky top-0 h-screen shrink-0 transition-colors">
-        <div className="h-16 px-4 border-b border-slate-200 dark:border-[#221D15] flex items-center justify-between gap-2">
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white border-r border-slate-200 sticky top-0 h-screen shrink-0">
+        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between gap-2">
           <button
             onClick={() => setScreen('landing')}
             className="cursor-pointer shrink-0"
           >
-            <BrandLogo variant={isDark ? 'light' : 'dark'} size="sm" />
+            <BrandLogo variant="dark" size="sm" />
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('account')}
             title="View my account information"
-            className="text-[11px] font-mono text-slate-500 dark:text-[#9E9789] hover:text-amber-600 dark:hover:text-[#E5A93C] truncate cursor-pointer"
+            className="text-[11px] font-mono text-slate-500 hover:text-amber-600 truncate cursor-pointer"
           >
             {user.exnessAccountId}
           </button>
@@ -400,7 +425,7 @@ export default function App() {
         <nav className="flex-1 overflow-y-auto p-3 space-y-5">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 text-[11px] font-medium text-slate-500 dark:text-[#706A5E] mb-1.5">{group.label}</div>
+              <div className="px-3 text-[11px] font-medium text-slate-500 mb-1.5">{group.label}</div>
               <div className="space-y-0.5">
                 {group.items.map((item) => {
                   const isActive = activeTab === item.id;
@@ -410,12 +435,12 @@ export default function App() {
                       onClick={() => setActiveTab(item.id)}
                       className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                         isActive
-                          ? 'bg-amber-50 dark:bg-[#1B1710] border border-amber-200 dark:border-[#2F2719] text-slate-950 dark:text-[#FBF9F5]'
-                          : 'border border-transparent text-slate-600 dark:text-[#9E9789] hover:text-slate-950 dark:hover:text-[#F5F2EB] hover:bg-slate-100 dark:hover:bg-[#15120D]'
+                          ? 'bg-amber-50 border border-amber-200 text-slate-950'
+                          : 'border border-transparent text-slate-600 hover:text-slate-950 hover:bg-slate-100'
                       }`}
                     >
                       <span className="flex items-center gap-2.5 min-w-0">
-                        <span className={isActive ? 'text-amber-600 dark:text-[#E5A93C]' : 'text-slate-400 dark:text-[#847D70]'}>
+                        <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
                           {item.icon}
                         </span>
                         <span className="truncate">{item.name}</span>
@@ -424,8 +449,8 @@ export default function App() {
                         <span
                           className={`font-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${
                             item.tag === 'Active'
-                              ? 'border-amber-200 dark:border-[#3A311E] bg-amber-50 dark:bg-[#16130D] text-amber-700 dark:text-[#E5A93C]'
-                              : 'border-slate-200 dark:border-[#2E271A] bg-slate-100 dark:bg-[#14110C] text-slate-600 dark:text-[#A69F90]'
+                              ? 'border-amber-200 bg-amber-50 text-amber-700'
+                              : 'border-slate-200 bg-slate-100 text-slate-600'
                           }`}
                         >
                           {item.tag}
@@ -439,22 +464,22 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-3.5 border-t border-slate-200 dark:border-[#221D15] space-y-2">
+        <div className="p-3.5 border-t border-slate-200 space-y-2">
           <a
             href={config.telegramUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2.5 px-3 bg-slate-50 dark:bg-[#13110D] border border-slate-200 dark:border-[#272219] hover:border-amber-400 dark:hover:border-[#3D3424] text-slate-800 dark:text-[#E8E2D6] text-xs font-medium rounded-lg flex items-center justify-between transition-colors"
+            className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 hover:border-amber-400 text-slate-800 text-xs font-medium rounded-lg flex items-center justify-between transition-colors"
           >
             <span className="inline-flex items-center gap-2">
-              <Send className="w-3.5 h-3.5 text-amber-600 dark:text-[#E5A93C]" />
+              <Send className="w-3.5 h-3.5 text-amber-600" />
               JakoyoFX Telegram
             </span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-slate-400 dark:text-[#8E8779]" />
+            <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
           </a>
           <button
             onClick={handleLogout}
-            className="w-full py-2 px-3 text-xs font-medium text-slate-500 dark:text-[#8E8779] hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-2 cursor-pointer transition-colors"
+            className="w-full py-2 px-3 text-xs font-medium text-slate-500 hover:text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign out ({firstName})
@@ -466,28 +491,25 @@ export default function App() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-black/60 dark:bg-black/75"
+            className="fixed inset-0 bg-black/50"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 bg-white dark:bg-[#0C0B09] border-r border-slate-200 dark:border-[#221D15] h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
+          <div className="relative w-72 bg-white border-r border-slate-200 h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200 dark:border-[#221D15]">
-                <BrandLogo variant={isDark ? 'light' : 'dark'} size="sm" />
-                <div className="flex items-center gap-1.5">
-                  <ThemeToggle compact />
-                  <button
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="p-1.5 text-slate-500 dark:text-[#9E9789] hover:text-slate-950 dark:hover:text-[#F5F2EB]"
-                    aria-label="Close menu"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+                <BrandLogo variant="dark" size="sm" />
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="p-1.5 text-slate-500 hover:text-slate-950"
+                  aria-label="Close menu"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <div className="space-y-4">
                 {navGroups.map((group) => (
                   <div key={group.label}>
-                    <div className="px-2 text-[11px] font-medium text-slate-500 dark:text-[#706A5E] mb-1">
+                    <div className="px-2 text-[11px] font-medium text-slate-500 mb-1">
                       {group.label}
                     </div>
                     {group.items.map((item) => {
@@ -501,17 +523,17 @@ export default function App() {
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium ${
                             isActive
-                              ? 'bg-amber-50 dark:bg-[#1B1710] border border-amber-200 dark:border-[#2F2719] text-slate-950 dark:text-[#FBF9F5]'
-                              : 'text-slate-600 dark:text-[#9E9789] hover:text-slate-950 dark:hover:text-[#F5F2EB]'
+                              ? 'bg-amber-50 border border-amber-200 text-slate-950'
+                              : 'text-slate-600 hover:text-slate-950'
                           }`}
                         >
                           <span className="flex items-center gap-2.5">
-                            <span className={isActive ? 'text-amber-600 dark:text-[#E5A93C]' : 'text-slate-400 dark:text-[#847D70]'}>
+                            <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
                               {item.icon}
                             </span>
                             <span>{item.name}</span>
                           </span>
-                          {item.tag && <span className="font-mono text-[10px] text-amber-600 dark:text-[#E5A93C]">{item.tag}</span>}
+                          {item.tag && <span className="font-mono text-[10px] text-amber-600">{item.tag}</span>}
                         </button>
                       );
                     })}
@@ -521,7 +543,7 @@ export default function App() {
             </div>
             <button
               onClick={handleLogout}
-              className="mt-6 w-full py-2.5 border border-slate-200 dark:border-[#2A2318] bg-slate-50 dark:bg-[#14110C] rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400"
+              className="mt-6 w-full py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-xs font-semibold text-rose-600"
             >
               Sign out
             </button>
@@ -532,33 +554,37 @@ export default function App() {
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Context Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/95 dark:bg-[#090909]/95 backdrop-blur-sm border-b border-slate-200 dark:border-[#201C14] px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4 transition-colors">
+        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-700 dark:text-[#C9C1B0]"
+              className="lg:hidden p-2 -ml-2 text-slate-700"
               aria-label="Open navigation"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="text-sm font-medium text-slate-500 dark:text-[#8E8779] truncate">
-              Workspace / <span className="font-semibold text-slate-950 dark:text-[#FBF9F5]">{currentTabTitle}</span>
+            <div className="text-sm font-medium text-slate-500 truncate">
+              Workspace / <span className="font-semibold text-slate-950">{currentTabTitle}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <ThemeToggle />
-            <div className="hidden md:inline-flex items-center px-3 py-1.5 rounded-lg bg-emerald-50 dark:bg-[#12100C] border border-emerald-200 dark:border-[#262118] text-xs font-medium text-emerald-700 dark:text-emerald-400 whitespace-nowrap">
-              Markets open
-            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('charts')}
+              title={marketStatusTooltip}
+              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${marketStatusStyle}`}
+            >
+              <span>{marketStatus ? marketStatus.summaryLabel : 'Checking TradingView…'}</span>
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('account')}
               title="My Information"
               className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === 'account'
-                  ? 'bg-amber-50 dark:bg-[#1B1710] border-amber-500 dark:border-[#E5A93C] text-slate-950 dark:text-[#FBF9F5]'
-                  : 'bg-slate-50 dark:bg-[#12100C] border-slate-200 dark:border-[#262118] hover:border-amber-400 dark:hover:border-[#3D3424] text-slate-700 dark:text-[#D8D1C5]'
+                  ? 'bg-amber-50 border-amber-500 text-slate-950'
+                  : 'bg-slate-50 border-slate-200 hover:border-amber-400 text-slate-700'
               }`}
             >
               <span className="w-5 h-5 rounded bg-[#E5A93C] text-[#090806] font-bold text-[10px] flex items-center justify-center">
@@ -572,8 +598,8 @@ export default function App() {
                 onClick={() => setActiveTab('eabots')}
                 className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                   user.mt5Connected
-                    ? 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 dark:border-emerald-700/60 text-emerald-700 dark:text-emerald-300 hover:border-emerald-500'
-                    : 'bg-amber-50 dark:bg-[#17140E] border-amber-300 dark:border-[#E5A93C]/50 text-amber-800 dark:text-[#E5A93C] hover:bg-amber-100 dark:hover:bg-[#1F1A11]'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:border-emerald-500'
+                    : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
                 }`}
               >
                 <Bot className="w-3.5 h-3.5" />
@@ -588,10 +614,10 @@ export default function App() {
               href={config.exnessIbUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-50 dark:bg-[#12100C] border border-slate-200 dark:border-[#282319] hover:border-slate-300 dark:hover:border-[#3F3524] text-xs font-medium text-slate-800 dark:text-[#F5F2EB] rounded-lg whitespace-nowrap transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-50 border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-800 rounded-lg whitespace-nowrap transition-colors"
             >
               Exness Portal
-              <ArrowUpRight className="w-3.5 h-3.5 text-slate-500 dark:text-[#C9C1B0]" />
+              <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
             </a>
             {!user.hasAnalyzer && (
               <button
@@ -604,7 +630,7 @@ export default function App() {
           </div>
         </header>
 
-        <main className="theme-adaptive p-6 max-w-7xl w-full mx-auto flex-1">
+        <main className="p-6 max-w-7xl w-full mx-auto flex-1">
           <MotionConfig reducedMotion="user">
             <AnimatePresence mode="wait">
               <motion.div
@@ -619,6 +645,7 @@ export default function App() {
                     user={user}
                     config={config}
                     quotes={quotes}
+                    marketStatus={marketStatus}
                     journal={journal}
                     orders={orders}
                     onNavigate={setActiveTab}
@@ -702,20 +729,18 @@ export default function App() {
       </div>
 
       {checkoutState && (
-        <div className="theme-adaptive">
-          <CheckoutModal
-            productKey={checkoutState.productKey}
-            config={config}
-            existingOrder={checkoutState.existingOrder}
-            onClose={() => setCheckoutState(null)}
-            onUnlocked={(updatedUser) => {
-              setUser(updatedUser);
-              setCheckoutState(null);
-              loadUserWorkspaceData();
-              setActiveTab(checkoutState.productKey === 'ea_bots' ? 'eabots' : 'analyzer');
-            }}
-          />
-        </div>
+        <CheckoutModal
+          productKey={checkoutState.productKey}
+          config={config}
+          existingOrder={checkoutState.existingOrder}
+          onClose={() => setCheckoutState(null)}
+          onUnlocked={(updatedUser) => {
+            setUser(updatedUser);
+            setCheckoutState(null);
+            loadUserWorkspaceData();
+            setActiveTab(checkoutState.productKey === 'ea_bots' ? 'eabots' : 'analyzer');
+          }}
+        />
       )}
     </div>
   );
@@ -804,12 +829,13 @@ const WorkspaceOverview: React.FC<{
   user: User;
   config: PublicConfig;
   quotes: MarketSymbolQuote[];
+  marketStatus: TradingViewMarketStatus | null;
   journal: JournalTrade[];
   orders: Order[];
   onNavigate: (tab: WorkspaceTab) => void;
   onUnlock: (productKey: 'analyzer' | 'ea_bots') => void;
   onOpenSymbolChart: (sym: string) => void;
-}> = ({ user, config, quotes, journal, orders, onNavigate, onUnlock, onOpenSymbolChart }) => {
+}> = ({ user, config, quotes, marketStatus, journal, orders, onNavigate, onUnlock, onOpenSymbolChart }) => {
   const [nyClock, setNyClock] = useState(() => new Date());
   const prevQuotesRef = useRef<Record<string, number>>({});
   const [tickDirs, setTickDirs] = useState<Record<string, 'up' | 'down'>>({});
@@ -856,21 +882,19 @@ const WorkspaceOverview: React.FC<{
     heroSubtext = 'Your MQL5 EA Bots Pack is unlocked. Connect your MT5 terminal below.';
   }
 
-  const { isDark } = useTheme();
-
   return (
     <div className="space-y-5">
-      {/* Warm Obsidian + Gold (Dark) / Warm Ivory + Gold (Light) Hero Banner */}
+      {/* Light Editorial Ivory + Gold Hero Banner */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-2xl border border-amber-200/80 dark:border-[#2A2316] bg-[radial-gradient(ellipse_at_top_left,_rgba(245,158,11,0.14),_#FFFFFF_52%,_#FAF7F0_100%)] dark:bg-[radial-gradient(ellipse_at_top_left,_rgba(217,119,6,0.16),_#12100C_48%,_#0D0C09_100%)] p-6 sm:p-7 transition-colors"
+        className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-[radial-gradient(ellipse_at_top_left,_rgba(245,158,11,0.14),_#FFFFFF_52%,_#FAF7F0_100%)] p-6 sm:p-7"
       >
         {/* Subtle ambient gold drift */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#E5A93C]/15 dark:bg-[#E5A93C]/10 blur-3xl animate-hero-ambient"
+          className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#E5A93C]/15 blur-3xl animate-hero-ambient"
         />
 
         <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
@@ -879,7 +903,7 @@ const WorkspaceOverview: React.FC<{
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.32, delay: 0.05 }}
-              className="text-3xl sm:text-4xl font-bold text-slate-950 dark:text-[#FBF9F5] tracking-tight leading-[1.12] max-w-md"
+              className="text-3xl sm:text-4xl font-bold text-slate-950 tracking-tight leading-[1.12] max-w-md"
             >
               Welcome back, {firstName}
             </motion.h1>
@@ -887,7 +911,7 @@ const WorkspaceOverview: React.FC<{
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.32, delay: 0.1 }}
-              className="text-sm text-slate-600 dark:text-[#A69F90] max-w-lg leading-relaxed"
+              className="text-sm text-slate-600 max-w-lg leading-relaxed"
             >
               {heroSubtext}
             </motion.p>
@@ -901,21 +925,21 @@ const WorkspaceOverview: React.FC<{
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-amber-50/80 dark:bg-[#17140E] border border-amber-200 dark:border-[#2D261A] hover:border-amber-400 dark:hover:border-[#4A3D25] text-xs text-slate-700 dark:text-[#A69F90] hover:text-slate-950 dark:hover:text-[#F5F2EB] transition-colors cursor-pointer whitespace-nowrap"
+                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap"
               >
-                Exness ID <span className="font-mono font-semibold text-amber-700 dark:text-[#E5A93C] ml-1">{user.exnessAccountId}</span>
+                Exness ID <span className="font-mono font-semibold text-amber-700 ml-1">{user.exnessAccountId}</span>
               </button>
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-amber-50/80 dark:bg-[#17140E] border border-amber-200 dark:border-[#2D261A] hover:border-amber-400 dark:hover:border-[#4A3D25] text-xs text-slate-700 dark:text-[#A69F90] hover:text-slate-950 dark:hover:text-[#F5F2EB] transition-colors cursor-pointer whitespace-nowrap"
+                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap"
               >
-                Referral code <span className="font-mono font-semibold text-slate-950 dark:text-[#F5F2EB] ml-1">{user.referralCode}</span>
+                Referral code <span className="font-mono font-semibold text-slate-950 ml-1">{user.referralCode}</span>
               </button>
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-transparent text-xs font-semibold text-amber-700 dark:text-[#E5A93C] hover:underline cursor-pointer whitespace-nowrap"
+                className="px-3 py-1.5 rounded-lg bg-transparent text-xs font-semibold text-amber-700 hover:underline cursor-pointer whitespace-nowrap"
               >
                 My information →
               </button>
@@ -941,9 +965,9 @@ const WorkspaceOverview: React.FC<{
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.985 }}
                 onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
-                className="px-5 py-2.5 rounded-lg bg-white dark:bg-[#17140F] border border-slate-300 dark:border-[#3A3120] hover:border-amber-500 dark:hover:border-[#E5A93C] text-slate-900 dark:text-[#F5F2EB] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-lg bg-white border border-slate-300 hover:border-amber-500 text-slate-900 text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
-                <Bot className="w-4 h-4 text-amber-600 dark:text-[#E5A93C]" />
+                <Bot className="w-4 h-4 text-amber-600" />
                 {user.hasEaBots
                   ? user.mt5Connected
                     ? 'Manage MT5 & EA Auto-Trade'
@@ -961,8 +985,9 @@ const WorkspaceOverview: React.FC<{
                 onClick={() => onOpenSymbolChart(featuredGold.sym)}
                 className="text-right mb-2 cursor-pointer group"
               >
-                <div className="text-xs text-slate-500 dark:text-[#8E8779] group-hover:text-slate-700 dark:group-hover:text-[#C9C1B0] transition-colors">
+                <div className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">
                   {featuredGold.sym} · {featuredGold.sym === 'XAUUSD' ? 'Gold' : featuredGold.name}
+                  {featuredGold.marketStatusLabel ? ` · ${featuredGold.marketStatusLabel}` : ''}
                 </div>
                 <div className="flex items-baseline justify-end gap-2 mt-0.5">
                   <motion.span
@@ -970,7 +995,7 @@ const WorkspaceOverview: React.FC<{
                     initial={featuredTickDir ? { scale: 1.04 } : false}
                     animate={{ scale: 1 }}
                     transition={{ duration: 0.25 }}
-                    className={`text-xl sm:text-2xl font-mono tabular-nums font-bold text-amber-600 dark:text-[#E5A93C] ${
+                    className={`text-xl sm:text-2xl font-mono tabular-nums font-bold text-amber-600 ${
                       featuredTickDir === 'up'
                         ? 'animate-price-up'
                         : featuredTickDir === 'down'
@@ -985,7 +1010,7 @@ const WorkspaceOverview: React.FC<{
                   </motion.span>
                   <span
                     className={`text-xs font-mono tabular-nums font-semibold ${
-                      featuredUp ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                      featuredUp ? 'text-emerald-600' : 'text-rose-600'
                     }`}
                   >
                     {featuredUp ? '▲ +' : '▼ '}
@@ -1014,7 +1039,7 @@ const WorkspaceOverview: React.FC<{
                     y1={y}
                     x2="338"
                     y2={y}
-                    stroke={isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.07)'}
+                    stroke="rgba(15,23,42,0.07)"
                     strokeWidth="1"
                   />
                 ))}
@@ -1090,23 +1115,23 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.08 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] hover:border-amber-300 dark:hover:border-[#3A3222] transition-colors p-5"
+          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
         >
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500 dark:text-[#8E8779]">ICT Strategy Analyzer</span>
+            <span className="text-xs text-slate-500">ICT Strategy Analyzer</span>
             {user.hasAnalyzer && (
-              <span className="w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700/50 flex items-center justify-center">
-                <Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+              <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
+                <Check className="w-3 h-3 text-emerald-600" />
               </span>
             )}
           </div>
-          <div className="text-lg font-bold text-slate-950 dark:text-[#FBF9F5] mt-1.5">
+          <div className="text-lg font-bold text-slate-950 mt-1.5">
             {user.hasAnalyzer ? 'Unlocked and ready' : `$${config.analyzerPriceUsd.toFixed(2)} required`}
           </div>
           <button
             type="button"
             onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-            className="text-xs font-semibold text-amber-700 dark:text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
+            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
           >
             {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
           </button>
@@ -1117,10 +1142,10 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.14 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] hover:border-amber-300 dark:hover:border-[#3A3222] transition-colors p-5"
+          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
         >
-          <div className="text-xs text-slate-500 dark:text-[#8E8779]">MQL5 EA Bots and MT5</div>
-          <div className="text-lg font-bold text-slate-950 dark:text-[#FBF9F5] mt-1.5">
+          <div className="text-xs text-slate-500">MQL5 EA Bots and MT5</div>
+          <div className="text-lg font-bold text-slate-950 mt-1.5">
             {user.hasEaBots
               ? user.mt5Connected
                 ? `MT5 ${user.mt5Login}`
@@ -1130,7 +1155,7 @@ const WorkspaceOverview: React.FC<{
           <button
             type="button"
             onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
-            className="text-xs font-semibold text-amber-700 dark:text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
+            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
           >
             {user.hasEaBots
               ? user.mt5Connected
@@ -1145,12 +1170,12 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.2 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] hover:border-amber-300 dark:hover:border-[#3A3222] transition-colors p-5"
+          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
         >
-          <div className="text-xs text-slate-500 dark:text-[#8E8779]">Journal performance</div>
+          <div className="text-xs text-slate-500">Journal performance</div>
           <div
             className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
-              totalPnl >= 0 ? 'text-amber-600 dark:text-[#E5A93C]' : 'text-rose-600 dark:text-rose-400'
+              totalPnl >= 0 ? 'text-amber-600' : 'text-rose-600'
             }`}
           >
             {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
@@ -1158,7 +1183,7 @@ const WorkspaceOverview: React.FC<{
           <button
             type="button"
             onClick={() => onNavigate('journal')}
-            className="text-xs font-semibold text-slate-600 dark:text-[#A69F90] hover:text-slate-950 dark:hover:text-[#F5F2EB] mt-2.5 cursor-pointer"
+            className="text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2.5 cursor-pointer"
           >
             {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
           </button>
@@ -1169,16 +1194,16 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.26 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] hover:border-amber-300 dark:hover:border-[#3A3222] transition-colors p-5"
+          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
         >
-          <div className="text-xs text-slate-500 dark:text-[#8E8779]">Orders and referrals</div>
-          <div className="text-lg font-bold font-mono tabular-nums text-slate-950 dark:text-[#FBF9F5] mt-1.5">
+          <div className="text-xs text-slate-500">Orders and referrals</div>
+          <div className="text-lg font-bold font-mono tabular-nums text-slate-950 mt-1.5">
             {orders.length} order{orders.length === 1 ? '' : 's'}
           </div>
           <button
             type="button"
             onClick={() => onNavigate('referrals')}
-            className="text-xs font-semibold text-amber-700 dark:text-[#E5A93C] hover:underline mt-2.5 cursor-pointer"
+            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
           >
             Earn {config.commissionPct}% commissions →
           </button>
@@ -1191,14 +1216,21 @@ const WorkspaceOverview: React.FC<{
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.34, delay: 0.22 }}
-          className="lg:col-span-8 rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] p-6"
+          className="lg:col-span-8 rounded-2xl bg-white border border-slate-200 p-6"
         >
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h2 className="text-base font-bold text-slate-950 dark:text-[#FBF9F5]">Market overview</h2>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-base font-bold text-slate-950">Market overview</h2>
+              {marketStatus && (
+                <span className="text-xs font-mono text-slate-500">
+                  · TradingView {marketStatus.openCount}/{marketStatus.totalCount} open
+                </span>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => onNavigate('charts')}
-              className="text-xs font-semibold text-amber-700 dark:text-[#E5A93C] hover:underline cursor-pointer"
+              className="text-xs font-semibold text-amber-700 hover:underline cursor-pointer"
             >
               Open TradingView charts →
             </button>
@@ -1206,30 +1238,41 @@ const WorkspaceOverview: React.FC<{
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-[#242017] text-xs text-slate-500 dark:text-[#7E786B]">
+                <tr className="border-b border-slate-200 text-xs text-slate-500">
                   <th className="py-2.5 pr-4 font-medium">Symbol</th>
                   <th className="py-2.5 pr-4 font-medium">Instrument</th>
+                  <th className="py-2.5 pr-4 font-medium">TradingView Session</th>
                   <th className="py-2.5 pr-4 text-right font-medium">Price</th>
                   <th className="py-2.5 pr-4 text-right font-medium">24h</th>
                   <th className="py-2.5 text-right font-medium">Trend</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-[#1E1B14]">
+              <tbody className="divide-y divide-slate-100">
                 {quotes.map((q, idx) => {
                   const up = q.chgPct >= 0;
                   const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
                   const dir = tickDirs[q.sym];
+                  const statusLabel = q.marketStatusLabel || (q.isMarketOpen === true ? 'Open' : q.isMarketOpen === false ? 'Closed' : '—');
+                  const statusClass =
+                    q.isMarketOpen === true
+                      ? 'text-emerald-700'
+                      : q.isMarketOpen === false
+                      ? 'text-slate-500'
+                      : 'text-slate-400';
                   return (
                     <tr
                       key={q.sym}
                       onClick={() => onOpenSymbolChart(q.sym)}
-                      className="group hover:bg-amber-50/50 dark:hover:bg-[#191610] transition-colors cursor-pointer"
+                      className="group hover:bg-amber-50/50 transition-colors cursor-pointer"
                     >
-                      <td className="py-3 pr-4 font-mono font-bold text-slate-950 dark:text-[#FBF9F5] group-hover:text-amber-700 dark:group-hover:text-[#E5A93C] transition-colors whitespace-nowrap">
+                      <td className="py-3 pr-4 font-mono font-bold text-slate-950 group-hover:text-amber-700 transition-colors whitespace-nowrap">
                         {q.sym}
                       </td>
-                      <td className="py-3 pr-4 text-slate-600 dark:text-[#9D9687] text-xs whitespace-nowrap">{q.name}</td>
-                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-[#F5F2EB] whitespace-nowrap">
+                      <td className="py-3 pr-4 text-slate-600 text-xs whitespace-nowrap">{q.name}</td>
+                      <td className={`py-3 pr-4 text-xs font-medium whitespace-nowrap ${statusClass}`}>
+                        {statusLabel}
+                      </td>
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-900 whitespace-nowrap">
                         <span
                           key={dir ? `${q.sym}-${tickSeq}` : q.sym}
                           className={
@@ -1248,7 +1291,7 @@ const WorkspaceOverview: React.FC<{
                       </td>
                       <td
                         className={`py-3 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
-                          up ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                          up ? 'text-emerald-600' : 'text-rose-600'
                         }`}
                       >
                         {up ? '+' : ''}
@@ -1313,11 +1356,11 @@ const WorkspaceOverview: React.FC<{
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.34, delay: 0.34 }}
-            className="rounded-2xl bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] p-5 space-y-3.5"
+            className="rounded-2xl bg-white border border-slate-200 p-5 space-y-3.5"
           >
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-950 dark:text-[#FBF9F5]">Killzones (NY time)</h3>
-              <span className="text-xs font-mono tabular-nums text-amber-700 dark:text-[#E5A93C]">{killzone.nyTimeFormatted} NY</span>
+              <h3 className="text-sm font-bold text-slate-950">Killzones (NY time)</h3>
+              <span className="text-xs font-mono tabular-nums text-amber-700">{killzone.nyTimeFormatted} NY</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
@@ -1334,7 +1377,7 @@ const WorkspaceOverview: React.FC<{
                   <div key={seg.key} className="space-y-1.5">
                     <div
                       className={`relative overflow-hidden h-2 rounded-sm ${
-                        isActive ? 'bg-[#E5A93C]' : 'bg-slate-200 dark:bg-[#262118]'
+                        isActive ? 'bg-[#E5A93C]' : 'bg-slate-200'
                       }`}
                     >
                       {isActive && (
@@ -1346,7 +1389,7 @@ const WorkspaceOverview: React.FC<{
                     </div>
                     <div
                       className={`text-[11px] font-medium ${
-                        isActive ? 'text-slate-950 dark:text-[#F5F2EB]' : 'text-slate-500 dark:text-[#7E786B]'
+                        isActive ? 'text-slate-950' : 'text-slate-500'
                       }`}
                     >
                       {seg.label}
@@ -1356,7 +1399,7 @@ const WorkspaceOverview: React.FC<{
               })}
             </div>
 
-            <div className="text-xs text-slate-600 dark:text-[#A69F90] pt-0.5 font-mono tabular-nums">
+            <div className="text-xs text-slate-600 pt-0.5 font-mono tabular-nums">
               {killzone.detail}
             </div>
           </motion.div>

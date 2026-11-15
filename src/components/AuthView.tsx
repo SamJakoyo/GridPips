@@ -3,8 +3,6 @@ import { ArrowUpRight, Shield, Lock, CheckCircle2, ArrowLeft } from 'lucide-reac
 import { apiFetch, setSessionToken } from '../lib/api';
 import { getSupabaseClient, signOutSupabase } from '../lib/supabase';
 import { BrandLogo } from './BrandLogo';
-import { ThemeToggle } from './ThemeToggle';
-import { useTheme } from '../lib/theme';
 import type { PublicConfig, User } from '../types';
 
 export interface PendingOAuthUser {
@@ -52,7 +50,6 @@ export const AuthView: React.FC<AuthViewProps> = ({
       : ''
   );
 
-  const { isDark } = useTheme();
   const [pendingOAuth, setPendingOAuth] = useState<PendingOAuthUser | null>(initialPendingOAuth);
   const supabase = getSupabaseClient(config.supabaseUrl, config.supabaseAnonKey);
 
@@ -210,33 +207,32 @@ export const AuthView: React.FC<AuthViewProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] dark:bg-[#090909] text-slate-950 dark:text-[#F5F2EB] flex flex-col justify-center py-12 px-4 sm:px-6 transition-colors">
+    <div className="min-h-screen bg-[#F7F5F0] text-slate-950 flex flex-col justify-center py-12 px-4 sm:px-6">
       <div className="max-w-lg w-full mx-auto">
         <div className="flex items-center justify-between gap-4 mb-6">
           <button
             onClick={onBackLanding}
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-[#A69F90] hover:text-slate-950 dark:hover:text-[#FBF9F5] cursor-pointer"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-slate-950 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Grid Pips
           </button>
-          <ThemeToggle />
         </div>
 
-        <div className="bg-white dark:bg-[#12100C] border border-slate-200 dark:border-[#252118] rounded-xl p-8">
-          <div className="mb-5 pb-4 border-b border-slate-100 dark:border-[#221E16] flex items-center justify-between">
-            <BrandLogo variant={isDark ? 'light' : 'dark'} size="sm" />
+        <div className="bg-white border border-slate-200 rounded-xl p-8">
+          <div className="mb-5 pb-4 border-b border-slate-100 flex items-center justify-between">
+            <BrandLogo variant="dark" size="sm" />
           </div>
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-slate-950 dark:text-[#FBF9F5]">
+              <h1 className="text-2xl font-bold text-slate-950">
                 {pendingOAuth
                   ? 'Finish Exness IB Linking'
                   : mode === 'register'
                   ? 'Exness Account Onboarding'
                   : 'Sign in to Grid Pips'}
               </h1>
-              <p className="text-sm text-slate-500 dark:text-[#9D9687] mt-1">
+              <p className="text-sm text-slate-500 mt-1">
                 {pendingOAuth
                   ? `Signed in (${pendingOAuth.email}). Link your Exness Partner Account ID to enter.`
                   : mode === 'register'
@@ -244,11 +240,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   : 'Access your trading workspace, ICT analyzer, and EA bots.'}
               </p>
             </div>
-            <Shield className="w-6 h-6 text-amber-600 dark:text-[#E5A93C] shrink-0" />
+            <Shield className="w-6 h-6 text-amber-600 shrink-0" />
           </div>
 
           {!pendingOAuth && (
-            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 dark:bg-[#17140F] border border-transparent dark:border-[#252118] rounded-lg mb-6">
+            <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-lg mb-6">
               <button
                 type="button"
                 onClick={() => {
@@ -258,8 +254,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 }}
                 className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                   mode === 'register'
-                    ? 'bg-white dark:bg-[#E5A93C] text-slate-950 dark:text-[#090806] shadow-sm'
-                    : 'text-slate-600 dark:text-[#9D9687] hover:text-slate-950 dark:hover:text-[#FBF9F5]'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
                 Register with Exness
@@ -273,8 +269,8 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 }}
                 className={`py-2 text-xs font-semibold rounded-md transition-colors cursor-pointer ${
                   mode === 'login'
-                    ? 'bg-white dark:bg-[#E5A93C] text-slate-950 dark:text-[#090806] shadow-sm'
-                    : 'text-slate-600 dark:text-[#9D9687] hover:text-slate-950 dark:hover:text-[#FBF9F5]'
+                    ? 'bg-white text-slate-950 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
                 Existing Member Login
@@ -283,11 +279,11 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           {(mode === 'register' || pendingOAuth) && (
-            <div className="mb-6 p-4 bg-slate-50 dark:bg-[#17140F] border border-slate-200 dark:border-[#2A2316] rounded-lg">
-              <div className="text-xs font-semibold text-slate-900 dark:text-[#FBF9F5] mb-1.5">
+            <div className="mb-6 p-4 bg-slate-50 border border-slate-200 rounded-lg">
+              <div className="text-xs font-semibold text-slate-900 mb-1.5">
                 Step 1. Open your Exness brokerage account
               </div>
-              <p className="text-xs text-slate-600 dark:text-[#A69F90] leading-relaxed mb-3">
+              <p className="text-xs text-slate-600 leading-relaxed mb-3">
                 Access to both free workspace tools and $5.25 pro software requires registering your Exness account through our partner link.
               </p>
               <a
@@ -295,13 +291,13 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => setOpenedExness(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-950 dark:bg-[#E5A93C] text-white dark:text-[#090806] text-xs font-semibold rounded-lg hover:bg-slate-800 dark:hover:bg-[#F0B84D] transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 transition-colors"
               >
                 Open Official Exness IB Link
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </a>
               {openedExness && (
-                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 font-medium">
+                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-emerald-700 font-medium">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   <span>Exness link opened. Enter your Exness Account ID below once created.</span>
                 </div>
@@ -310,7 +306,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           {infoNotice && (
-            <div className="mb-5 p-3 bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300 text-xs font-medium rounded-lg flex items-center justify-between gap-3">
+            <div className="mb-5 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium rounded-lg flex items-center justify-between gap-3">
               <span>{infoNotice}</span>
               {pendingOAuth && (
                 <button
@@ -321,7 +317,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     setError('');
                     void signOutSupabase(config.supabaseUrl, config.supabaseAnonKey);
                   }}
-                  className="shrink-0 underline font-semibold text-emerald-900 dark:text-emerald-200 hover:text-emerald-700 cursor-pointer"
+                  className="shrink-0 underline font-semibold text-emerald-900 hover:text-emerald-700 cursor-pointer"
                 >
                   Switch account
                 </button>
@@ -330,7 +326,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           )}
 
           {error && (
-            <div className="mb-5 p-3 bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-700/60 text-rose-700 dark:text-rose-300 text-xs font-medium rounded-lg">
+            <div className="mb-5 p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-lg">
               {error}
             </div>
           )}
@@ -338,7 +334,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
           <form onSubmit={handleSubmit} className="space-y-4">
             {(mode === 'register' || pendingOAuth) && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-[#C9C1B0] mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Exness Account ID / Trading Login
                 </label>
                 <input
@@ -347,14 +343,14 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={exnessAccountId}
                   onChange={(e) => setExnessAccountId(e.target.value)}
                   placeholder="e.g. EXN-29481024 or MT5 Login"
-                  className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[#17140F] text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B] border border-slate-300 dark:border-[#342E21] rounded-lg focus:outline-none focus:border-amber-600 dark:focus:border-[#E5A93C] font-mono"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-600 font-mono"
                 />
               </div>
             )}
 
             {!pendingOAuth && mode === 'register' && (
               <div>
-                <label className="block text-xs font-semibold text-slate-700 dark:text-[#C9C1B0] mb-1.5">
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   Full Name
                 </label>
                 <input
@@ -363,7 +359,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Daniel Mwangi"
-                  className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[#17140F] text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B] border border-slate-300 dark:border-[#342E21] rounded-lg focus:outline-none focus:border-amber-600 dark:focus:border-[#E5A93C]"
+                  className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-600"
                 />
               </div>
             )}
@@ -371,7 +367,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             {!pendingOAuth && (
               <>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-[#C9C1B0] mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Email Address
                   </label>
                   <input
@@ -380,12 +376,12 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="trader@example.com"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[#17140F] text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B] border border-slate-300 dark:border-[#342E21] rounded-lg focus:outline-none focus:border-amber-600 dark:focus:border-[#E5A93C]"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-600"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-[#C9C1B0] mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Password
                   </label>
                   <input
@@ -395,7 +391,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder={mode === 'register' ? 'Minimum 8 characters' : 'Enter your password'}
-                    className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[#17140F] text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B] border border-slate-300 dark:border-[#342E21] rounded-lg focus:outline-none focus:border-amber-600 dark:focus:border-[#E5A93C]"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-600"
                   />
                 </div>
               </>
@@ -404,7 +400,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             {(mode === 'register' || pendingOAuth) && (
               <>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 dark:text-[#C9C1B0] mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                     Influencer Referral Code (Optional)
                   </label>
                   <input
@@ -412,16 +408,16 @@ export const AuthView: React.FC<AuthViewProps> = ({
                     value={referralCode}
                     onChange={(e) => setReferralCode(e.target.value)}
                     placeholder="e.g. TRADER100"
-                    className="w-full px-3.5 py-2.5 text-sm bg-white dark:bg-[#17140F] text-slate-950 dark:text-[#F5F2EB] placeholder:text-slate-400 dark:placeholder:text-[#7E786B] border border-slate-300 dark:border-[#342E21] rounded-lg focus:outline-none focus:border-amber-600 dark:focus:border-[#E5A93C] font-mono uppercase"
+                    className="w-full px-3.5 py-2.5 text-sm bg-white text-slate-950 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-600 font-mono uppercase"
                   />
                 </div>
 
-                <label className="flex items-start gap-2.5 text-xs text-slate-600 dark:text-[#A69F90] cursor-pointer pt-1">
+                <label className="flex items-start gap-2.5 text-xs text-slate-600 cursor-pointer pt-1">
                   <input
                     type="checkbox"
                     checked={exnessConfirmed}
                     onChange={(e) => setExnessConfirmed(e.target.checked)}
-                    className="mt-0.5 rounded border-slate-300 dark:border-[#342E21] text-amber-600"
+                    className="mt-0.5 rounded border-slate-300 text-amber-600"
                   />
                   <span>
                     I confirm I registered my Exness account via the Grid Pips Exness IB link and agree to automated email notifications.
@@ -445,7 +441,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-[#221E16] flex items-center justify-between text-xs text-slate-500 dark:text-[#8E8779]">
+          <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
             <span className="inline-flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5" />
               Encrypted Session Protected
@@ -454,7 +450,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
               href={config.telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-amber-700 dark:text-[#E5A93C] hover:underline font-medium"
+              className="text-amber-700 hover:underline font-medium"
             >
               Need help? t.me/JakoyoFx
             </a>

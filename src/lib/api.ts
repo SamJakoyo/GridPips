@@ -82,6 +82,15 @@ export async function apiFetch<T>(url: string, options: RequestInit = {}): Promi
   return data as T;
 }
 
+export interface TradingViewMarketStatus {
+  traditionalOpen: boolean;
+  cryptoOpen: boolean;
+  openCount: number;
+  totalCount: number;
+  summaryLabel: string;
+  checkedAt: string;
+}
+
 export interface MarketSymbolQuote {
   sym: string;
   tvSymbol?: string;
@@ -92,6 +101,12 @@ export interface MarketSymbolQuote {
   ask?: number | null;
   digits: number;
   assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+  currentSession?: string | null;
+  isMarketOpen?: boolean | null;
+  marketStatusLabel?: string;
+  lastTickIso?: string | null;
+  sessionSchedule?: string | null;
+  exchangeTimezone?: string | null;
 }
 
 export const INITIAL_MARKET_QUOTES: MarketSymbolQuote[] = [
