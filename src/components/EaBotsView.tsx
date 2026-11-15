@@ -50,15 +50,19 @@ interface Mt5TradeCommand {
 }
 
 const PRESET_SERVERS = [
-  'Exness-MT5Real',
   'Exness-MT5Real2',
   'Exness-MT5Real5',
+  'Exness-MT5Real8',
+  'Exness-MT5Real9',
   'Exness-MT5Real14',
-  'Exness-MT5Trial',
+  'Exness-MT5Real18',
   'Exness-MT5Trial5',
   'Exness-MT5Trial8',
   'CUSTOM',
 ];
+
+const BARE_SERVER_PREFIX_RE = /^Exness-MT5(Real|Trial)$/i;
+const NUMERIC_MT5_LOGIN_RE = /^\d{4,16}$/;
 
 const TRADE_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'NAS100', 'US30', 'BTCUSD'];
 
@@ -72,14 +76,21 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   const [fileContent, setFileContent] = useState('');
   const [fileName, setFileName] = useState('');
 
-  const initialServer = user.mt5Server || 'Exness-MT5Real';
+  const rawSavedServer = (user.mt5Server || '').trim();
+  const hasValidSavedServer = Boolean(rawSavedServer && !BARE_SERVER_PREFIX_RE.test(rawSavedServer));
   const [serverPreset, setServerPreset] = useState(
-    PRESET_SERVERS.includes(initialServer) ? initialServer : 'CUSTOM'
+    !hasValidSavedServer
+      ? ''
+      : PRESET_SERVERS.includes(rawSavedServer)
+      ? rawSavedServer
+      : 'CUSTOM'
   );
   const [customServer, setCustomServer] = useState(
-    PRESET_SERVERS.includes(initialServer) ? '' : initialServer
+    hasValidSavedServer && !PRESET_SERVERS.includes(rawSavedServer) ? rawSavedServer : ''
   );
-  const [mt5Login, setMt5Login] = useState(user.mt5Login || user.exnessAccountId || '');
+  const savedNumericLogin =
+    user.mt5Login && NUMERIC_MT5_LOGIN_RE.test(user.mt5Login.trim()) ? user.mt5Login.trim() : '';
+  const [mt5Login, setMt5Login] = useState(savedNumericLogin);
   const [mt5Password, setMt5Password] = useState('');
   const [activeBot, setActiveBot] = useState<'silverbullet' | 'orderblock' | 'both'>(
     (user.mt5ActiveBot as 'silverbullet' | 'orderblock' | 'both') || 'both'
@@ -90,6 +101,15 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   const [profileConfigured, setProfileConfigured] = useState(
     Boolean(user.mt5ProvisioningProfileConfigured)
   );
+
+  useEffect(() => {
+    if (typeof user.mt5ApiConfigured === 'boolean') {
+      setMt5ApiConfigured(user.mt5ApiConfigured);
+    }
+    if (typeof user.mt5ProvisioningProfileConfigured === 'boolean') {
+      setProfileConfigured(user.mt5ProvisioningProfileConfigured);
+    }
+  }, [user.mt5ApiConfigured, user.mt5ProvisioningProfileConfigured]);
 
   const [connecting, setConnecting] = useState(false);
   const [togglingAuto, setTogglingAuto] = useState(false);
@@ -199,9 +219,27 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
 
   async function handleConnectMt5(e: React.FormEvent) {
     e.preventDefault();
-    if (!mt5Login.trim() || !effectiveServer || !mt5Password.trim()) {
+    const cleanLogin = mt5Login.trim();
+    const cleanServer = effectiveServer.trim();
+    const cleanPassword = mt5Password.trim();
+
+    if (!cleanLogin || !cleanServer || !cleanPassword) {
       setErrorMessage(
-        'Enter the client MT5 Login ID, Broker Server, and MT5 Trading Password to connect via MetaApi Cloud.'
+        'Enter the numeric MT5 Login ID, exact Broker Server, and MT5 Trading Password to connect via MetaApi Cloud.'
+      );
+      return;
+    }
+
+    if (!NUMERIC_MT5_LOGIN_RE.test(cleanLogin)) {
+      setErrorMessage(
+        'MT5 Login ID must be the numeric account number shown in MT5 (e.g. 12345678), not an EXN-... Exness ID.'
+      );
+      return;
+    }
+
+    if (BARE_SERVER_PREFIX_RE.test(cleanServer)) {
+      setErrorMessage(
+        `${cleanServer} is only the prefix. Pick the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8).`
       );
       return;
     }
@@ -215,9 +253,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
         {
           method: 'POST',
           body: JSON.stringify({
-            mt5Login: mt5Login.trim(),
-            mt5Server: effectiveServer,
-            mt5Password: mt5Password.trim(),
+            mt5Login: cleanLogin,
+            mt5Server: cleanServer,
+            mt5Password: cleanPassword,
             autoTrade: true,
             activeBot,
             riskPercent: Number(riskPercent) || 1.0,
@@ -513,30 +551,39 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
             <form onSubmit={handleConnectMt5} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Client MT5 Login ID
+                  Client MT5 Login ID (Numeric)
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]{4,16}"
                   required
                   value={mt5Login}
-                  onChange={(e) => setMt5Login(e.target.value)}
-                  placeholder="e.g. 192837465"
+                  onChange={(e) => setMt5Login(e.target.value.replace(/\s+/g, ''))}
+                  placeholder="e.g. 12345678"
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Enter the numeric MT5 account number shown in MT5 (not an EXN-... Exness ID).
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  MT5 Broker Server
+                  Exact MT5 Broker Server
                 </label>
                 <select
+                  required
                   value={serverPreset}
                   onChange={(e) => setServerPreset(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
                 >
+                  <option value="" disabled>
+                    -- Select numbered MT5 server (e.g. Exness-MT5Real8) --
+                  </option>
                   {PRESET_SERVERS.map((srv) => (
                     <option key={srv} value={srv}>
-                      {srv === 'CUSTOM' ? 'Other / Custom MT5 Server...' : srv}
+                      {srv === 'CUSTOM' ? 'Other / Custom Numbered MT5 Server...' : srv}
                     </option>
                   ))}
                 </select>
@@ -546,10 +593,13 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                     required
                     value={customServer}
                     onChange={(e) => setCustomServer(e.target.value)}
-                    placeholder="Enter exact MT5 Server (e.g. Exness-MT5Real18)"
+                    placeholder="Exact numbered MT5 server (e.g. Exness-MT5Real8)"
                     className="mt-2 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
                   />
                 )}
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Exness servers are numbered (e.g. <span className="font-mono">Exness-MT5Real8</span>). Match the exact server shown in the client&apos;s MT5 terminal.
+                </p>
               </div>
 
               <div>
@@ -561,10 +611,13 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                   required
                   value={mt5Password}
                   onChange={(e) => setMt5Password(e.target.value)}
-                  placeholder="Client MT5 trading password"
+                  placeholder="MT5 master trading password"
                   autoComplete="new-password"
                   className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
                 />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Use the account&apos;s MT5 trading password — not the read-only investor password or Exness portal login.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

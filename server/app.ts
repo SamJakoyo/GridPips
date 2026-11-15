@@ -1918,7 +1918,21 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
 
   if (!mt5Login || !mt5Server || !mt5Password) {
     res.status(400).json({
-      error: 'Enter your client MT5 Login ID, Broker Server (e.g. Exness-MT5Real), and MT5 Trading Password.',
+      error: 'Enter the numeric MT5 Login ID, exact Broker Server (e.g. Exness-MT5Real8), and MT5 Trading Password.',
+    });
+    return;
+  }
+
+  if (!/^\d{4,16}$/.test(mt5Login)) {
+    res.status(400).json({
+      error: 'MT5 Login ID must be the numeric account number from MT5 (e.g. 12345678), not an EXN-... Exness ID.',
+    });
+    return;
+  }
+
+  if (/^Exness-MT5(Real|Trial)$/i.test(mt5Server)) {
+    res.status(400).json({
+      error: `${mt5Server} is only the server prefix. Enter the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8).`,
     });
     return;
   }
