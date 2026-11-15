@@ -107,6 +107,8 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
     process.env.SUPABASE_PROJECT_REF,
     process.env.SUPABASE_PROJECT_ID,
     process.env.SUPABASE_DB_URL,
+    process.env.POSTGRES_URL,
+    process.env.POSTGRES_PRISMA_URL,
   ];
 
   const hasSecretKeyMisplacedInUrl = rawUrlCandidates.some(
@@ -129,6 +131,9 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
     process.env.SUPABASE_PUBLISHABLE_KEY,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
     process.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+    process.env.SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
+    process.env.VITE_SUPABASE_PUBLISHABLE_DEFAULT_KEY,
   ];
 
   let anonKey = '';
@@ -142,6 +147,7 @@ export function getSupabaseEnvConfig(): SupabaseEnvConfig {
 
   const serviceRoleKey =
     normalizeKey(process.env.SUPABASE_SERVICE_ROLE_KEY) ||
+    normalizeKey(process.env.SUPABASE_SERVICE_KEY) ||
     normalizeKey(process.env.SUPABASE_SECRET_KEY) ||
     rawUrlCandidates
       .map((v) => normalizeKey(v))
