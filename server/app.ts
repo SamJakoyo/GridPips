@@ -17,7 +17,6 @@ import {
 } from './security.ts';
 import {
   checkSupabaseHealth,
-  createSupabaseMediaCreation,
   createSupabasePlaybook,
   createSupabaseSavedSetup,
   deleteSupabasePlaybook,
@@ -27,7 +26,6 @@ import {
   getServerSupabaseAdminClient,
   getServerSupabaseClient,
   getSupabaseEnvConfig,
-  listSupabaseMediaCreations,
   listSupabasePlaybooks,
   listSupabaseSavedSetups,
   upsertSupabaseProfile,
@@ -43,14 +41,6 @@ import {
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
 import { getTradingViewLiveQuotes } from './tradingViewFeed.ts';
 import { getForexFactoryLiveFeed } from './forexFactory.ts';
-import {
-  formatGeminiApiError,
-  runGeminiChat,
-  runGeminiImageStudio,
-  runGeminiImageToVideo,
-  type ChatRoleKey,
-  type GeminiChatModel,
-} from './gemini.ts';
 
 try {
   initDatabase();
@@ -1399,214 +1389,6 @@ app.delete('/api/supabase/playbooks/:id', requireAuth, async (req: AuthedRequest
   } catch (err) {
     console.error('Delete playbook error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to delete playbook.' });
-  }
-});
-
-app.get('/api/supabase/media', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const sbAdmin = getServerSupabaseAdminClient();
-    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
-
-    if (sbAdmin && uid) {
-      const { items, error } = await listSupabaseMediaCreations(uid);
-      if (error) {
-        res.status(500).json({ error });
-        return;
-      }
-      res.json({
-        items: items.map((m) => ({
-          id: m.id,
-          kind: m.kind,
-          model: m.model,
-          prompt: m.prompt,
-          aspectRatio: m.aspect_ratio,
-          createdAt: m.created_at,
-        })),
-      });
-      return;
-    }
-
-    const rows = db
-      .prepare('SELECT * FROM media_creations WHERE user_id = ? ORDER BY id DESC LIMIT 25')
-      .all(req.currentUser!.id) as Array<{
-      id: number;
-      kind: 'image' | 'video';
-      model: string;
-      prompt: string;
-      aspect_ratio: string;
-      created_at: string;
-    }>;
-
-    res.json({
-      items: rows.map((m) => ({
-        id: String(m.id),
-        kind: m.kind,
-        model: m.model,
-        prompt: m.prompt,
-        aspectRatio: m.aspect_ratio,
-        createdAt: m.created_at,
-      })),
-    });
-  } catch (err) {
-    console.error('Load media history error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to load media history.' });
-  }
-});
-
-app.post('/api/supabase/media', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const kind = req.body?.kind === 'video' ? 'video' : 'image';
-    const model = sanitizeText(req.body?.model || 'gemini-nano-banana-2.1', 64);
-    const prompt = sanitizeText(req.body?.prompt || 'Media creation', 600);
-    const aspectRatio = sanitizeText(req.body?.aspectRatio || '1:1', 12);
-
-    const sbAdmin = getServerSupabaseAdminClient();
-    const uid = sbAdmin ? await resolveUserSupabaseUid(req.currentUser!) : null;
-
-    if (sbAdmin && uid) {
-      const { item, error } = await createSupabaseMediaCreation({
-        user_id: uid,
-        kind,
-        model,
-        prompt,
-        aspect_ratio: aspectRatio,
-      });
-      if (error || !item) {
-        res.status(500).json({ error: error || 'Unable to save media creation log to Supabase.' });
-        return;
-      }
-      res.status(201).json({
-        item: {
-          id: item.id,
-          kind: item.kind,
-          model: item.model,
-          prompt: item.prompt,
-          aspectRatio: item.aspect_ratio,
-          createdAt: item.created_at,
-        },
-      });
-      return;
-    }
-
-    const info = db
-      .prepare(
-        `INSERT INTO media_creations (user_id, kind, model, prompt, aspect_ratio)
-         VALUES (?, ?, ?, ?, ?)`
-      )
-      .run(req.currentUser!.id, kind, model, prompt, aspectRatio);
-    const row = db.prepare('SELECT * FROM media_creations WHERE id = ?').get(info.lastInsertRowid) as {
-      id: number;
-      kind: 'image' | 'video';
-      model: string;
-      prompt: string;
-      aspect_ratio: string;
-      created_at: string;
-    };
-
-    res.status(201).json({
-      item: {
-        id: String(row.id),
-        kind: row.kind,
-        model: row.model,
-        prompt: row.prompt,
-        aspectRatio: row.aspect_ratio,
-        createdAt: row.created_at,
-      },
-    });
-  } catch (err) {
-    console.error('Save media log error:', err);
-    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to save media log.' });
-  }
-});
-
-// ---------------- Gemini AI Desk, Search Grounding, Image & Video Studio ----------------
-app.post('/api/ai/chat', requireAuth, async (req: AuthedRequest, res) => {
-  const model = (req.body?.model || 'gemini-4-hydrogen') as GeminiChatModel;
-  try {
-    const message = sanitizeText(req.body?.message, 4000);
-    if (!message) {
-      res.status(400).json({ error: 'Message prompt is required.' });
-      return;
-    }
-    const rawHistory = Array.isArray(req.body?.history) ? req.body.history : [];
-    const history = rawHistory
-      .filter((h: { role?: unknown; text?: unknown }) => (h?.role === 'user' || h?.role === 'model') && typeof h?.text === 'string')
-      .map((h: { role: 'user' | 'model'; text: string }) => ({
-        role: h.role,
-        text: h.text.slice(0, 4000),
-      }));
-
-    const roleKey = (req.body?.roleKey || 'ict_mentor') as ChatRoleKey;
-    const useSearchGrounding = Boolean(req.body?.useSearchGrounding);
-    const deepReasoning = Boolean(req.body?.deepReasoning);
-
-    const result = await runGeminiChat({
-      message,
-      history,
-      model,
-      roleKey,
-      useSearchGrounding,
-      deepReasoning,
-    });
-    res.json(result);
-  } catch (err) {
-    const formatted = formatGeminiApiError(err, model);
-    res.status(formatted.status).json({ error: formatted.message });
-  }
-});
-
-app.post('/api/ai/image', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const prompt = sanitizeText(req.body?.prompt, 1200);
-    if (!prompt) {
-      res.status(400).json({ error: 'Image prompt is required.' });
-      return;
-    }
-    const aspectRatio = sanitizeText(req.body?.aspectRatio || '1:1', 10);
-    const imageSize = req.body?.imageSize === '2K' ? '2K' : '1K';
-    const sourceImageBase64 = typeof req.body?.sourceImageBase64 === 'string' ? req.body.sourceImageBase64 : undefined;
-    const sourceImageMimeType = sanitizeText(req.body?.sourceImageMimeType || 'image/png', 40);
-
-    const result = await runGeminiImageStudio({
-      prompt,
-      aspectRatio,
-      imageSize,
-      sourceImageBase64,
-      sourceImageMimeType,
-    });
-    res.json(result);
-  } catch (err) {
-    const formatted = formatGeminiApiError(err, 'gemini-nano-banana-2.1');
-    res.status(formatted.status).json({ error: formatted.message });
-  }
-});
-
-app.post('/api/ai/video', requireAuth, async (req: AuthedRequest, res) => {
-  try {
-    const prompt = sanitizeText(req.body?.prompt, 1000);
-    const imageBase64 = typeof req.body?.imageBase64 === 'string' ? req.body.imageBase64 : '';
-    const imageMimeType = sanitizeText(req.body?.imageMimeType || 'image/png', 40);
-    const aspectRatio = req.body?.aspectRatio === '9:16' ? '9:16' : '16:9';
-
-    if (!imageBase64) {
-      res.status(400).json({ error: 'Please upload a starting image to animate.' });
-      return;
-    }
-    if (!prompt) {
-      res.status(400).json({ error: 'Please provide a motion animation prompt.' });
-      return;
-    }
-
-    const result = await runGeminiImageToVideo({
-      prompt,
-      aspectRatio,
-      imageBase64,
-      imageMimeType,
-    });
-    res.json(result);
-  } catch (err) {
-    const formatted = formatGeminiApiError(err, 'gemini-omni-1.2-flash');
-    res.status(formatted.status).json({ error: formatted.message });
   }
 });
 

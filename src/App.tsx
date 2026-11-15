@@ -19,9 +19,6 @@ import {
   Users,
   X,
   ArrowUpRight,
-  Sparkles,
-  Film,
-  Box,
 } from 'lucide-react';
 import { apiFetch, clearSessionToken, setSessionToken, INITIAL_MARKET_QUOTES, type MarketSymbolQuote } from './lib/api';
 import { getSupabaseClient } from './lib/supabase';
@@ -48,8 +45,6 @@ import {
   ReferralsHubView,
 } from './components/OrdersAndReferralsViews';
 import { AdminDashboardView } from './components/AdminDashboardView';
-import { GeminiDeskView, MediaStudioView } from './components/AiStudioViews';
-import { ThreeLiquidityScene } from './components/ThreeLiquidityScene';
 import { BrandLogo } from './components/BrandLogo';
 
 type WorkspaceTab =
@@ -57,9 +52,6 @@ type WorkspaceTab =
   | 'analyzer'
   | 'eabots'
   | 'orders'
-  | 'aichat'
-  | 'mediastudio'
-  | 'liquidity3d'
   | 'charts'
   | 'journal'
   | 'analytics'
@@ -340,14 +332,6 @@ export default function App() {
       ],
     },
     {
-      label: 'AI & 3D Studio',
-      items: [
-        { id: 'aichat', name: 'Gemini Desk', icon: <Sparkles className="w-4 h-4" /> },
-        { id: 'mediastudio', name: 'Media Studio', icon: <Film className="w-4 h-4" /> },
-        { id: 'liquidity3d', name: '3D Liquidity Lab', icon: <Box className="w-4 h-4" /> },
-      ],
-    },
-    {
       label: 'Free Workspace',
       items: [
         { id: 'charts', name: 'Live Charts', icon: <CandlestickChart className="w-4 h-4" /> },
@@ -589,11 +573,6 @@ export default function App() {
               }
               onBuyNew={(productKey) => setCheckoutState({ productKey })}
             />
-          )}
-          {activeTab === 'aichat' && <GeminiDeskView />}
-          {activeTab === 'mediastudio' && <MediaStudioView />}
-          {activeTab === 'liquidity3d' && (
-            <ThreeLiquidityScene onExit={() => setActiveTab('overview')} />
           )}
           {activeTab === 'charts' && (
             <TradingViewChartsView
