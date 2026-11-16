@@ -4017,6 +4017,154 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
     );
   }
 
+  const userStats = db
+    .prepare(
+      `SELECT
+        COUNT(*) as totalUsers,
+        COALESCE(SUM(CASE WHEN last_login_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END), 0) as active24hUsers,
+        COALESCE(SUM(CASE WHEN last_login_at >= datetime('now', '-7 days') THEN 1 ELSE 0 END), 0) as active7dUsers,
+        COALESCE(SUM(CASE WHEN exness_verified = 1 THEN 1 ELSE 0 END), 0) as exnessVerifiedUsers,
+        COALESCE(SUM(CASE WHEN has_analyzer = 1 THEN 1 ELSE 0 END), 0) as analyzerHolders,
+        COALESCE(SUM(CASE WHEN has_ea_bots = 1 THEN 1 ELSE 0 END), 0) as eaBotHolders,
+        COALESCE(SUM(CASE WHEN mt5_connected = 1 THEN 1 ELSE 0 END), 0) as mt5ConnectedUsers,
+        COALESCE(SUM(wallet_balance_kes), 0) as totalWalletLiabilityKes
+       FROM users`
+    )
+    .get() as {
+    totalUsers: number;
+    active24hUsers: number;
+    active7dUsers: number;
+    exnessVerifiedUsers: number;
+    analyzerHolders: number;
+    eaBotHolders: number;
+    mt5ConnectedUsers: number;
+    totalWalletLiabilityKes: number;
+  };
+
+  const orderFunnel = db
+    .prepare(
+      `SELECT
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END), 0) as paidOrders,
+        COALESCE(SUM(CASE WHEN payment_status IN ('pending', 'processing') THEN 1 ELSE 0 END), 0) as pendingOrders,
+        COALESCE(SUM(CASE WHEN payment_status IN ('failed', 'refunded') THEN 1 ELSE 0 END), 0) as failedOrders
+       FROM orders`
+    )
+    .get() as {
+    totalOrders: number;
+    paidOrders: number;
+    pendingOrders: number;
+    failedOrders: number;
+  };
+
+  const engagementRow = db
+    .prepare(
+      `SELECT
+        (SELECT COUNT(*) FROM referral_clicks) as totalReferralClicks,
+        (SELECT COUNT(*) FROM referral_clicks WHERE created_at >= datetime('now', '-7 days')) as clicks7d,
+        (SELECT COUNT(*) FROM journal_trades) as journalTradesCount,
+        (SELECT COUNT(*) FROM saved_setups) as savedSetupsCount,
+        (SELECT COUNT(*) FROM strategy_playbooks) as playbooksCount,
+        (SELECT COUNT(*) FROM mt5_trade_commands) as mt5CommandsCount,
+        (SELECT COUNT(*) FROM email_logs) as emailsSentCount,
+        (SELECT COUNT(*) FROM security_logs WHERE severity = 'critical' AND created_at >= datetime('now', '-1 day')) as criticalAlerts24h`
+    )
+    .get() as {
+    totalReferralClicks: number;
+    clicks7d: number;
+    journalTradesCount: number;
+    savedSetupsCount: number;
+    playbooksCount: number;
+    mt5CommandsCount: number;
+    emailsSentCount: number;
+    criticalAlerts24h: number;
+  };
+
+  const productBreakdown = db
+    .prepare(
+      `SELECT
+        product_key as productKey,
+        product_name as productName,
+        COUNT(*) as totalAttempts,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END), 0) as paidCount,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_usd ELSE 0 END), 0) as revenueUsd,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_kes ELSE 0 END), 0) as revenueKes
+       FROM orders
+       GROUP BY product_key, product_name
+       ORDER BY revenueUsd DESC`
+    )
+    .all() as Array<{
+    productKey: string;
+    productName: string;
+    totalAttempts: number;
+    paidCount: number;
+    revenueUsd: number;
+    revenueKes: number;
+  }>;
+
+  const signupsByDay = db
+    .prepare(
+      `SELECT date(created_at) as day, COUNT(*) as count
+       FROM users
+       WHERE created_at >= date('now', '-6 days')
+       GROUP BY date(created_at)`
+    )
+    .all() as Array<{ day: string; count: number }>;
+  const ordersByDay = db
+    .prepare(
+      `SELECT
+        date(created_at) as day,
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END), 0) as paidOrders,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN amount_usd ELSE 0 END), 0) as revenueUsd
+       FROM orders
+       WHERE created_at >= date('now', '-6 days')
+       GROUP BY date(created_at)`
+    )
+    .all() as Array<{ day: string; totalOrders: number; paidOrders: number; revenueUsd: number }>;
+  const mpesaByDay = db
+    .prepare(
+      `SELECT
+        date(created_at) as day,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completedCount,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN amount_kes ELSE 0 END), 0) as completedKes
+       FROM mpesa_transactions
+       WHERE created_at >= date('now', '-6 days')
+       GROUP BY date(created_at)`
+    )
+    .all() as Array<{ day: string; completedCount: number; completedKes: number }>;
+
+  const signupsMap = new Map(signupsByDay.map((r) => [r.day, Number(r.count || 0)]));
+  const ordersMap = new Map(ordersByDay.map((r) => [r.day, r]));
+  const mpesaMap = new Map(mpesaByDay.map((r) => [r.day, r]));
+
+  const dailySeries = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(Date.now() - (6 - idx) * 86_400_000);
+    const day = d.toISOString().slice(0, 10);
+    const ord = ordersMap.get(day);
+    const mp = mpesaMap.get(day);
+    return {
+      day,
+      signups: signupsMap.get(day) ?? 0,
+      paidOrders: Number(ord?.paidOrders || 0),
+      totalOrders: Number(ord?.totalOrders || 0),
+      revenueUsd: Number(ord?.revenueUsd || 0),
+      mpesaCompletedCount: Number(mp?.completedCount || 0),
+      mpesaCompletedKes: Number(mp?.completedKes || 0),
+    };
+  });
+
+  const totalMpesaAttempts =
+    Number(mpesaMetricsRow.completedCount || 0) +
+    Number(mpesaMetricsRow.pendingCount || 0) +
+    Number(mpesaMetricsRow.failedOrCancelledCount || 0);
+  const orderConversionPct =
+    orderFunnel.totalOrders > 0 ? Math.round((orderFunnel.paidOrders / orderFunnel.totalOrders) * 1000) / 10 : 0;
+  const mpesaSuccessRatePct =
+    totalMpesaAttempts > 0
+      ? Math.round((Number(mpesaMetricsRow.completedCount || 0) / totalMpesaAttempts) * 1000) / 10
+      : 0;
+
   res.json({
     metrics: {
       totalRevenueUsd: Number(revenueRow.usd || 0),
@@ -4030,6 +4178,23 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
       completedCount: Number(mpesaMetricsRow.completedCount || 0),
       pendingCount: Number(mpesaMetricsRow.pendingCount || 0),
       failedOrCancelledCount: Number(mpesaMetricsRow.failedOrCancelledCount || 0),
+    },
+    websiteAnalytics: {
+      users: userStats,
+      orderFunnel: {
+        ...orderFunnel,
+        conversionPct: orderConversionPct,
+      },
+      mpesaFunnel: {
+        totalAttempts: totalMpesaAttempts,
+        completedCount: Number(mpesaMetricsRow.completedCount || 0),
+        pendingCount: Number(mpesaMetricsRow.pendingCount || 0),
+        failedOrCancelledCount: Number(mpesaMetricsRow.failedOrCancelledCount || 0),
+        successRatePct: mpesaSuccessRatePct,
+      },
+      engagement: engagementRow,
+      productBreakdown,
+      dailySeries,
     },
     mpesaConfigAudit: {
       configured: darajaStatus.configured,
@@ -4349,6 +4514,282 @@ app.post('/api/admin/domain/check', requireAdmin, async (req: AuthedRequest, res
     readyForCallbacks,
     recommendedCallbackUrl,
     diagnostics,
+  });
+});
+
+interface SiteCheckupItem {
+  id: string;
+  name: string;
+  category: 'Domain & SEO' | 'Payments' | 'Database & Auth' | 'Market Feeds' | 'Security';
+  status: 'pass' | 'warn' | 'fail';
+  latencyMs: number;
+  summary: string;
+  detail: string;
+}
+
+app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => {
+  const checkedAt = new Date().toISOString();
+  const settings = getSettingsMap();
+  const rawOrigin = (process.env.APP_URL || 'https://www.gridpips.com').trim().replace(/\/+$/, '');
+  const targetOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(rawOrigin)
+    ? 'https://www.gridpips.com'
+    : rawOrigin;
+
+  const checks: SiteCheckupItem[] = [];
+
+  // 1. Primary Website HTTPS Availability
+  const tWeb = Date.now();
+  try {
+    const webResp = await fetch(`${targetOrigin}/`, {
+      method: 'GET',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(7000),
+    });
+    const latencyMs = Date.now() - tWeb;
+    checks.push({
+      id: 'primary-web',
+      name: `Primary Domain (${targetOrigin.replace(/^https?:\/\//, '')})`,
+      category: 'Domain & SEO',
+      status: webResp.status === 200 ? 'pass' : webResp.status >= 300 && webResp.status < 400 ? 'warn' : 'fail',
+      latencyMs,
+      summary: `HTTP ${webResp.status}`,
+      detail:
+        webResp.status === 200
+          ? `Site served cleanly over HTTPS without redirects (${latencyMs}ms).`
+          : `Unexpected HTTP ${webResp.status}${webResp.headers.get('location') ? ` -> ${webResp.headers.get('location')}` : ''}.`,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'primary-web',
+      name: `Primary Domain (${targetOrigin.replace(/^https?:\/\//, '')})`,
+      category: 'Domain & SEO',
+      status: 'fail',
+      latencyMs: Date.now() - tWeb,
+      summary: 'Unreachable',
+      detail: err instanceof Error ? err.message : 'Unable to reach primary domain.',
+    });
+  }
+
+  // 2. Public M-Pesa Callback Endpoint
+  const cbUrl = `${targetOrigin}/api/payments/mpesa/callback`;
+  const tCb = Date.now();
+  try {
+    const cbResp = await fetch(cbUrl, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ping: true }),
+      signal: AbortSignal.timeout(7000),
+    });
+    const cbJson = (await cbResp.json().catch(() => null)) as { ResultCode?: number } | null;
+    const latencyMs = Date.now() - tCb;
+    const accepted = cbResp.status === 200 && cbJson?.ResultCode === 0;
+    const configuredCb = cleanMpesaEnvVar('MPESA_CALLBACK_URL');
+    const apexWarn = /^https?:\/\/gridpips\.com(\/|$)/i.test(configuredCb);
+    checks.push({
+      id: 'mpesa-callback',
+      name: 'M-Pesa Daraja Callback Endpoint',
+      category: 'Payments',
+      status: !accepted ? 'fail' : apexWarn ? 'warn' : 'pass',
+      latencyMs,
+      summary: accepted ? 'HTTP 200 · ResultCode 0' : `HTTP ${cbResp.status}`,
+      detail: !accepted
+        ? `Callback POST to ${cbUrl} did not return ResultCode 0.`
+        : apexWarn
+        ? `Endpoint works on ${cbUrl}, but MPESA_CALLBACK_URL currently uses apex gridpips.com (308 redirect).`
+        : `${cbUrl} accepts Safaricom POST callbacks directly with zero redirects.`,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'mpesa-callback',
+      name: 'M-Pesa Daraja Callback Endpoint',
+      category: 'Payments',
+      status: 'fail',
+      latencyMs: Date.now() - tCb,
+      summary: 'Probe failed',
+      detail: err instanceof Error ? err.message : 'Callback check failed.',
+    });
+  }
+
+  // 3. Daraja OAuth Authentication Check
+  const tDaraja = Date.now();
+  try {
+    const dRes = await testDarajaConnection(settings);
+    checks.push({
+      id: 'daraja-oauth',
+      name: 'Safaricom Daraja OAuth & Shortcode',
+      category: 'Payments',
+      status: dRes.ok ? (dRes.env === 'production' ? 'pass' : 'warn') : 'fail',
+      latencyMs: Date.now() - tDaraja,
+      summary: dRes.ok ? `${dRes.env.toUpperCase()} · SC ${dRes.shortCode} → Till ${dRes.partyB}` : `Auth Failed (${dRes.env})`,
+      detail: dRes.message,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'daraja-oauth',
+      name: 'Safaricom Daraja OAuth & Shortcode',
+      category: 'Payments',
+      status: 'fail',
+      latencyMs: Date.now() - tDaraja,
+      summary: 'Error',
+      detail: err instanceof Error ? err.message : 'Daraja check failed.',
+    });
+  }
+
+  // 4. Supabase Auth & Cloud DB Tables
+  const tSb = Date.now();
+  try {
+    const [sbHealth, cloudTables] = await Promise.all([checkSupabaseHealth(), checkCloudSyncTablesHealth()]);
+    const allOk = sbHealth.reachable && cloudTables.tablesReady;
+    checks.push({
+      id: 'supabase-cloud',
+      name: 'Supabase Auth & Cloud Sync Tables',
+      category: 'Database & Auth',
+      status: allOk ? 'pass' : sbHealth.reachable ? 'warn' : 'fail',
+      latencyMs: Date.now() - tSb,
+      summary: allOk ? 'Connected · All Tables Ready' : sbHealth.reachable ? 'Auth OK · Tables Missing' : 'Disconnected',
+      detail: allOk ? cloudTables.message : cloudTables.message || sbHealth.message,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'supabase-cloud',
+      name: 'Supabase Auth & Cloud Sync Tables',
+      category: 'Database & Auth',
+      status: 'fail',
+      latencyMs: Date.now() - tSb,
+      summary: 'Check failed',
+      detail: err instanceof Error ? err.message : 'Supabase check failed.',
+    });
+  }
+
+  // 5. TradingView Live Quotes Feed
+  const tQuotes = Date.now();
+  try {
+    const quotes = await getTradingViewLiveQuotes();
+    checks.push({
+      id: 'tv-quotes',
+      name: 'Live Market Quotes Feed (TradingView)',
+      category: 'Market Feeds',
+      status: quotes.length >= 6 ? 'pass' : 'warn',
+      latencyMs: Date.now() - tQuotes,
+      summary: `${quotes.length} Pairs Live`,
+      detail: `Active quote feed from tradingview.com (${quotes.map((q) => q.symbol).slice(0, 4).join(', ')}...).`,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'tv-quotes',
+      name: 'Live Market Quotes Feed (TradingView)',
+      category: 'Market Feeds',
+      status: 'fail',
+      latencyMs: Date.now() - tQuotes,
+      summary: 'Feed offline',
+      detail: err instanceof Error ? err.message : 'Market quotes failed.',
+    });
+  }
+
+  // 6. Forex Factory Economic Calendar & News
+  const tFf = Date.now();
+  try {
+    const ffRes = await getForexFactoryLiveFeed(false);
+    checks.push({
+      id: 'ff-calendar',
+      name: 'Forex Factory Calendar & News Feed',
+      category: 'Market Feeds',
+      status: ffRes.calendarIsFallback ? 'warn' : 'pass',
+      latencyMs: Date.now() - tFf,
+      summary: `${ffRes.events.length} Events · ${ffRes.news.length} Headlines`,
+      detail: ffRes.calendarIsFallback
+        ? `Using fallback calendar cache (${ffRes.calendarFeedProvider}).`
+        : `Streaming live via ${ffRes.calendarFeedProvider}.`,
+    });
+  } catch (err) {
+    checks.push({
+      id: 'ff-calendar',
+      name: 'Forex Factory Calendar & News Feed',
+      category: 'Market Feeds',
+      status: 'fail',
+      latencyMs: Date.now() - tFf,
+      summary: 'Feed failed',
+      detail: err instanceof Error ? err.message : 'Forex Factory check failed.',
+    });
+  }
+
+  // 7. SEO & Domain Consistency (robots.txt + sitemap.xml)
+  const tSeo = Date.now();
+  try {
+    const [robotsResp, sitemapResp] = await Promise.all([
+      fetch(`${targetOrigin}/robots.txt`, { signal: AbortSignal.timeout(5000) }),
+      fetch(`${targetOrigin}/sitemap.xml`, { signal: AbortSignal.timeout(5000) }),
+    ]);
+    const [robotsTxt, sitemapTxt] = await Promise.all([robotsResp.text(), sitemapResp.text()]);
+    const hasCustomDomain =
+      robotsTxt.includes('www.gridpips.com') && sitemapTxt.includes('www.gridpips.com');
+    checks.push({
+      id: 'seo-sitemap',
+      name: 'SEO Robots & Sitemap Canonicalization',
+      category: 'Domain & SEO',
+      status: robotsResp.status === 200 && sitemapResp.status === 200 && hasCustomDomain ? 'pass' : 'warn',
+      latencyMs: Date.now() - tSeo,
+      summary: hasCustomDomain ? 'Canonical www.gridpips.com' : 'Needs Vercel Redeploy',
+      detail: hasCustomDomain
+        ? 'robots.txt and sitemap.xml both serve https://www.gridpips.com/ cleanly.'
+        : 'Live robots.txt/sitemap.xml still point to vercel.app; redeploy Vercel to serve updated static files.',
+    });
+  } catch (err) {
+    checks.push({
+      id: 'seo-sitemap',
+      name: 'SEO Robots & Sitemap Canonicalization',
+      category: 'Domain & SEO',
+      status: 'warn',
+      latencyMs: Date.now() - tSeo,
+      summary: 'Check failed',
+      detail: err instanceof Error ? err.message : 'Unable to fetch robots.txt/sitemap.xml.',
+    });
+  }
+
+  // 8. Session Secret & Security Posture
+  const strongSecret = hasStrongSessionSecret();
+  const criticalCount = (
+    db
+      .prepare("SELECT COUNT(*) as cnt FROM security_logs WHERE severity = 'critical' AND created_at >= datetime('now', '-1 day')")
+      .get() as { cnt: number }
+  ).cnt;
+  checks.push({
+    id: 'security-session',
+    name: 'Session Signing & Security Posture',
+    category: 'Security',
+    status: !strongSecret ? 'warn' : criticalCount > 0 ? 'warn' : 'pass',
+    latencyMs: 0,
+    summary: strongSecret
+      ? `${criticalCount} critical alerts (24h)`
+      : 'SESSION_SECRET missing or <32 chars',
+    detail: strongSecret
+      ? `32+ char SESSION_SECRET active. ${criticalCount} critical security events recorded in the last 24h.`
+      : 'Add a random 32+ character SESSION_SECRET environment variable in Vercel Project Settings for persistent signed login sessions.',
+  });
+
+  const passed = checks.filter((c) => c.status === 'pass').length;
+  const warnings = checks.filter((c) => c.status === 'warn').length;
+  const failed = checks.filter((c) => c.status === 'fail').length;
+
+  logSecurityEvent(
+    'ADMIN_SITE_CHECKUP',
+    failed > 0 ? 'warning' : 'info',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Site checkup completed: ${passed} pass, ${warnings} warn, ${failed} fail`
+  );
+
+  res.json({
+    checkedAt,
+    targetOrigin,
+    summary: {
+      total: checks.length,
+      passed,
+      warnings,
+      failed,
+    },
+    checks,
   });
 });
 

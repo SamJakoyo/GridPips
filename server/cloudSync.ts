@@ -5,6 +5,7 @@ import { fetchSupabaseProfileByEmail, getServerSupabaseAdminClient } from './sup
 export interface CloudSyncStatus {
   configured: boolean;
   tablesReady: boolean;
+  missingTables?: string[];
   message: string;
 }
 
@@ -26,27 +27,40 @@ export async function checkCloudSyncTablesHealth(): Promise<CloudSyncStatus> {
   }
 
   try {
-    const { error } = await client
-      .from('gridpips_user_state')
-      .select('user_email', { count: 'exact', head: true });
-    if (error) {
-      if (isMissingTableError(error)) {
-        return {
-          configured: true,
-          tablesReady: false,
-          message: 'Run supabase/gridpips_cloud_tables.sql in Supabase SQL Editor to enable Cloud DB persistence for orders, journal, paper trading & MT5 links.',
-        };
-      }
+    const tablesToCheck = [
+      { name: 'gridpips_user_state', col: 'user_email' },
+      { name: 'gridpips_orders', col: 'order_number' },
+      { name: 'gridpips_mpesa_transactions', col: 'tx_reference' },
+    ];
+    const results = await Promise.all(
+      tablesToCheck.map(async (t) => {
+        const { error } = await client.from(t.name).select(t.col, { count: 'exact', head: true });
+        return { name: t.name, error };
+      })
+    );
+    const missingTables = results.filter((r) => isMissingTableError(r.error)).map((r) => r.name);
+    const otherError = results.find((r) => r.error && !isMissingTableError(r.error))?.error;
+
+    if (missingTables.length > 0) {
       return {
         configured: true,
         tablesReady: false,
-        message: `Supabase Cloud DB check error: ${error.message}`,
+        missingTables,
+        message: `Run supabase/gridpips_cloud_tables.sql in Supabase SQL Editor to create: ${missingTables.join(', ')}.`,
+      };
+    }
+    if (otherError) {
+      return {
+        configured: true,
+        tablesReady: false,
+        message: `Supabase Cloud DB check error: ${otherError.message}`,
       };
     }
     return {
       configured: true,
       tablesReady: true,
-      message: 'Cloud DB tables (orders, journal, paper, plans, MT5 state) are active.',
+      missingTables: [],
+      message: 'Cloud DB tables (user state, orders, journal, MT5 & M-Pesa ledger) are active.',
     };
   } catch (err) {
     return {

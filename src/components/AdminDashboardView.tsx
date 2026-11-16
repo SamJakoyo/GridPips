@@ -1,7 +1,83 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Check, XCircle, RefreshCw, Search, Smartphone } from 'lucide-react';
+import { ShieldAlert, Check, XCircle, RefreshCw, Search, Smartphone, Activity } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import type { EmailLogItem, MpesaTransaction, Order, SecurityLogItem } from '../types';
+
+interface WebsiteAnalyticsData {
+  users: {
+    totalUsers: number;
+    active24hUsers: number;
+    active7dUsers: number;
+    exnessVerifiedUsers: number;
+    analyzerHolders: number;
+    eaBotHolders: number;
+    mt5ConnectedUsers: number;
+    totalWalletLiabilityKes: number;
+  };
+  orderFunnel: {
+    totalOrders: number;
+    paidOrders: number;
+    pendingOrders: number;
+    failedOrders: number;
+    conversionPct: number;
+  };
+  mpesaFunnel: {
+    totalAttempts: number;
+    completedCount: number;
+    pendingCount: number;
+    failedOrCancelledCount: number;
+    successRatePct: number;
+  };
+  engagement: {
+    totalReferralClicks: number;
+    clicks7d: number;
+    journalTradesCount: number;
+    savedSetupsCount: number;
+    playbooksCount: number;
+    mt5CommandsCount: number;
+    emailsSentCount: number;
+    criticalAlerts24h: number;
+  };
+  productBreakdown: Array<{
+    productKey: string;
+    productName: string;
+    totalAttempts: number;
+    paidCount: number;
+    revenueUsd: number;
+    revenueKes: number;
+  }>;
+  dailySeries: Array<{
+    day: string;
+    signups: number;
+    paidOrders: number;
+    totalOrders: number;
+    revenueUsd: number;
+    mpesaCompletedCount: number;
+    mpesaCompletedKes: number;
+  }>;
+}
+
+interface SiteCheckupItem {
+  id: string;
+  name: string;
+  category: string;
+  status: 'pass' | 'warn' | 'fail';
+  latencyMs: number;
+  summary: string;
+  detail: string;
+}
+
+interface SiteCheckupResponse {
+  checkedAt: string;
+  targetOrigin: string;
+  summary: {
+    total: number;
+    passed: number;
+    warnings: number;
+    failed: number;
+  };
+  checks: SiteCheckupItem[];
+}
 
 interface AdminOverviewResponse {
   metrics: {
@@ -17,6 +93,7 @@ interface AdminOverviewResponse {
     pendingCount: number;
     failedOrCancelledCount: number;
   };
+  websiteAnalytics?: WebsiteAnalyticsData;
   mpesaConfigAudit?: {
     configured: boolean;
     env: 'sandbox' | 'production';
@@ -92,9 +169,12 @@ interface SupabaseHealthResponse {
 export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }> = ({
   onConfigSaved,
 }) => {
-  const [tab, setTab] = useState<'orders' | 'mpesa' | 'users' | 'security' | 'payouts' | 'emails' | 'settings'>('orders');
+  const [tab, setTab] = useState<'analytics' | 'orders' | 'mpesa' | 'users' | 'security' | 'payouts' | 'emails' | 'settings'>('analytics');
   const [data, setData] = useState<AdminOverviewResponse | null>(null);
   const [health, setHealth] = useState<SupabaseHealthResponse | null>(null);
+  const [checkupRunning, setCheckupRunning] = useState(false);
+  const [checkupError, setCheckupError] = useState('');
+  const [checkupResult, setCheckupResult] = useState<SiteCheckupResponse | null>(null);
   const [mpesaSearch, setMpesaSearch] = useState('');
   const [mpesaFilter, setMpesaFilter] = useState<'all' | 'completed' | 'pending' | 'cancelled' | 'failed'>('all');
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
@@ -120,6 +200,19 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
     diagnostics: string[];
   } | null>(null);
 
+  async function handleRunSiteCheckup() {
+    setCheckupRunning(true);
+    setCheckupError('');
+    try {
+      const res = await apiFetch<SiteCheckupResponse>('/api/admin/checkup', { method: 'POST' });
+      setCheckupResult(res);
+    } catch (err) {
+      setCheckupError(err instanceof Error ? err.message : 'Unable to complete website checkup.');
+    } finally {
+      setCheckupRunning(false);
+    }
+  }
+
   async function loadAdmin() {
     const [res, healthRes] = await Promise.all([
       apiFetch<AdminOverviewResponse>('/api/admin/overview'),
@@ -132,6 +225,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
   useEffect(() => {
     loadAdmin().catch(() => {});
+    handleRunSiteCheckup().catch(() => {});
   }, []);
 
   if (!data) {
@@ -286,6 +380,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
         <div className="flex flex-wrap gap-1 p-1 bg-slate-200/70 rounded-lg">
           {(
             [
+              ['analytics', 'Analytics & Checkups'],
               ['orders', 'Revenue & Orders'],
               ['mpesa', 'M-Pesa Deposits'],
               ['users', 'Users & Logins'],
@@ -298,7 +393,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
                 tab === key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
               }`}
             >
@@ -309,12 +404,295 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
         <button
           onClick={() => loadAdmin()}
-          className="px-3 py-1.5 border border-slate-300 bg-white text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer"
+          className="px-3 py-1.5 border border-slate-300 bg-white text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           Refresh
         </button>
       </div>
+
+      {/* Tab 0: Website Analytics & Live Checkups */}
+      {tab === 'analytics' && (
+        <div className="space-y-6">
+          {/* Funnel & Engagement KPIs */}
+          {data.websiteAnalytics && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <div className="text-xs text-slate-500">Active Accounts (24h / 7d)</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
+                  {data.websiteAnalytics.users.active24hUsers}{' '}
+                  <span className="text-sm font-normal text-slate-500">
+                    / {data.websiteAnalytics.users.active7dUsers}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1 tabular-nums">
+                  {data.websiteAnalytics.users.exnessVerifiedUsers} Exness verified ·{' '}
+                  {data.websiteAnalytics.users.mt5ConnectedUsers} MT5 linked
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <div className="text-xs text-slate-500">Checkout Conversion Rate</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 mt-1">
+                  {data.websiteAnalytics.orderFunnel.conversionPct.toFixed(1)}%
+                </div>
+                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                  {data.websiteAnalytics.orderFunnel.paidOrders} paid / {data.websiteAnalytics.orderFunnel.totalOrders}{' '}
+                  orders
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <div className="text-xs text-slate-500">M-Pesa STK Completion</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-blue-700 mt-1">
+                  {data.websiteAnalytics.mpesaFunnel.successRatePct.toFixed(1)}%
+                </div>
+                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                  {data.websiteAnalytics.mpesaFunnel.completedCount} ok ·{' '}
+                  {data.websiteAnalytics.mpesaFunnel.pendingCount} pending ·{' '}
+                  {data.websiteAnalytics.mpesaFunnel.failedOrCancelledCount} failed
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <div className="text-xs text-slate-500">Confirmed Wallet Liability</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
+                  KES {Number(data.websiteAnalytics.users.totalWalletLiabilityKes || 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                  {data.websiteAnalytics.engagement.totalReferralClicks} ref clicks ({data.websiteAnalytics.engagement.clicks7d}{' '}
+                  in 7d)
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Live Website Checkups & System Diagnostics */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-600" />
+                  Live Website Checkups &amp; Endpoint Diagnostics
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Probes live HTTPS availability, M-Pesa Daraja callback and OAuth auth, Supabase Cloud Postgres, market data feeds, SEO files, and session security.
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={checkupRunning}
+                onClick={() => void handleRunSiteCheckup()}
+                className="px-4 py-2 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg cursor-pointer disabled:opacity-60 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${checkupRunning ? 'animate-spin' : ''}`} />
+                {checkupRunning ? 'Running Checkups...' : 'Run Full Website Checkup'}
+              </button>
+            </div>
+
+            {checkupError && (
+              <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-700">
+                {checkupError}
+              </div>
+            )}
+
+            {checkupResult && (
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                  <div className="flex flex-wrap items-center gap-3 font-mono tabular-nums">
+                    <span className="font-semibold text-emerald-700">
+                      {checkupResult.summary.passed} PASSED
+                    </span>
+                    <span aria-hidden="true" className="text-slate-300">
+                      ·
+                    </span>
+                    <span className="font-semibold text-amber-700">
+                      {checkupResult.summary.warnings} WARNINGS
+                    </span>
+                    <span aria-hidden="true" className="text-slate-300">
+                      ·
+                    </span>
+                    <span className="font-semibold text-rose-700">
+                      {checkupResult.summary.failed} FAILED
+                    </span>
+                  </div>
+                  <div className="font-mono tabular-nums text-[11px] text-slate-500">
+                    Target: {checkupResult.targetOrigin} · Checked {new Date(checkupResult.checkedAt).toLocaleTimeString()}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2 pr-4">Category</th>
+                        <th className="py-2 pr-4">System Check</th>
+                        <th className="py-2 pr-4">Status</th>
+                        <th className="py-2 pr-4 text-right">Latency</th>
+                        <th className="py-2 pr-4">Result</th>
+                        <th className="py-2">Diagnostic Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {checkupResult.checks.map((chk) => (
+                        <tr key={chk.id} className="align-top">
+                          <td className="py-2.5 pr-4 text-slate-500 whitespace-nowrap">{chk.category}</td>
+                          <td className="py-2.5 pr-4 font-semibold text-slate-950 whitespace-nowrap">{chk.name}</td>
+                          <td className="py-2.5 pr-4 whitespace-nowrap font-mono font-bold">
+                            {chk.status === 'pass' ? (
+                              <span className="text-emerald-700">PASS</span>
+                            ) : chk.status === 'warn' ? (
+                              <span className="text-amber-700">WARN</span>
+                            ) : (
+                              <span className="text-rose-700">FAIL</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                            {chk.latencyMs > 0 ? `${chk.latencyMs} ms` : '—'}
+                          </td>
+                          <td className="py-2.5 pr-4 font-mono text-slate-900 whitespace-nowrap">{chk.summary}</td>
+                          <td className="py-2.5 text-slate-600">{chk.detail}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {!checkupResult && checkupRunning && (
+              <div className="py-8 text-center text-xs text-slate-500">
+                Running live diagnostics across domain, Daraja OAuth, Supabase, and market feeds...
+              </div>
+            )}
+          </div>
+
+          {/* 7-Day Trend + Product & Feature Engagement */}
+          {data.websiteAnalytics && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+                <div>
+                  <h3 className="text-base font-bold text-slate-950">7-Day Signup &amp; Revenue Activity</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Daily registrations, completed checkouts, and verified M-Pesa inflows (UTC).
+                  </p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2 pr-3">Date</th>
+                        <th className="py-2 pr-3 text-right">Signups</th>
+                        <th className="py-2 pr-3 text-right">Paid / Orders</th>
+                        <th className="py-2 pr-3 text-right">Revenue</th>
+                        <th className="py-2 text-right">M-Pesa KES</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
+                      {data.websiteAnalytics.dailySeries.map((row) => (
+                        <tr key={row.day}>
+                          <td className="py-2.5 pr-3 text-slate-700">{row.day}</td>
+                          <td className="py-2.5 pr-3 text-right font-semibold text-slate-950">{row.signups}</td>
+                          <td className="py-2.5 pr-3 text-right text-slate-700">
+                            {row.paidOrders} / {row.totalOrders}
+                          </td>
+                          <td className="py-2.5 pr-3 text-right font-semibold text-emerald-700">
+                            ${row.revenueUsd.toFixed(2)}
+                          </td>
+                          <td className="py-2.5 text-right text-slate-900">
+                            {row.mpesaCompletedKes > 0 ? `KES ${row.mpesaCompletedKes.toLocaleString()}` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+                <div>
+                  <h3 className="text-base font-bold text-slate-950">Product Sales &amp; Platform Engagement</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    License distribution and trader tool usage recorded across the platform.
+                  </p>
+                </div>
+
+                {data.websiteAnalytics.productBreakdown.length === 0 ? (
+                  <p className="text-xs text-slate-500 py-3">No product checkouts initiated yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-2 pr-3">Product</th>
+                          <th className="py-2 pr-3 text-right">Paid / Attempts</th>
+                          <th className="py-2 pr-3 text-right">USD</th>
+                          <th className="py-2 text-right">KES</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
+                        {data.websiteAnalytics.productBreakdown.map((prod) => (
+                          <tr key={prod.productKey}>
+                            <td className="py-2.5 pr-3 font-sans font-semibold text-slate-950">{prod.productName}</td>
+                            <td className="py-2.5 pr-3 text-right text-slate-700">
+                              {prod.paidCount} / {prod.totalAttempts}
+                            </td>
+                            <td className="py-2.5 pr-3 text-right font-semibold text-emerald-700">
+                              ${Number(prod.revenueUsd || 0).toFixed(2)}
+                            </td>
+                            <td className="py-2.5 text-right text-slate-700">
+                              KES {Number(prod.revenueKes || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <div className="text-slate-500">Analyzer Licenses</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.users.analyzerHolders}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">EA Bot Licenses</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.users.eaBotHolders}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Journal Trades Logged</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.engagement.journalTradesCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Saved ICT Setups</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.engagement.savedSetupsCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">MT5 Bridge Commands</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.engagement.mt5CommandsCount}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-slate-500">Automated Emails</div>
+                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                      {data.websiteAnalytics.engagement.emailsSentCount}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tab 1: Orders & Revenue */}
       {tab === 'orders' && (
