@@ -1,5 +1,6 @@
 import { db } from './db.ts';
-import { getServerSupabaseAdminClient } from './supabaseAuth.ts';
+import { hashPassword, generateSecureToken } from './security.ts';
+import { fetchSupabaseProfileByEmail, getServerSupabaseAdminClient } from './supabaseAuth.ts';
 
 export interface CloudSyncStatus {
   configured: boolean;
@@ -499,8 +500,8 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
         ).run(userId, JSON.stringify(state.watchlist_json));
       }
 
-      if (typeof state.wallet_balance_kes === 'number' && state.wallet_balance_kes > 0) {
-        db.prepare('UPDATE users SET wallet_balance_kes = MAX(wallet_balance_kes, ?) WHERE id = ?').run(
+      if (typeof state.wallet_balance_kes === 'number' && state.wallet_balance_kes >= 0) {
+        db.prepare('UPDATE users SET wallet_balance_kes = ? WHERE id = ?').run(
           Number(state.wallet_balance_kes),
           userId
         );
@@ -643,7 +644,315 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
         }
       }
     }
+
+    // Hydrate user's M-Pesa STK transactions from cloud
+    const { data: cloudMpesa } = await client
+      .from('gridpips_mpesa_transactions')
+      .select('*')
+      .eq('user_email', cleanEmail)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (Array.isArray(cloudMpesa) && cloudMpesa.length > 0) {
+      const upsertTx = db.prepare(
+        `INSERT INTO mpesa_transactions (
+          tx_reference, user_id, order_id, purpose, business_short_code, party_b, transaction_type,
+          phone_number, amount_kes, merchant_request_id, checkout_request_id, mpesa_receipt_number,
+          result_code, result_desc, status, credited_to_wallet, transaction_date, callback_received_at,
+          source_ip, created_at, updated_at
+        ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(tx_reference) DO UPDATE SET
+          mpesa_receipt_number = COALESCE(excluded.mpesa_receipt_number, mpesa_transactions.mpesa_receipt_number),
+          result_code = COALESCE(excluded.result_code, mpesa_transactions.result_code),
+          result_desc = COALESCE(excluded.result_desc, mpesa_transactions.result_desc),
+          status = CASE
+            WHEN mpesa_transactions.status = 'completed' THEN 'completed'
+            ELSE excluded.status
+          END,
+          credited_to_wallet = MAX(mpesa_transactions.credited_to_wallet, excluded.credited_to_wallet),
+          updated_at = datetime('now')`
+      );
+      for (const m of cloudMpesa) {
+        upsertTx.run(
+          m.tx_reference,
+          userId,
+          m.purpose || 'wallet_deposit',
+          m.business_short_code || '1443082',
+          m.party_b || '1921416',
+          m.transaction_type || 'CustomerBuyGoodsOnline',
+          m.phone_number || '',
+          Number(m.amount_kes || 0),
+          m.merchant_request_id ?? null,
+          m.checkout_request_id ?? null,
+          m.mpesa_receipt_number ?? null,
+          m.result_code ?? null,
+          m.result_desc ?? null,
+          m.status || 'pending',
+          m.credited_to_wallet ? 1 : 0,
+          m.transaction_date ?? null,
+          m.callback_received_at ?? null,
+          m.source_ip ?? null,
+          m.created_at || new Date().toISOString(),
+          m.updated_at || new Date().toISOString()
+        );
+      }
+    }
   } catch (err) {
     console.warn('Cloud hydration warning:', err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function ensureLocalMirrorUserByEmail(email: string): Promise<number | null> {
+  const cleanEmail = email.toLowerCase();
+  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(cleanEmail) as
+    | { id: number }
+    | undefined;
+  if (existing) return existing.id;
+
+  const { profile } = await fetchSupabaseProfileByEmail(cleanEmail).catch(() => ({ profile: null }));
+  const refCode =
+    profile?.referral_code ||
+    `TRADER${Math.floor(100 + Math.random() * 899)}${Date.now().toString(36).slice(-2).toUpperCase()}`;
+
+  const info = db
+    .prepare(
+      `INSERT INTO users (
+        supabase_uid, name, email, password_hash, role, exness_account_id, exness_email,
+        exness_verified, referral_code, has_analyzer, has_ea_bots, mt5_bridge_token
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      profile?.id ?? null,
+      profile?.full_name || cleanEmail.split('@')[0] || 'Trader',
+      cleanEmail,
+      hashPassword(generateSecureToken(24)),
+      profile?.role || 'user',
+      profile?.exness_account_id || 'EXN-PENDING',
+      cleanEmail,
+      profile?.exness_verified ? 1 : 0,
+      refCode,
+      profile?.has_analyzer ? 1 : 0,
+      profile?.has_ea_bots ? 1 : 0,
+      generateSecureToken(16)
+    );
+  const newUserId = Number(info.lastInsertRowid);
+  db.prepare('INSERT OR IGNORE INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(newUserId);
+
+  const client = getServerSupabaseAdminClient();
+  if (client) {
+    const { data: state } = await client
+      .from('gridpips_user_state')
+      .select('wallet_balance_kes')
+      .eq('user_email', cleanEmail)
+      .maybeSingle();
+    if (state && typeof state.wallet_balance_kes === 'number') {
+      db.prepare('UPDATE users SET wallet_balance_kes = ? WHERE id = ?').run(
+        Number(state.wallet_balance_kes),
+        newUserId
+      );
+    }
+  }
+  return newUserId;
+}
+
+/**
+ * Ensures Daraja callbacks routed to a cold serverless container (e.g. Vercel /tmp SQLite)
+ * and polling requests routed across containers stay consistent with Supabase Cloud Postgres.
+ */
+export async function hydrateMpesaCheckoutFromCloud(checkoutRequestId: string): Promise<void> {
+  const client = getServerSupabaseAdminClient();
+  if (!client || !checkoutRequestId) return;
+
+  try {
+    const [{ data: cloudTx }, { data: cloudOrder }] = await Promise.all([
+      client
+        .from('gridpips_mpesa_transactions')
+        .select('*')
+        .eq('checkout_request_id', checkoutRequestId)
+        .maybeSingle(),
+      client
+        .from('gridpips_orders')
+        .select('*')
+        .eq('mpesa_checkout_id', checkoutRequestId)
+        .maybeSingle(),
+    ]);
+
+    let hydratedOrderId: number | null = null;
+    if (cloudOrder && cloudOrder.user_email) {
+      const userId = await ensureLocalMirrorUserByEmail(String(cloudOrder.user_email));
+      if (userId) {
+        db.prepare(
+          `INSERT INTO orders (
+            order_number, user_id, product_key, product_name, amount_usd, amount_kes,
+            payment_method, payment_status, mpesa_phone, mpesa_receipt, mpesa_checkout_id,
+            mpesa_merchant_request_id, mpesa_result_code, mpesa_result_desc,
+            crypto_currency, crypto_network, crypto_address, crypto_tx_hash, commission_usd,
+            created_at, paid_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(order_number) DO UPDATE SET
+            payment_status = CASE WHEN orders.payment_status = 'paid' THEN 'paid' ELSE excluded.payment_status END,
+            mpesa_receipt = COALESCE(excluded.mpesa_receipt, orders.mpesa_receipt),
+            mpesa_checkout_id = COALESCE(excluded.mpesa_checkout_id, orders.mpesa_checkout_id),
+            mpesa_merchant_request_id = COALESCE(excluded.mpesa_merchant_request_id, orders.mpesa_merchant_request_id),
+            mpesa_result_code = COALESCE(excluded.mpesa_result_code, orders.mpesa_result_code),
+            mpesa_result_desc = COALESCE(excluded.mpesa_result_desc, orders.mpesa_result_desc),
+            paid_at = COALESCE(excluded.paid_at, orders.paid_at)`
+        ).run(
+          cloudOrder.order_number,
+          userId,
+          cloudOrder.product_key,
+          cloudOrder.product_name,
+          cloudOrder.amount_usd,
+          cloudOrder.amount_kes ?? 0,
+          cloudOrder.payment_method,
+          cloudOrder.payment_status,
+          cloudOrder.mpesa_phone,
+          cloudOrder.mpesa_receipt,
+          cloudOrder.mpesa_checkout_id,
+          cloudOrder.mpesa_merchant_request_id ?? null,
+          cloudOrder.mpesa_result_code ?? null,
+          cloudOrder.mpesa_result_desc ?? null,
+          cloudOrder.crypto_currency,
+          cloudOrder.crypto_network,
+          cloudOrder.crypto_address,
+          cloudOrder.crypto_tx_hash,
+          cloudOrder.commission_usd ?? 0,
+          cloudOrder.created_at || new Date().toISOString(),
+          cloudOrder.paid_at
+        );
+        if (cloudOrder.payment_status === 'paid') {
+          if (cloudOrder.product_key === 'analyzer') {
+            db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(userId);
+          } else if (cloudOrder.product_key === 'ea_bots') {
+            db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(userId);
+          }
+        }
+        const ordRow = db
+          .prepare('SELECT id FROM orders WHERE order_number = ?')
+          .get(cloudOrder.order_number) as { id: number } | undefined;
+        hydratedOrderId = ordRow?.id ?? null;
+      }
+    }
+
+    if (cloudTx && cloudTx.user_email) {
+      const userId = await ensureLocalMirrorUserByEmail(String(cloudTx.user_email));
+      if (userId) {
+        db.prepare(
+          `INSERT INTO mpesa_transactions (
+            tx_reference, user_id, order_id, purpose, business_short_code, party_b, transaction_type,
+            phone_number, amount_kes, merchant_request_id, checkout_request_id, mpesa_receipt_number,
+            result_code, result_desc, status, credited_to_wallet, transaction_date, callback_received_at,
+            source_ip, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(tx_reference) DO UPDATE SET
+            mpesa_receipt_number = COALESCE(excluded.mpesa_receipt_number, mpesa_transactions.mpesa_receipt_number),
+            result_code = COALESCE(excluded.result_code, mpesa_transactions.result_code),
+            result_desc = COALESCE(excluded.result_desc, mpesa_transactions.result_desc),
+            status = CASE WHEN mpesa_transactions.status = 'completed' THEN 'completed' ELSE excluded.status END,
+            credited_to_wallet = MAX(mpesa_transactions.credited_to_wallet, excluded.credited_to_wallet),
+            transaction_date = COALESCE(excluded.transaction_date, mpesa_transactions.transaction_date),
+            callback_received_at = COALESCE(excluded.callback_received_at, mpesa_transactions.callback_received_at),
+            source_ip = COALESCE(excluded.source_ip, mpesa_transactions.source_ip),
+            updated_at = datetime('now')`
+        ).run(
+          cloudTx.tx_reference,
+          userId,
+          hydratedOrderId,
+          cloudTx.purpose || 'wallet_deposit',
+          cloudTx.business_short_code || '1443082',
+          cloudTx.party_b || '1921416',
+          cloudTx.transaction_type || 'CustomerBuyGoodsOnline',
+          cloudTx.phone_number || '',
+          Number(cloudTx.amount_kes || 0),
+          cloudTx.merchant_request_id ?? null,
+          cloudTx.checkout_request_id ?? null,
+          cloudTx.mpesa_receipt_number ?? null,
+          cloudTx.result_code ?? null,
+          cloudTx.result_desc ?? null,
+          cloudTx.status || 'pending',
+          cloudTx.credited_to_wallet ? 1 : 0,
+          cloudTx.transaction_date ?? null,
+          cloudTx.callback_received_at ?? null,
+          cloudTx.source_ip ?? null,
+          cloudTx.created_at || new Date().toISOString(),
+          cloudTx.updated_at || new Date().toISOString()
+        );
+        if (cloudTx.credited_to_wallet) {
+          const { data: state } = await client
+            .from('gridpips_user_state')
+            .select('wallet_balance_kes')
+            .eq('user_email', String(cloudTx.user_email).toLowerCase())
+            .maybeSingle();
+          if (state && typeof state.wallet_balance_kes === 'number') {
+            db.prepare('UPDATE users SET wallet_balance_kes = MAX(wallet_balance_kes, ?) WHERE id = ?').run(
+              Number(state.wallet_balance_kes),
+              userId
+            );
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Cloud M-Pesa checkout hydration error:', err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function syncAllCloudMpesaTransactionsToLocal(): Promise<void> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) return;
+
+  try {
+    const { data: rows, error } = await client
+      .from('gridpips_mpesa_transactions')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(150);
+    if (error || !Array.isArray(rows) || rows.length === 0) return;
+
+    const upsertStmt = db.prepare(
+      `INSERT INTO mpesa_transactions (
+        tx_reference, user_id, order_id, purpose, business_short_code, party_b, transaction_type,
+        phone_number, amount_kes, merchant_request_id, checkout_request_id, mpesa_receipt_number,
+        result_code, result_desc, status, credited_to_wallet, transaction_date, callback_received_at,
+        source_ip, created_at, updated_at
+      ) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tx_reference) DO UPDATE SET
+        mpesa_receipt_number = COALESCE(excluded.mpesa_receipt_number, mpesa_transactions.mpesa_receipt_number),
+        result_code = COALESCE(excluded.result_code, mpesa_transactions.result_code),
+        result_desc = COALESCE(excluded.result_desc, mpesa_transactions.result_desc),
+        status = CASE WHEN mpesa_transactions.status = 'completed' THEN 'completed' ELSE excluded.status END,
+        credited_to_wallet = MAX(mpesa_transactions.credited_to_wallet, excluded.credited_to_wallet),
+        source_ip = COALESCE(excluded.source_ip, mpesa_transactions.source_ip),
+        updated_at = datetime('now')`
+    );
+
+    for (const m of rows) {
+      if (!m.user_email) continue;
+      const userId = await ensureLocalMirrorUserByEmail(String(m.user_email));
+      if (!userId) continue;
+      upsertStmt.run(
+        m.tx_reference,
+        userId,
+        m.purpose || 'wallet_deposit',
+        m.business_short_code || '1443082',
+        m.party_b || '1921416',
+        m.transaction_type || 'CustomerBuyGoodsOnline',
+        m.phone_number || '',
+        Number(m.amount_kes || 0),
+        m.merchant_request_id ?? null,
+        m.checkout_request_id ?? null,
+        m.mpesa_receipt_number ?? null,
+        m.result_code ?? null,
+        m.result_desc ?? null,
+        m.status || 'pending',
+        m.credited_to_wallet ? 1 : 0,
+        m.transaction_date ?? null,
+        m.callback_received_at ?? null,
+        m.source_ip ?? null,
+        m.created_at || new Date().toISOString(),
+        m.updated_at || new Date().toISOString()
+      );
+    }
+  } catch (err) {
+    console.warn('Cloud M-Pesa admin sync warning:', err instanceof Error ? err.message : String(err));
   }
 }

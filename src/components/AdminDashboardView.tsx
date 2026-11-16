@@ -102,6 +102,23 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
   const [feedback, setFeedback] = useState('');
   const [darajaTesting, setDarajaTesting] = useState(false);
   const [darajaTestResult, setDarajaTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [domainInput, setDomainInput] = useState('www.gridpips.com');
+  const [domainChecking, setDomainChecking] = useState(false);
+  const [domainCheckError, setDomainCheckError] = useState('');
+  const [domainCheckResult, setDomainCheckResult] = useState<{
+    domain: string;
+    dnsRecords: { a: string[]; cname: string[] };
+    pointsToVercel: boolean;
+    healthStatus: number | null;
+    healthEnv: string | null;
+    healthRedirectLocation: string | null;
+    callbackStatus: number | null;
+    callbackRedirectLocation: string | null;
+    callbackAccepted: boolean;
+    readyForCallbacks: boolean;
+    recommendedCallbackUrl: string | null;
+    diagnostics: string[];
+  } | null>(null);
 
   async function loadAdmin() {
     const [res, healthRes] = await Promise.all([
@@ -209,6 +226,25 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       });
     } finally {
       setDarajaTesting(false);
+    }
+  }
+
+  async function handleCheckDomain(e: React.FormEvent) {
+    e.preventDefault();
+    if (!domainInput.trim()) return;
+    setDomainChecking(true);
+    setDomainCheckError('');
+    setDomainCheckResult(null);
+    try {
+      const res = await apiFetch<NonNullable<typeof domainCheckResult>>('/api/admin/domain/check', {
+        method: 'POST',
+        body: JSON.stringify({ domain: domainInput.trim() }),
+      });
+      setDomainCheckResult(res);
+    } catch (err) {
+      setDomainCheckError(err instanceof Error ? err.message : 'Domain verification failed.');
+    } finally {
+      setDomainChecking(false);
     }
   }
 
@@ -884,6 +920,73 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       {darajaTestResult.message}
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-slate-200 space-y-2">
+                    <div className="font-semibold text-slate-900">
+                      Test Custom Domain (Namecheap DNS) &amp; Callback URL
+                    </div>
+                    <form onSubmit={handleCheckDomain} className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={domainInput}
+                        onChange={(e) => setDomainInput(e.target.value)}
+                        placeholder="gridpips.com or app.yourdomain.com"
+                        className="flex-1 min-w-[220px] px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-md focus:outline-none focus:border-slate-900 font-mono"
+                      />
+                      <button
+                        type="submit"
+                        disabled={domainChecking || !domainInput.trim()}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
+                      >
+                        {domainChecking ? 'Checking DNS & HTTPS...' : 'Check Domain'}
+                      </button>
+                    </form>
+                    {domainCheckError && (
+                      <div className="p-2.5 rounded-md border bg-rose-50 border-rose-200 text-rose-700 text-xs">
+                        {domainCheckError}
+                      </div>
+                    )}
+                    {domainCheckResult && (
+                      <div
+                        className={`p-3 rounded-md border text-xs space-y-1.5 ${
+                          domainCheckResult.readyForCallbacks
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                            : 'bg-amber-50 border-amber-200 text-amber-900'
+                        }`}
+                      >
+                        <div className="font-semibold flex flex-wrap items-center justify-between gap-2">
+                          <span>
+                            {domainCheckResult.domain}:{' '}
+                            {domainCheckResult.readyForCallbacks
+                              ? 'Ready for Safaricom M-Pesa Callbacks'
+                              : 'Action Required Before Using as Callback Host'}
+                          </span>
+                          <span className="font-mono text-[11px]">
+                            Vercel DNS: {domainCheckResult.pointsToVercel ? 'YES' : 'NO'} · /api/health:{' '}
+                            {domainCheckResult.healthStatus ?? 'ERR'} · Callback POST:{' '}
+                            {domainCheckResult.callbackStatus ?? 'ERR'}
+                          </span>
+                        </div>
+                        <div className="font-mono text-[11px] text-slate-700">
+                          A: {domainCheckResult.dnsRecords.a.join(', ') || 'none'} · CNAME:{' '}
+                          {domainCheckResult.dnsRecords.cname.join(', ') || 'none'}
+                          {domainCheckResult.healthEnv ? ` · Live Env: ${domainCheckResult.healthEnv}` : ''}
+                        </div>
+                        {domainCheckResult.recommendedCallbackUrl && (
+                          <div className="font-mono text-[11px] bg-white/80 border border-emerald-300 rounded px-2 py-1 text-emerald-900 break-all">
+                            MPESA_CALLBACK_URL={domainCheckResult.recommendedCallbackUrl}
+                          </div>
+                        )}
+                        {domainCheckResult.diagnostics.length > 0 && (
+                          <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                            {domainCheckResult.diagnostics.map((d, i) => (
+                              <li key={i}>{d}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

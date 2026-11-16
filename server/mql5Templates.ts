@@ -3,7 +3,7 @@ function sanitizeMqlString(val: string): string {
 }
 
 export function buildSilverBulletEa(bridgeUrl: string, bridgeToken: string): string {
-  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://grid-pips.vercel.app/api/ea/mt5/heartbeat';
+  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://www.gridpips.com/api/ea/mt5/heartbeat';
   const safeToken = sanitizeMqlString(bridgeToken) || 'PASTE_YOUR_BRIDGE_TOKEN_HERE';
 
   return `//+------------------------------------------------------------------+
@@ -323,7 +323,7 @@ void SyncWithGRIDPIPsBridge(string eventStatus)
 }
 
 export function buildSmcOrderBlockEa(bridgeUrl: string, bridgeToken: string): string {
-  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://grid-pips.vercel.app/api/ea/mt5/heartbeat';
+  const safeUrl = sanitizeMqlString(bridgeUrl) || 'https://www.gridpips.com/api/ea/mt5/heartbeat';
   const safeToken = sanitizeMqlString(bridgeToken) || 'PASTE_YOUR_BRIDGE_TOKEN_HERE';
 
   return `//+------------------------------------------------------------------+
@@ -599,12 +599,12 @@ void SyncWithGRIDPIPsBridge(string eventStatus)
 }
 
 export const ICT_SILVER_BULLET_MQ5 = buildSilverBulletEa(
-  'https://grid-pips.vercel.app/api/ea/mt5/heartbeat',
+  'https://www.gridpips.com/api/ea/mt5/heartbeat',
   'PASTE_YOUR_BRIDGE_TOKEN_HERE'
 );
 
 export const SMC_ORDERBLOCK_MQ5 = buildSmcOrderBlockEa(
-  'https://grid-pips.vercel.app/api/ea/mt5/heartbeat',
+  'https://www.gridpips.com/api/ea/mt5/heartbeat',
   'PASTE_YOUR_BRIDGE_TOKEN_HERE'
 );
 

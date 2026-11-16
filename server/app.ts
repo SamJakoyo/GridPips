@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import dns from 'node:dns/promises';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
@@ -60,15 +61,18 @@ import {
 import {
   checkCloudSyncTablesHealth,
   deleteCloudJournalTrade,
+  hydrateMpesaCheckoutFromCloud,
   hydrateUserFromCloud,
   insertCloudJournalTrade,
   insertCloudMt5Command,
+  syncAllCloudMpesaTransactionsToLocal,
   syncUserStateToCloud,
   upsertCloudMpesaTransaction,
   upsertCloudOrder,
 } from './cloudSync.ts';
 import { runCloudAutoTradePass } from './autoTradeEngine.ts';
 import {
+  cleanMpesaEnvVar,
   clearDarajaTokenCache,
   getDarajaConfigStatus,
   initiateDarajaStkPush,
@@ -1680,8 +1684,7 @@ async function fulfillOrder(orderId: number): Promise<void> {
     db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
   }
 
-  void upsertCloudOrder(orderId);
-  void syncUserStateToCloud(order.user_id);
+  await Promise.all([upsertCloudOrder(orderId), syncUserStateToCloud(order.user_id)]);
 
   if (alreadyPaid) return;
 
@@ -1828,9 +1831,28 @@ const settleMpesaTxAndCreditWallet = db.transaction(
 );
 
 function resolveDarajaCallbackUrl(req: Request): string {
-  const configured = (process.env.MPESA_CALLBACK_URL || '').trim();
-  if (configured) return configured;
-  return `${resolvePublicAppOrigin(req)}/api/payments/mpesa/callback`;
+  const configured = cleanMpesaEnvVar('MPESA_CALLBACK_URL');
+  if (configured) {
+    if (/^https?:\/\/gridpips\.com(\/|$)/i.test(configured)) {
+      return configured.replace(/^https?:\/\/gridpips\.com/i, 'https://www.gridpips.com');
+    }
+    return configured;
+  }
+  const host = (req.get('host') || '').toLowerCase();
+  if (
+    host &&
+    !host.startsWith('localhost') &&
+    !host.startsWith('127.0.0.1') &&
+    !host.includes('ais-dev-') &&
+    !host.includes('ais-pre-') &&
+    host !== 'gridpips.com'
+  ) {
+    return `https://${host}/api/payments/mpesa/callback`;
+  }
+  const fallbackOrigin = (process.env.APP_URL || 'https://www.gridpips.com')
+    .replace(/\/+$/, '')
+    .replace(/^https?:\/\/gridpips\.com$/i, 'https://www.gridpips.com');
+  return `${fallbackOrigin}/api/payments/mpesa/callback`;
 }
 
 app.post('/api/orders/:id/mpesa/stk', requireAuth, async (req: AuthedRequest, res) => {
@@ -1925,8 +1947,10 @@ app.post('/api/orders/:id/mpesa/stk', requireAuth, async (req: AuthedRequest, re
         stkResult.customerMessage
       );
 
-    void upsertCloudOrder(order.id);
-    void upsertCloudMpesaTransaction(Number(txInfo.lastInsertRowid));
+    await Promise.all([
+      upsertCloudOrder(order.id),
+      upsertCloudMpesaTransaction(Number(txInfo.lastInsertRowid)),
+    ]);
     logSecurityEvent(
       'DARAJA_STK_INITIATED',
       'info',
@@ -2023,7 +2047,7 @@ app.post('/api/orders/:id/wallet/pay', requireAuth, async (req: AuthedRequest, r
 
 app.get('/api/orders/:id/mpesa/status', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
-  const order = db
+  let order = db
     .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
     .get(orderId, req.currentUser!.id) as
     | {
@@ -2040,6 +2064,14 @@ app.get('/api/orders/:id/mpesa/status', requireAuth, async (req: AuthedRequest, 
   if (!order) {
     res.status(404).json({ error: 'Order not found.' });
     return;
+  }
+
+  if (order.payment_status !== 'paid' && order.mpesa_checkout_id) {
+    await hydrateMpesaCheckoutFromCloud(order.mpesa_checkout_id).catch(() => {});
+    const refreshed = db
+      .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+      .get(orderId, req.currentUser!.id) as typeof order;
+    if (refreshed) order = refreshed;
   }
 
   if (order.payment_status === 'paid') {
@@ -2086,7 +2118,7 @@ app.get('/api/orders/:id/mpesa/status', requireAuth, async (req: AuthedRequest, 
             rawCallbackJson: null,
             fromCallback: false,
           });
-          void upsertCloudMpesaTransaction(matchingTx.id);
+          await upsertCloudMpesaTransaction(matchingTx.id);
         }
         await fulfillOrder(order.id);
         const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
@@ -2273,7 +2305,8 @@ app.post('/api/orders/:id/mpesa/reset', requireAuth, (req: AuthedRequest, res) =
 });
 
 // ---------------- Customer Wallet Deposits (Safaricom Daraja STK Push) ----------------
-app.get('/api/wallet/summary', requireAuth, (req: AuthedRequest, res) => {
+app.get('/api/wallet/summary', requireAuth, async (req: AuthedRequest, res) => {
+  await hydrateUserFromCloud(req.currentUser!.id, req.currentUser!.email).catch(() => {});
   const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
   const transactions = db
     .prepare(
@@ -2346,7 +2379,7 @@ app.post('/api/wallet/mpesa/deposit', requireAuth, async (req: AuthedRequest, re
       );
 
     const txId = Number(info.lastInsertRowid);
-    void upsertCloudMpesaTransaction(txId);
+    await upsertCloudMpesaTransaction(txId);
     logSecurityEvent(
       'DARAJA_WALLET_STK_INITIATED',
       'info',
@@ -2381,13 +2414,21 @@ app.post('/api/wallet/mpesa/deposit', requireAuth, async (req: AuthedRequest, re
 
 app.get('/api/wallet/mpesa/:id/status', requireAuth, async (req: AuthedRequest, res) => {
   const txId = Number(req.params.id);
-  const tx = db
+  let tx = db
     .prepare('SELECT * FROM mpesa_transactions WHERE id = ? AND user_id = ?')
     .get(txId, req.currentUser!.id) as DbMpesaTx | undefined;
 
   if (!tx) {
     res.status(404).json({ error: 'M-Pesa transaction not found.' });
     return;
+  }
+
+  if (tx.status === 'pending' && tx.checkout_request_id) {
+    await hydrateMpesaCheckoutFromCloud(tx.checkout_request_id).catch(() => {});
+    const refreshed = db
+      .prepare('SELECT * FROM mpesa_transactions WHERE id = ? AND user_id = ?')
+      .get(txId, req.currentUser!.id) as DbMpesaTx | undefined;
+    if (refreshed) tx = refreshed;
   }
 
   if (tx.status === 'completed') {
@@ -2430,9 +2471,9 @@ app.get('/api/wallet/mpesa/:id/status', requireAuth, async (req: AuthedRequest, 
           rawCallbackJson: null,
           fromCallback: false,
         });
-        void upsertCloudMpesaTransaction(tx.id);
+        await upsertCloudMpesaTransaction(tx.id);
         if (outcome.newlyCredited) {
-          void syncUserStateToCloud(req.currentUser!.id);
+          await syncUserStateToCloud(req.currentUser!.id);
           logSecurityEvent(
             'WALLET_CREDITED_STK_QUERY',
             'info',
@@ -2459,7 +2500,7 @@ app.get('/api/wallet/mpesa/:id/status', requireAuth, async (req: AuthedRequest, 
            SET status = ?, result_code = ?, result_desc = ?, updated_at = datetime('now')
            WHERE id = ? AND status = 'pending'`
         ).run(nextStatus, queryRes.resultCode, queryRes.resultDesc, tx.id);
-        void upsertCloudMpesaTransaction(tx.id);
+        await upsertCloudMpesaTransaction(tx.id);
         const updatedTx = db.prepare('SELECT * FROM mpesa_transactions WHERE id = ?').get(tx.id);
         const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
         res.json({
@@ -2501,7 +2542,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
   const clientIp = getClientIp(req);
   try {
     // 1. Optional shared callback secret enforcement when MPESA_CALLBACK_SECRET is set
-    const callbackSecret = (process.env.MPESA_CALLBACK_SECRET || '').trim();
+    const callbackSecret = cleanMpesaEnvVar('MPESA_CALLBACK_SECRET');
     if (callbackSecret) {
       const providedToken = String(req.query.token || req.headers['x-mpesa-callback-secret'] || '').trim();
       if (providedToken !== callbackSecret) {
@@ -2530,10 +2571,10 @@ async function handleDarajaCallback(req: Request, res: Response) {
       return;
     }
 
-    const tx = db
+    let tx = db
       .prepare('SELECT * FROM mpesa_transactions WHERE checkout_request_id = ?')
       .get(parsed.checkoutRequestId) as DbMpesaTx | undefined;
-    const order = db
+    let order = db
       .prepare('SELECT * FROM orders WHERE mpesa_checkout_id = ?')
       .get(parsed.checkoutRequestId) as
       | {
@@ -2545,7 +2586,18 @@ async function handleDarajaCallback(req: Request, res: Response) {
         }
       | undefined;
 
-    // 2. Reject fabricated / unknown CheckoutRequestID payloads
+    // 2. Hydrate from Supabase Cloud Postgres if callback arrived at a cold serverless instance
+    if (!tx && !order) {
+      await hydrateMpesaCheckoutFromCloud(parsed.checkoutRequestId);
+      tx = db
+        .prepare('SELECT * FROM mpesa_transactions WHERE checkout_request_id = ?')
+        .get(parsed.checkoutRequestId) as DbMpesaTx | undefined;
+      order = db
+        .prepare('SELECT * FROM orders WHERE mpesa_checkout_id = ?')
+        .get(parsed.checkoutRequestId) as typeof order;
+    }
+
+    // 2b. Reject fabricated / unknown CheckoutRequestID payloads
     if (!tx && !order) {
       logSecurityEvent(
         'DARAJA_CALLBACK_UNKNOWN_CHECKOUT',
@@ -2643,7 +2695,29 @@ async function handleDarajaCallback(req: Request, res: Response) {
         )
         .get(parsed.mpesaReceiptNumber, parsed.checkoutRequestId) as { id: number } | undefined;
 
-      if (duplicateReceiptTx || duplicateReceiptOrder) {
+      let cloudDuplicateReceipt = false;
+      const sbAdmin = getServerSupabaseAdminClient();
+      if (sbAdmin && !duplicateReceiptTx && !duplicateReceiptOrder) {
+        const [{ data: sbDupTx }, { data: sbDupOrder }] = await Promise.all([
+          sbAdmin
+            .from('gridpips_mpesa_transactions')
+            .select('checkout_request_id')
+            .eq('mpesa_receipt_number', parsed.mpesaReceiptNumber)
+            .neq('checkout_request_id', parsed.checkoutRequestId)
+            .limit(1)
+            .maybeSingle(),
+          sbAdmin
+            .from('gridpips_orders')
+            .select('mpesa_checkout_id')
+            .eq('mpesa_receipt', parsed.mpesaReceiptNumber)
+            .neq('mpesa_checkout_id', parsed.checkoutRequestId)
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        cloudDuplicateReceipt = Boolean(sbDupTx || sbDupOrder);
+      }
+
+      if (duplicateReceiptTx || duplicateReceiptOrder || cloudDuplicateReceipt) {
         logSecurityEvent(
           'DARAJA_DUPLICATE_RECEIPT_BLOCKED',
           'critical',
@@ -2659,6 +2733,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
       const amountOk = parsed.amount === null || parsed.amount >= Math.max(1, expectedAmountKes - 1);
       if (!amountOk) {
         const mismatchMsg = `Received KES ${parsed.amount} which is less than expected KES ${expectedAmountKes}.`;
+        const cloudSaves: Array<Promise<void>> = [];
         if (tx) {
           db.prepare(
             `UPDATE mpesa_transactions
@@ -2672,7 +2747,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
                  updated_at = datetime('now')
              WHERE id = ?`
           ).run(mismatchMsg, parsed.mpesaReceiptNumber, clientIp, rawCallbackJson, tx.id);
-          void upsertCloudMpesaTransaction(tx.id);
+          cloudSaves.push(upsertCloudMpesaTransaction(tx.id));
         }
         if (order) {
           db.prepare(
@@ -2682,8 +2757,9 @@ async function handleDarajaCallback(req: Request, res: Response) {
                  mpesa_result_desc = ?
              WHERE id = ?`
           ).run(mismatchMsg, order.id);
-          void upsertCloudOrder(order.id);
+          cloudSaves.push(upsertCloudOrder(order.id));
         }
+        await Promise.all(cloudSaves);
         logSecurityEvent('DARAJA_AMOUNT_MISMATCH', 'critical', clientIp, null, mismatchMsg);
         res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
         return;
@@ -2701,9 +2777,11 @@ async function handleDarajaCallback(req: Request, res: Response) {
           rawCallbackJson,
           fromCallback: true,
         });
-        void upsertCloudMpesaTransaction(tx.id);
+        await Promise.all([
+          upsertCloudMpesaTransaction(tx.id),
+          outcome.newlyCredited ? syncUserStateToCloud(outcome.userId) : Promise.resolve(),
+        ]);
         if (outcome.newlyCredited) {
-          void syncUserStateToCloud(outcome.userId);
           const owner = db.prepare('SELECT email FROM users WHERE id = ?').get(outcome.userId) as
             | { email: string }
             | undefined;
@@ -2715,7 +2793,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
             `Wallet credited KES ${outcome.amountKes} · Ref ${tx.tx_reference} · Receipt ${parsed.mpesaReceiptNumber}`
           );
           if (owner?.email) {
-            void sendAutomatedEmail({
+            await sendAutomatedEmail({
               to: owner.email,
               subject: `GRIDPIPs Wallet Deposit Confirmed — ${tx.tx_reference}`,
               category: 'wallet_deposit',
@@ -2759,6 +2837,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
       // Failed or user-cancelled STK Push
       const readableDesc = mapDarajaResultMessage(String(parsed.resultCode), parsed.resultDesc);
       const nextStatus = parsed.resultCode === 1032 ? 'cancelled' : 'failed';
+      const cloudSaves: Array<Promise<void>> = [];
 
       if (tx && tx.status === 'pending') {
         db.prepare(
@@ -2772,7 +2851,7 @@ async function handleDarajaCallback(req: Request, res: Response) {
                updated_at = datetime('now')
            WHERE id = ? AND status = 'pending'`
         ).run(nextStatus, String(parsed.resultCode), readableDesc, clientIp, rawCallbackJson, tx.id);
-        void upsertCloudMpesaTransaction(tx.id);
+        cloudSaves.push(upsertCloudMpesaTransaction(tx.id));
       }
 
       if (order && order.payment_status !== 'paid') {
@@ -2783,9 +2862,10 @@ async function handleDarajaCallback(req: Request, res: Response) {
                mpesa_result_desc = ?
            WHERE id = ?`
         ).run(String(parsed.resultCode), readableDesc, order.id);
-        void upsertCloudOrder(order.id);
+        cloudSaves.push(upsertCloudOrder(order.id));
       }
 
+      await Promise.all(cloudSaves);
       logSecurityEvent(
         nextStatus === 'cancelled' ? 'DARAJA_CALLBACK_CANCELLED' : 'DARAJA_CALLBACK_FAILED',
         'warning',
@@ -2990,7 +3070,7 @@ function resolvePublicAppOrigin(req: Request): string {
     const proto = req.headers['x-forwarded-proto'] === 'https' || req.secure ? 'https' : req.protocol;
     return `${proto}://${host}`.replace(/\/+$/, '');
   }
-  return (process.env.APP_URL || 'https://grid-pips.vercel.app').replace(/\/+$/, '');
+  return (process.env.APP_URL || 'https://www.gridpips.com').replace(/\/+$/, '');
 }
 
 app.get('/api/ea/source/:bot', requireAuth, (req: AuthedRequest, res) => {
@@ -3862,7 +3942,8 @@ app.post('/api/referrals/payout', requireAuth, async (req: AuthedRequest, res) =
 });
 
 // ---------------- Admin Command Center ----------------
-app.get('/api/admin/overview', requireAdmin, (_req, res) => {
+app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
+  await syncAllCloudMpesaTransactionsToLocal().catch(() => {});
   const revenueRow = db
     .prepare("SELECT COALESCE(SUM(amount_usd), 0) as usd, COALESCE(SUM(amount_kes), 0) as kes, COUNT(*) as count FROM orders WHERE payment_status = 'paid'")
     .get() as { usd: number; kes: number; count: number };
@@ -3914,8 +3995,8 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   const emailLogs = db.prepare('SELECT * FROM email_logs ORDER BY id DESC LIMIT 60').all();
   const settings = getSettingsMap();
   const darajaStatus = getDarajaConfigStatus(settings);
-  const rawEnv = (process.env.MPESA_ENV || '').trim();
-  const configuredCallbackUrl = (process.env.MPESA_CALLBACK_URL || '').trim();
+  const rawEnv = cleanMpesaEnvVar('MPESA_ENV');
+  const configuredCallbackUrl = cleanMpesaEnvVar('MPESA_CALLBACK_URL');
   const mismatchWarnings: string[] = [];
   if (darajaStatus.env === 'sandbox' && darajaStatus.shortCode && darajaStatus.shortCode !== '174379') {
     mismatchWarnings.push(
@@ -3924,11 +4005,15 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   }
   if (!configuredCallbackUrl) {
     mismatchWarnings.push(
-      'MPESA_CALLBACK_URL is not set. Set it to https://<your-public-deployed-domain>/api/payments/mpesa/callback after deploying.'
+      'MPESA_CALLBACK_URL is not explicitly set. Recommended value: https://www.gridpips.com/api/payments/mpesa/callback'
     );
   } else if (configuredCallbackUrl.includes('ais-dev-')) {
     mismatchWarnings.push(
-      'MPESA_CALLBACK_URL currently points to an authenticated ais-dev preview URL (returns 302 login wall). Update it to a public unauthenticated HTTPS domain.'
+      'MPESA_CALLBACK_URL currently points to an authenticated ais-dev preview URL (returns 302 login wall). Update it to https://www.gridpips.com/api/payments/mpesa/callback'
+    );
+  } else if (/^https?:\/\/gridpips\.com(\/|$)/i.test(configuredCallbackUrl)) {
+    mismatchWarnings.push(
+      'MPESA_CALLBACK_URL uses apex gridpips.com which returns HTTP 308 redirect to www.gridpips.com. Update MPESA_CALLBACK_URL to https://www.gridpips.com/api/payments/mpesa/callback so Safaricom callbacks hit HTTP 200 directly.'
     );
   }
 
@@ -3950,14 +4035,14 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       configured: darajaStatus.configured,
       env: darajaStatus.env,
       rawEnvSet: Boolean(rawEnv),
-      consumerKeySet: Boolean((process.env.MPESA_CONSUMER_KEY || '').trim()),
-      consumerSecretSet: Boolean((process.env.MPESA_CONSUMER_SECRET || '').trim()),
-      passkeySet: Boolean((process.env.MPESA_PASSKEY || '').trim()),
+      consumerKeySet: Boolean(cleanMpesaEnvVar('MPESA_CONSUMER_KEY')),
+      consumerSecretSet: Boolean(cleanMpesaEnvVar('MPESA_CONSUMER_SECRET')),
+      passkeySet: Boolean(cleanMpesaEnvVar('MPESA_PASSKEY')),
       shortCode: darajaStatus.shortCode,
       partyB: darajaStatus.partyB,
       transactionType: darajaStatus.transactionType,
       callbackUrl: configuredCallbackUrl || null,
-      callbackSecretSet: Boolean((process.env.MPESA_CALLBACK_SECRET || '').trim()),
+      callbackSecretSet: Boolean(cleanMpesaEnvVar('MPESA_CALLBACK_SECRET')),
       mismatchWarnings,
     },
     users,
@@ -4116,6 +4201,154 @@ app.post('/api/admin/mpesa/reset-stale', requireAdmin, (req: AuthedRequest, res)
     ok: true,
     resetCount: info.changes + txInfo.changes,
     message: `Cleared Daraja OAuth cache, reset ${info.changes} incomplete STK order(s) and ${txInfo.changes} pending M-Pesa transaction(s).`,
+  });
+});
+
+function isPrivateOrReservedIpv4(ip: string): boolean {
+  const parts = ip.split('.').map((n) => Number(n));
+  if (parts.length !== 4 || parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
+  const [a, b] = parts;
+  if (a === 10 || a === 127 || a === 0) return true;
+  if (a === 169 && b === 254) return true;
+  if (a === 172 && b >= 16 && b <= 31) return true;
+  if (a === 192 && b === 168) return true;
+  if (a === 100 && b >= 64 && b <= 127) return true;
+  if (a >= 224) return true;
+  return false;
+}
+
+app.post('/api/admin/domain/check', requireAdmin, async (req: AuthedRequest, res) => {
+  const rawInput = sanitizeText(req.body?.domain, 253)
+    .trim()
+    .replace(/^https?:\/\//i, '')
+    .split('/')[0]
+    .split('?')[0]
+    .split('#')[0]
+    .split(':')[0]
+    .toLowerCase();
+
+  if (
+    !rawInput ||
+    rawInput === 'localhost' ||
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(rawInput) ||
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$/.test(rawInput)
+  ) {
+    res.status(400).json({
+      error: 'Enter a valid public domain hostname (e.g. gridpips.com or app.gridpips.com).',
+    });
+    return;
+  }
+
+  let aRecords: string[] = [];
+  let cnameRecords: string[] = [];
+  try {
+    aRecords = await dns.resolve4(rawInput).catch(() => []);
+    cnameRecords = await dns.resolveCname(rawInput).catch(() => []);
+  } catch {
+    // handled below
+  }
+
+  const diagnostics: string[] = [];
+  if (aRecords.length === 0 && cnameRecords.length === 0) {
+    diagnostics.push(
+      `No DNS A or CNAME records found for ${rawInput}. In Namecheap Advanced DNS, add A Record @ -> 76.76.21.21 and CNAME www -> cname.vercel-dns.com.`
+    );
+  } else if (aRecords.some(isPrivateOrReservedIpv4)) {
+    res.status(400).json({ error: 'Domain resolves to a private or reserved IP address.' });
+    return;
+  }
+
+  const pointsToVercel =
+    aRecords.some((ip) => ip === '76.76.21.21' || ip.startsWith('76.76.21.') || ip.startsWith('216.198.79.')) ||
+    cnameRecords.some((host) => /vercel-dns\.com$|vercel\.app$/i.test(host));
+
+  if ((aRecords.length > 0 || cnameRecords.length > 0) && !pointsToVercel) {
+    diagnostics.push(
+      `DNS for ${rawInput} resolves to ${aRecords.join(', ') || cnameRecords.join(', ')}, which does not look like Vercel DNS (76.76.21.21 or cname.vercel-dns.com). Ensure Vercel project Domains shows "Valid Configuration" and wait for propagation.`
+    );
+  }
+
+  let healthStatus: number | null = null;
+  let healthEnv: string | null = null;
+  let healthRedirectLocation: string | null = null;
+  let callbackStatus: number | null = null;
+  let callbackRedirectLocation: string | null = null;
+  let callbackAccepted = false;
+
+  if (aRecords.length > 0 || cnameRecords.length > 0) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000);
+    try {
+      const healthResp = await fetch(`https://${rawInput}/api/health`, {
+        method: 'GET',
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+      healthStatus = healthResp.status;
+      healthRedirectLocation = healthResp.headers.get('location');
+      if (healthResp.status === 200) {
+        const body = (await healthResp.json().catch(() => null)) as { mpesaDarajaEnv?: string } | null;
+        healthEnv = body?.mpesaDarajaEnv || null;
+      } else if (healthResp.status >= 300 && healthResp.status < 400) {
+        diagnostics.push(
+          `${rawInput} redirects (${healthResp.status} -> ${healthRedirectLocation || 'another host'}). Safaricom Daraja drops POST callbacks on HTTP redirects; use the final non-redirecting hostname as MPESA_CALLBACK_URL.`
+        );
+      }
+
+      const cbResp = await fetch(`https://${rawInput}/api/payments/mpesa/callback`, {
+        method: 'POST',
+        redirect: 'manual',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ping: true }),
+        signal: controller.signal,
+      });
+      callbackStatus = cbResp.status;
+      callbackRedirectLocation = cbResp.headers.get('location');
+      if (cbResp.status === 200) {
+        const cbJson = (await cbResp.json().catch(() => null)) as { ResultCode?: number } | null;
+        callbackAccepted = cbJson?.ResultCode === 0;
+      } else if (cbResp.status >= 300 && cbResp.status < 400) {
+        diagnostics.push(
+          `POST /api/payments/mpesa/callback returned ${cbResp.status} redirect to ${callbackRedirectLocation || 'another host'}. Add this exact domain without redirect as your Vercel Primary Domain, or use the redirect target in MPESA_CALLBACK_URL.`
+        );
+      } else {
+        diagnostics.push(
+          `POST /api/payments/mpesa/callback returned HTTP ${cbResp.status} instead of HTTP 200.`
+        );
+      }
+    } catch (err) {
+      diagnostics.push(
+        `HTTPS check failed for ${rawInput}: ${err instanceof Error ? err.message : 'TLS/network error'}. Wait for Vercel SSL certificate provisioning to complete.`
+      );
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  const readyForCallbacks = healthStatus === 200 && callbackStatus === 200 && callbackAccepted;
+  const recommendedCallbackUrl = readyForCallbacks ? `https://${rawInput}/api/payments/mpesa/callback` : null;
+
+  logSecurityEvent(
+    'ADMIN_DOMAIN_CHECK',
+    readyForCallbacks ? 'info' : 'warning',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Domain check ${rawInput}: ready=${readyForCallbacks} health=${healthStatus ?? 'err'} callback=${callbackStatus ?? 'err'}`
+  );
+
+  res.json({
+    domain: rawInput,
+    dnsRecords: { a: aRecords, cname: cnameRecords },
+    pointsToVercel,
+    healthStatus,
+    healthEnv,
+    healthRedirectLocation,
+    callbackStatus,
+    callbackRedirectLocation,
+    callbackAccepted,
+    readyForCallbacks,
+    recommendedCallbackUrl,
+    diagnostics,
   });
 });
 

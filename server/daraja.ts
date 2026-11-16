@@ -51,8 +51,20 @@ export interface DarajaParsedCallback {
 
 let cachedToken: { cacheKey: string; token: string; expiresAtMs: number } | null = null;
 
+export function cleanMpesaEnvVar(name: string): string {
+  let val = (process.env[name] || '').trim();
+  if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+    val = val.slice(1, -1).trim();
+  }
+  return val;
+}
+
+function isPlaceholderCredential(val: string): boolean {
+  return /^<.*>$/.test(val) || /^YOUR_/i.test(val) || /^REPLACE_/i.test(val);
+}
+
 export function getDarajaEnv(): DarajaEnv {
-  const raw = (process.env.MPESA_ENV || '').trim().toLowerCase();
+  const raw = cleanMpesaEnvVar('MPESA_ENV').toLowerCase();
   return raw === 'production' || raw === 'prod' || raw === 'live' ? 'production' : 'sandbox';
 }
 
@@ -86,20 +98,20 @@ export function isSafaricomCallbackIp(ip: string): boolean {
 
 export function getDarajaConfigStatus(settings?: Record<string, string>): DarajaConfigStatus {
   const env = getDarajaEnv();
-  const consumerKey = (process.env.MPESA_CONSUMER_KEY || '').trim();
-  const consumerSecret = (process.env.MPESA_CONSUMER_SECRET || '').trim();
-  const passkey = (process.env.MPESA_PASSKEY || '').trim();
-  const shortCode = (process.env.MPESA_SHORTCODE || '').trim();
+  const consumerKey = cleanMpesaEnvVar('MPESA_CONSUMER_KEY');
+  const consumerSecret = cleanMpesaEnvVar('MPESA_CONSUMER_SECRET');
+  const passkey = cleanMpesaEnvVar('MPESA_PASSKEY');
+  const shortCode = cleanMpesaEnvVar('MPESA_SHORTCODE');
 
   const isDarajaSandboxTestShortcode = shortCode === '174379';
-  const envPartyB = (process.env.MPESA_PARTY_B || '').trim();
+  const envPartyB = cleanMpesaEnvVar('MPESA_PARTY_B');
   const settingsPartyB = (settings?.mpesa_party_b || settings?.mpesa_till_number || '').trim();
   const usableSettingsPartyB =
     !isDarajaSandboxTestShortcode && settingsPartyB ? settingsPartyB : '';
 
   const partyB = envPartyB || usableSettingsPartyB || shortCode;
 
-  const envTxType = (process.env.MPESA_TRANSACTION_TYPE || '').trim();
+  const envTxType = cleanMpesaEnvVar('MPESA_TRANSACTION_TYPE');
   const settingsTxType = (settings?.mpesa_transaction_type || '').trim();
 
   let transactionType: DarajaTransactionType = 'CustomerPayBillOnline';
@@ -178,19 +190,11 @@ export function mapDarajaResultMessage(code: string, fallbackDesc?: string): str
   }
 }
 
-export async function getDarajaAccessToken(forceRefresh = false): Promise<string> {
-  const consumerKey = (process.env.MPESA_CONSUMER_KEY || '').trim();
-  const consumerSecret = (process.env.MPESA_CONSUMER_SECRET || '').trim();
-  if (!consumerKey || !consumerSecret) {
-    throw new Error('Missing MPESA_CONSUMER_KEY or MPESA_CONSUMER_SECRET.');
-  }
-
-  const env = getDarajaEnv();
-  const cacheKey = `${env}:${consumerKey.slice(0, 8)}`;
-  if (!forceRefresh && cachedToken && cachedToken.cacheKey === cacheKey && cachedToken.expiresAtMs > Date.now() + 60_000) {
-    return cachedToken.token;
-  }
-
+async function requestOAuthTokenForEnv(
+  env: DarajaEnv,
+  consumerKey: string,
+  consumerSecret: string
+): Promise<{ token: string; expiresInSec: number }> {
   const credentials = Buffer.from(`${consumerKey}:${consumerSecret}`, 'utf8').toString('base64');
   const url = `${getDarajaBaseUrl(env)}/oauth/v1/generate?grant_type=client_credentials`;
 
@@ -203,28 +207,64 @@ export async function getDarajaAccessToken(forceRefresh = false): Promise<string
     signal: AbortSignal.timeout(12_000),
   });
 
-  const payload = (await resp.json().catch(() => ({}))) as {
+  const rawText = await resp.text();
+  let payload: {
     access_token?: string;
     expires_in?: string | number;
     errorMessage?: string;
     error_description?: string;
-  };
+    error?: string;
+    Fault?: { faultstring?: string };
+  } = {};
+  try {
+    payload = rawText ? (JSON.parse(rawText) as typeof payload) : {};
+  } catch {
+    payload = {};
+  }
 
   if (!resp.ok || !payload.access_token) {
-    throw new Error(
+    const detail =
       payload.errorMessage ||
-        payload.error_description ||
-        `Safaricom Daraja OAuth failed (HTTP ${resp.status}). Verify Consumer Key & Secret for ${env}.`
+      payload.error_description ||
+      payload.Fault?.faultstring ||
+      payload.error ||
+      rawText.replace(/<[^>]+>/g, ' ').trim().slice(0, 140);
+    throw new Error(
+      `Safaricom Daraja OAuth failed (HTTP ${resp.status}) on ${env}${detail ? `: ${detail}` : '.'}`
     );
   }
 
-  const expiresInSec = Math.max(120, Number(payload.expires_in || 3599));
+  return {
+    token: payload.access_token,
+    expiresInSec: Math.max(120, Number(payload.expires_in || 3599)),
+  };
+}
+
+export async function getDarajaAccessToken(forceRefresh = false): Promise<string> {
+  const consumerKey = cleanMpesaEnvVar('MPESA_CONSUMER_KEY');
+  const consumerSecret = cleanMpesaEnvVar('MPESA_CONSUMER_SECRET');
+  if (!consumerKey || !consumerSecret) {
+    throw new Error('Missing MPESA_CONSUMER_KEY or MPESA_CONSUMER_SECRET.');
+  }
+  if (isPlaceholderCredential(consumerKey) || isPlaceholderCredential(consumerSecret)) {
+    throw new Error(
+      'MPESA_CONSUMER_KEY or MPESA_CONSUMER_SECRET still contains a placeholder value (<Your...>). Paste your real Daraja app keys in Environment Variables.'
+    );
+  }
+
+  const env = getDarajaEnv();
+  const cacheKey = `${env}:${consumerKey.slice(0, 8)}`;
+  if (!forceRefresh && cachedToken && cachedToken.cacheKey === cacheKey && cachedToken.expiresAtMs > Date.now() + 60_000) {
+    return cachedToken.token;
+  }
+
+  const { token, expiresInSec } = await requestOAuthTokenForEnv(env, consumerKey, consumerSecret);
   cachedToken = {
     cacheKey,
-    token: payload.access_token,
+    token,
     expiresAtMs: Date.now() + expiresInSec * 1000,
   };
-  return payload.access_token;
+  return token;
 }
 
 export async function testDarajaConnection(settings?: Record<string, string>): Promise<{
@@ -247,15 +287,68 @@ export async function testDarajaConnection(settings?: Record<string, string>): P
       message: `Missing environment variable(s): ${status.missingEnvVars.join(', ')}`,
     };
   }
-  await getDarajaAccessToken(true);
-  return {
-    ok: true,
-    env: status.env,
-    transactionType: status.transactionType,
-    shortCode: status.shortCode,
-    partyB: status.partyB,
-    message: `Safaricom Daraja (${status.env}) OAuth token verified successfully for Shortcode ${status.shortCode} (${status.transactionType}).`,
-  };
+
+  const consumerKey = cleanMpesaEnvVar('MPESA_CONSUMER_KEY');
+  const consumerSecret = cleanMpesaEnvVar('MPESA_CONSUMER_SECRET');
+  const passkey = cleanMpesaEnvVar('MPESA_PASSKEY');
+
+  if (
+    isPlaceholderCredential(consumerKey) ||
+    isPlaceholderCredential(consumerSecret) ||
+    isPlaceholderCredential(passkey)
+  ) {
+    return {
+      ok: false,
+      env: status.env,
+      transactionType: status.transactionType,
+      shortCode: status.shortCode,
+      partyB: status.partyB,
+      message:
+        'Your MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, or MPESA_PASSKEY still contains placeholder text (<Your...>). Replace it with your real Safaricom Daraja credentials and redeploy.',
+    };
+  }
+
+  try {
+    await getDarajaAccessToken(true);
+    return {
+      ok: true,
+      env: status.env,
+      transactionType: status.transactionType,
+      shortCode: status.shortCode,
+      partyB: status.partyB,
+      message: `Safaricom Daraja (${status.env}) OAuth token verified successfully for Shortcode ${status.shortCode} → Till ${status.partyB} (${status.transactionType}).`,
+    };
+  } catch (primaryErr) {
+    const primaryMsg = primaryErr instanceof Error ? primaryErr.message : 'Daraja OAuth failed.';
+    const altEnv: DarajaEnv = status.env === 'sandbox' ? 'production' : 'sandbox';
+    try {
+      await requestOAuthTokenForEnv(altEnv, consumerKey, consumerSecret);
+      return {
+        ok: false,
+        env: status.env,
+        transactionType: status.transactionType,
+        shortCode: status.shortCode,
+        partyB: status.partyB,
+        message:
+          altEnv === 'production'
+            ? `${primaryMsg} — HOWEVER, your Consumer Key & Secret SUCCEEDED on PRODUCTION (api.safaricom.co.ke)! Change MPESA_ENV from "${status.env}" to "production" in Vercel & AI Studio and redeploy.`
+            : `${primaryMsg} — HOWEVER, your Consumer Key & Secret SUCCEEDED on SANDBOX (sandbox.safaricom.co.ke). Replace them with your Go-Live Production App keys from developer.safaricom.co.ke to use production.`,
+      };
+    } catch {
+      const hint =
+        status.env === 'sandbox'
+          ? 'Verify you copied Consumer Key & Secret from your Sandbox App in developer.safaricom.co.ke → My Apps (with no spaces or quotes), OR if using Production keys, set MPESA_ENV=production.'
+          : 'Verify you copied Consumer Key & Secret from your Approved Go-Live Production App in developer.safaricom.co.ke → My Apps (with no spaces or quotes).';
+      return {
+        ok: false,
+        env: status.env,
+        transactionType: status.transactionType,
+        shortCode: status.shortCode,
+        partyB: status.partyB,
+        message: `${primaryMsg} ${hint}`,
+      };
+    }
+  }
 }
 
 export async function initiateDarajaStkPush(
@@ -268,7 +361,7 @@ export async function initiateDarajaStkPush(
     );
   }
 
-  const passkey = (process.env.MPESA_PASSKEY || '').trim();
+  const passkey = cleanMpesaEnvVar('MPESA_PASSKEY');
   const token = await getDarajaAccessToken();
   const timestamp = getDarajaTimestamp();
   const password = buildDarajaPassword(status.shortCode, passkey, timestamp);
@@ -347,7 +440,7 @@ export async function queryDarajaStkStatus(
     throw new Error('M-Pesa Daraja credentials are not configured.');
   }
 
-  const passkey = (process.env.MPESA_PASSKEY || '').trim();
+  const passkey = cleanMpesaEnvVar('MPESA_PASSKEY');
   const token = await getDarajaAccessToken();
   const timestamp = getDarajaTimestamp();
   const password = buildDarajaPassword(status.shortCode, passkey, timestamp);
