@@ -144,7 +144,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
             .updateUser({
               data: {
                 exness_account_id: exnessAccountId.trim().toUpperCase(),
-                exness_verified: true,
+                exness_verified: false,
                 referral_code: referralCode.trim().toUpperCase() || undefined,
               },
             })
@@ -436,7 +436,7 @@ export const AuthView: React.FC<AuthViewProps> = ({
                 : pendingOAuth
                 ? 'Link Exness & Enter Dashboard'
                 : mode === 'register'
-                ? 'Complete Exness Verification & Enter'
+                ? 'Link Exness & Create Account'
                 : 'Sign In Securely'}
             </button>
           </form>

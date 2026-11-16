@@ -42,19 +42,44 @@ interface AdminOverviewResponse {
   settings: Record<string, string>;
 }
 
+interface SupabaseHealthResponse {
+  status?: string;
+  configured: boolean;
+  reachable: boolean;
+  cloudSync?: {
+    configured: boolean;
+    tablesReady: boolean;
+    missingTables?: string[];
+  };
+  envDiagnostics?: {
+    hasSecretKeyMisplacedInUrl?: boolean;
+    supabaseUrlValid?: boolean;
+    missingSessionSecret?: boolean;
+    sessionSecretStrong?: boolean;
+    missingMetaApiEnvVars?: string[];
+    metaApiConfigured?: boolean;
+    metaApiProfileConfigured?: boolean;
+  };
+}
+
 export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }> = ({
   onConfigSaved,
 }) => {
   const [tab, setTab] = useState<'orders' | 'users' | 'security' | 'payouts' | 'emails' | 'settings'>('orders');
   const [data, setData] = useState<AdminOverviewResponse | null>(null);
+  const [health, setHealth] = useState<SupabaseHealthResponse | null>(null);
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [feedback, setFeedback] = useState('');
 
   async function loadAdmin() {
-    const res = await apiFetch<AdminOverviewResponse>('/api/admin/overview');
+    const [res, healthRes] = await Promise.all([
+      apiFetch<AdminOverviewResponse>('/api/admin/overview'),
+      apiFetch<SupabaseHealthResponse>('/api/health/supabase').catch(() => null),
+    ]);
     setData(res);
     setSettingsForm(res.settings);
+    if (healthRes) setHealth(healthRes);
   }
 
   useEffect(() => {
@@ -84,6 +109,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       isSuspended?: boolean;
       hasAnalyzer?: boolean;
       hasEaBots?: boolean;
+      exnessVerified?: boolean;
     }
   ) {
     await apiFetch(`/api/admin/users/${userId}/update`, {
@@ -276,7 +302,16 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     <div className="font-semibold text-slate-900">{u.name}</div>
                     <div className="text-slate-500">{u.email}</div>
                   </td>
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-700">{u.exness_account_id}</td>
+                  <td className="py-3 pr-4 font-mono text-xs text-slate-700">
+                    <div>{u.exness_account_id}</div>
+                    <div
+                      className={`text-[11px] font-sans font-semibold mt-0.5 ${
+                        u.exness_verified ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {u.exness_verified ? 'Verified Exness Partner' : 'Pending IB Review'}
+                    </div>
+                  </td>
                   <td className="py-3 pr-4">
                     <select
                       value={u.role}
@@ -290,7 +325,17 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       <option value="admin">admin</option>
                     </select>
                   </td>
-                  <td className="py-3 pr-4 text-xs space-x-2">
+                  <td className="py-3 pr-4 text-xs space-x-2 whitespace-nowrap">
+                    <button
+                      onClick={() => updateUser(u.id, { exnessVerified: !u.exness_verified })}
+                      className={`px-2 py-1 rounded border cursor-pointer ${
+                        u.exness_verified
+                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
+                          : 'border-amber-500 text-amber-800 bg-amber-50'
+                      }`}
+                    >
+                      {u.exness_verified ? 'Revoke IB' : 'Verify IB'}
+                    </button>
                     <button
                       onClick={() => updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
                       className={`px-2 py-1 rounded border cursor-pointer ${
@@ -332,11 +377,113 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 3: Security Audit Center */}
       {tab === 'security' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert className="w-5 h-5 text-blue-600" />
-            <h3 className="text-base font-bold text-slate-950">Intrusion &amp; Authentication Audit Log</h3>
+        <div className="space-y-6">
+          {/* Live Environment, Security & Cloud DB Readiness */}
+          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-blue-600" />
+                <h3 className="text-base font-bold text-slate-950">
+                  Live Environment, Security &amp; Cloud DB Readiness
+                </h3>
+              </div>
+              <span className="text-xs font-mono text-slate-500">
+                Source: /api/health/supabase
+              </span>
+            </div>
+
+            {!health ? (
+              <p className="text-xs text-slate-500">Health telemetry unavailable.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">1. SUPABASE_URL / VITE_SUPABASE_URL</span>
+                    <span
+                      className={`font-semibold ${
+                        health.envDiagnostics?.supabaseUrlValid && !health.envDiagnostics?.hasSecretKeyMisplacedInUrl
+                          ? 'text-emerald-700'
+                          : 'text-rose-700'
+                      }`}
+                    >
+                      {health.envDiagnostics?.hasSecretKeyMisplacedInUrl
+                        ? 'Action Required (Secret Key in URL)'
+                        : health.envDiagnostics?.supabaseUrlValid && health.reachable
+                        ? 'Configured'
+                        : 'Action Required'}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    Must be your <span className="font-mono">https://&lt;project-ref&gt;.supabase.co</span> URL — never paste an <span className="font-mono">sb_secret_</span> or <span className="font-mono">service_role</span> key into the URL variable.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">2. SESSION_SECRET</span>
+                    <span
+                      className={`font-semibold ${
+                        health.envDiagnostics?.sessionSecretStrong ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {health.envDiagnostics?.sessionSecretStrong
+                        ? 'Configured (32+ chars)'
+                        : health.envDiagnostics?.missingSessionSecret
+                        ? 'Action Required (Missing)'
+                        : 'Too Short (<32 chars)'}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    Set a 32+ character cryptographic random secret on the server to harden signed login session cookies.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">3. MetaApi Cloud MT5 Keys</span>
+                    <span
+                      className={`font-semibold ${
+                        health.envDiagnostics?.metaApiConfigured && health.envDiagnostics?.metaApiProfileConfigured
+                          ? 'text-emerald-700'
+                          : 'text-amber-700'
+                      }`}
+                    >
+                      {health.envDiagnostics?.metaApiConfigured && health.envDiagnostics?.metaApiProfileConfigured
+                        ? 'Configured'
+                        : `Missing: ${(health.envDiagnostics?.missingMetaApiEnvVars || ['METAAPI_TOKEN', 'METAAPI_PROVISIONING_PROFILE_ID']).join(', ')}`}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    Server-only credentials (<span className="font-mono">METAAPI_TOKEN</span> &amp; <span className="font-mono">METAAPI_PROVISIONING_PROFILE_ID</span>) required for automated cloud MT5 provisioning and trading.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">4. Cloud DB Sync Tables (Supabase)</span>
+                    <span
+                      className={`font-semibold ${
+                        health.cloudSync?.tablesReady ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {health.cloudSync?.tablesReady ? 'Tables Ready' : 'Run SQL Migration'}
+                    </span>
+                  </div>
+                  <p className="text-slate-600">
+                    {health.cloudSync?.tablesReady
+                      ? 'Orders, journal trades, paper state, trading plans, and MT5 links are persisting to Supabase Cloud Postgres.'
+                      : `Run supabase/gridpips_cloud_tables.sql in Supabase SQL Editor (${(health.cloudSync?.missingTables || ['gridpips_user_state', 'gridpips_orders']).join(', ')}).`}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <ShieldAlert className="w-5 h-5 text-blue-600" />
+              <h3 className="text-base font-bold text-slate-950">Intrusion &amp; Authentication Audit Log</h3>
+            </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
@@ -372,6 +519,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 ))}
               </tbody>
             </table>
+          </div>
           </div>
         </div>
       )}

@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { app } from './server/app.ts';
+import { runCloudAutoTradePass } from './server/autoTradeEngine.ts';
+import { isMt5ApiConfigured } from './server/mt5Api.ts';
 
 const PORT = 3000;
 
@@ -26,6 +28,18 @@ async function startServer() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`PipGrid server running on http://0.0.0.0:${PORT}`);
   });
+
+  // Cloud Auto-Trade background scheduler (non-serverless Node runtime)
+  if (!process.env.VERCEL) {
+    const runScheduledScan = () => {
+      if (!isMt5ApiConfigured()) return;
+      void runCloudAutoTradePass().catch((err) => {
+        console.warn('Cloud Auto-Trade scheduled tick warning:', err instanceof Error ? err.message : String(err));
+      });
+    };
+    setTimeout(runScheduledScan, 30_000);
+    setInterval(runScheduledScan, 5 * 60 * 1000);
+  }
 }
 
 startServer().catch((err) => {

@@ -15,12 +15,18 @@ import { BrandLogo } from './BrandLogo';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
 import { ANALYZER_TIMEFRAMES, TRADING_SYMBOLS, type AnalyzerTimeframe } from '../lib/tradingTimeframes';
 import type { PublicConfig, User } from '../types';
-import type { MarketSymbolQuote } from '../lib/api';
+import {
+  apiFetch,
+  type MarketMiniBar,
+  type MarketSymbolQuote,
+  type TradingViewMarketStatus,
+} from '../lib/api';
 
 interface LandingPageProps {
   config: PublicConfig;
   user: User | null;
   quotes: MarketSymbolQuote[];
+  marketStatus?: TradingViewMarketStatus | null;
   onGoAuth: (mode: 'login' | 'register') => void;
   onGoWorkspace: () => void;
   onSelectProduct: (product: 'analyzer' | 'ea_bots', symbol?: string, timeframe?: AnalyzerTimeframe) => void;
@@ -45,79 +51,6 @@ const HERO_FRAMES = [
     caption: 'MQL5 Automation · MetaTrader 5 Bridge',
   },
 ];
-
-const PHONE_CANDLES_BY_TF: Record<string, Array<{ o: number; h: number; l: number; c: number }>> = {
-  '1D': [
-    { o: 28, h: 35, l: 24, c: 32 },
-    { o: 32, h: 36, l: 26, c: 29 },
-    { o: 29, h: 42, l: 27, c: 40 },
-    { o: 40, h: 45, l: 33, c: 36 },
-    { o: 36, h: 52, l: 35, c: 48 },
-    { o: 48, h: 50, l: 39, c: 42 },
-    { o: 42, h: 58, l: 40, c: 55 },
-    { o: 55, h: 66, l: 50, c: 63 },
-    { o: 63, h: 65, l: 52, c: 56 },
-    { o: 56, h: 74, l: 54, c: 71 },
-    { o: 71, h: 82, l: 67, c: 78 },
-    { o: 78, h: 90, l: 74, c: 87 },
-  ],
-  '1W': [
-    { o: 44, h: 51, l: 40, c: 49 },
-    { o: 49, h: 54, l: 43, c: 45 },
-    { o: 45, h: 58, l: 44, c: 56 },
-    { o: 56, h: 63, l: 50, c: 60 },
-    { o: 60, h: 62, l: 48, c: 51 },
-    { o: 51, h: 68, l: 50, c: 66 },
-    { o: 66, h: 74, l: 62, c: 70 },
-    { o: 70, h: 79, l: 66, c: 76 },
-    { o: 76, h: 78, l: 69, c: 73 },
-    { o: 73, h: 86, l: 72, c: 83 },
-    { o: 83, h: 91, l: 79, c: 88 },
-    { o: 88, h: 94, l: 84, c: 91 },
-  ],
-  '1M': [
-    { o: 62, h: 68, l: 54, c: 57 },
-    { o: 57, h: 63, l: 48, c: 51 },
-    { o: 51, h: 59, l: 47, c: 55 },
-    { o: 55, h: 67, l: 53, c: 64 },
-    { o: 64, h: 72, l: 60, c: 69 },
-    { o: 69, h: 74, l: 61, c: 63 },
-    { o: 63, h: 77, l: 62, c: 75 },
-    { o: 75, h: 82, l: 70, c: 79 },
-    { o: 79, h: 85, l: 73, c: 77 },
-    { o: 77, h: 89, l: 76, c: 86 },
-    { o: 86, h: 92, l: 81, c: 89 },
-    { o: 89, h: 95, l: 85, c: 92 },
-  ],
-  '3M': [
-    { o: 22, h: 30, l: 19, c: 28 },
-    { o: 28, h: 38, l: 26, c: 36 },
-    { o: 36, h: 41, l: 30, c: 33 },
-    { o: 33, h: 48, l: 31, c: 45 },
-    { o: 45, h: 55, l: 42, c: 52 },
-    { o: 52, h: 61, l: 49, c: 59 },
-    { o: 59, h: 63, l: 51, c: 54 },
-    { o: 54, h: 70, l: 52, c: 68 },
-    { o: 68, h: 79, l: 65, c: 76 },
-    { o: 76, h: 83, l: 71, c: 80 },
-    { o: 80, h: 89, l: 78, c: 86 },
-    { o: 86, h: 93, l: 82, c: 90 },
-  ],
-  '1Y': [
-    { o: 18, h: 25, l: 15, c: 23 },
-    { o: 23, h: 33, l: 21, c: 31 },
-    { o: 31, h: 40, l: 29, c: 37 },
-    { o: 37, h: 44, l: 32, c: 35 },
-    { o: 35, h: 52, l: 34, c: 50 },
-    { o: 50, h: 60, l: 47, c: 57 },
-    { o: 57, h: 66, l: 53, c: 64 },
-    { o: 64, h: 72, l: 59, c: 69 },
-    { o: 69, h: 80, l: 66, c: 78 },
-    { o: 78, h: 86, l: 74, c: 83 },
-    { o: 83, h: 91, l: 80, c: 89 },
-    { o: 89, h: 96, l: 86, c: 94 },
-  ],
-};
 
 const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> = {
   risk: {
@@ -195,6 +128,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   config,
   user,
   quotes,
+  marketStatus,
   onGoAuth,
   onGoWorkspace,
   onSelectProduct,
@@ -205,7 +139,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [frameIndex, setFrameIndex] = useState(0);
   const [phoneTf, setPhoneTf] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1D');
   const [phoneSymIndex, setPhoneSymIndex] = useState(0);
-  const [liveCandleTick, setLiveCandleTick] = useState(0);
+  const [miniBars, setMiniBars] = useState<MarketMiniBar[]>([]);
+  const [miniBarsLoading, setMiniBarsLoading] = useState(true);
   const [nyClock, setNyClock] = useState(() => getNyClock());
   const [freeChartSymbol, setFreeChartSymbol] = useState<string>('EURUSD');
   const [freeChartTf, setFreeChartTf] = useState<AnalyzerTimeframe>('1M');
@@ -222,13 +157,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     const frameId = setInterval(() => {
       setFrameIndex((i) => (i + 1) % HERO_FRAMES.length);
     }, 7000);
-    const candleId = setInterval(() => {
-      setLiveCandleTick((t) => (t + 1) % 6);
-    }, 1600);
-    return () => {
-      clearInterval(frameId);
-      clearInterval(candleId);
-    };
+    return () => clearInterval(frameId);
   }, [heroMotionActive]);
 
   const featuredQuotes = useMemo(() => {
@@ -239,24 +168,59 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   }, [quotes]);
 
   const phoneQuote = featuredQuotes[phoneSymIndex % Math.max(1, featuredQuotes.length)] || quotes[0];
+  const phoneSymbol = phoneQuote?.sym || 'XAUUSD';
 
-  const livePhoneCandles = useMemo(() => {
-    const base = PHONE_CANDLES_BY_TF[phoneTf] || PHONE_CANDLES_BY_TF['1D'];
-    if (!heroMotionActive) return base;
-    const offsets = [-3, 2, -1, 4, 1, 5];
-    const delta = offsets[liveCandleTick % offsets.length];
-    return base.map((c, idx) => {
-      if (idx < base.length - 2) return c;
-      const shift = idx === base.length - 1 ? delta : Math.round(delta * 0.5);
-      const nextClose = Math.min(96, Math.max(14, c.c + shift));
-      return {
-        o: c.o,
-        h: Math.min(98, Math.max(c.h, nextClose + 3)),
-        l: Math.max(10, Math.min(c.l, nextClose - 3)),
-        c: nextClose,
+  useEffect(() => {
+    let cancelled = false;
+    const loadMiniBars = async () => {
+      try {
+        const res = await apiFetch<{ bars: MarketMiniBar[] }>(
+          `/api/market/mini-candles?symbol=${encodeURIComponent(phoneSymbol)}&tf=${encodeURIComponent(phoneTf)}`
+        );
+        if (!cancelled && Array.isArray(res.bars)) {
+          setMiniBars(res.bars.slice(-12));
+        }
+      } catch {
+        if (!cancelled) {
+          setMiniBars([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setMiniBarsLoading(false);
+        }
+      }
+    };
+
+    setMiniBarsLoading(true);
+    loadMiniBars();
+    if (!heroMotionActive) {
+      return () => {
+        cancelled = true;
       };
-    });
-  }, [phoneTf, liveCandleTick, heroMotionActive]);
+    }
+    const pollId = setInterval(loadMiniBars, 20000);
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+    };
+  }, [phoneSymbol, phoneTf, heroMotionActive]);
+
+  const normalizedPhoneCandles = useMemo(() => {
+    if (!miniBars.length) return [];
+    const highs = miniBars.map((b) => b.high);
+    const lows = miniBars.map((b) => b.low);
+    const maxHigh = Math.max(...highs);
+    const minLow = Math.min(...lows);
+    const span = Math.max(maxHigh - minLow, 1e-9);
+    const toY = (price: number) => 66 - ((price - minLow) / span) * 58;
+    return miniBars.map((b) => ({
+      yHigh: toY(b.high),
+      yLow: toY(b.low),
+      yOpen: toY(b.open),
+      yClose: toY(b.close),
+      bull: b.close >= b.open,
+    }));
+  }, [miniBars]);
 
   return (
     <div className="min-h-screen bg-[#F7F5F0] text-slate-950">
@@ -582,40 +546,49 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </div>
                   </div>
 
-                  {/* Live Animated Candlestick Chart */}
+                  {/* Live TradingView Candlestick Chart */}
                   <div className="my-2 bg-black/80 border border-neutral-800 rounded-xl p-2">
                     <svg viewBox="0 0 180 72" className="w-full h-16">
-                      {livePhoneCandles.map((c, idx) => {
-                        const x = 8 + idx * 14;
-                        const bull = c.c >= c.o;
-                        const col = bull ? '#22c55e' : '#f59e0b';
-                        const yHigh = 70 - c.h * 0.68;
-                        const yLow = 70 - c.l * 0.68;
-                        const yTop = 70 - Math.max(c.o, c.c) * 0.68;
-                        const h = Math.max(3, Math.abs(c.c - c.o) * 0.68);
-                        return (
-                          <g key={idx}>
-                            <line
-                              x1={x + 3}
-                              y1={yHigh}
-                              x2={x + 3}
-                              y2={yLow}
-                              stroke={col}
-                              strokeWidth="1.2"
-                              className="transition-all duration-500"
-                            />
-                            <rect
-                              x={x}
-                              y={yTop}
-                              width="6"
-                              height={h}
-                              fill={col}
-                              rx="1"
-                              className="transition-all duration-500"
-                            />
-                          </g>
-                        );
-                      })}
+                      {normalizedPhoneCandles.length > 0 ? (
+                        normalizedPhoneCandles.map((c, idx) => {
+                          const step = 164 / Math.max(1, normalizedPhoneCandles.length);
+                          const x = 8 + idx * step;
+                          const col = c.bull ? '#22c55e' : '#f59e0b';
+                          const yTop = Math.min(c.yOpen, c.yClose);
+                          const h = Math.max(2.5, Math.abs(c.yClose - c.yOpen));
+                          return (
+                            <g key={idx}>
+                              <line
+                                x1={x + 3}
+                                y1={c.yHigh}
+                                x2={x + 3}
+                                y2={c.yLow}
+                                stroke={col}
+                                strokeWidth="1.2"
+                              />
+                              <rect
+                                x={x}
+                                y={yTop}
+                                width="6"
+                                height={h}
+                                fill={col}
+                                rx="1"
+                              />
+                            </g>
+                          );
+                        })
+                      ) : (
+                        <text
+                          x="90"
+                          y="39"
+                          textAnchor="middle"
+                          fill="#94a3b8"
+                          fontSize="8.5"
+                          fontFamily="monospace"
+                        >
+                          {miniBarsLoading ? 'Loading TradingView bars...' : 'Awaiting TradingView feed'}
+                        </text>
+                      )}
                     </svg>
 
                     <div className="mt-1.5 flex items-center justify-between gap-1">
@@ -655,8 +628,27 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Bottom 5-Item Live Market Quote Strip */}
-          <div className="mt-12 pt-4 pb-3 border-t border-b border-slate-300 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {/* Live TradingView Market Session Summary + Bottom 5-Item Market Quote Strip */}
+          {marketStatus && (
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-600">
+              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    marketStatus.traditionalOpen ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                />
+                TradingView Live Session: {marketStatus.summaryLabel}
+              </span>
+              <span className="text-[11px] text-slate-500">
+                {marketStatus.openCount}/{marketStatus.totalCount} markets open · Updated{' '}
+                {new Date(marketStatus.checkedAt).toLocaleTimeString()}
+              </span>
+            </div>
+          )}
+
+          <div
+            className={`${marketStatus ? 'mt-3' : 'mt-12'} pt-4 pb-3 border-t border-b border-slate-300 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4`}
+          >
             {featuredQuotes.map((q) => {
               const up = q.chgPct >= 0;
               return (
@@ -751,7 +743,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          <LiveTradingViewChart symbol={freeChartSymbol} timeframe={freeChartTf} heightClass="h-[520px]" />
+          <LiveTradingViewChart
+            symbol={freeChartSymbol}
+            timeframe={freeChartTf}
+            heightClass="h-[380px] sm:h-[520px]"
+          />
         </div>
       </section>
 

@@ -14,6 +14,8 @@ import {
   sanitizeText,
   getClientIp,
   generateSecureToken,
+  hasStrongSessionSecret,
+  hasValidSessionSecret,
 } from './security.ts';
 import {
   checkSupabaseHealth,
@@ -39,7 +41,12 @@ import {
   buildInstallationGuide,
 } from './mql5Templates.ts';
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
-import { getTradingViewLiveQuotes, summarizeTradingViewMarketStatus } from './tradingViewFeed.ts';
+import {
+  fetchTradingViewChartData,
+  getTradingViewLiveQuotes,
+  summarizeTradingViewMarketStatus,
+  type TvInterval,
+} from './tradingViewFeed.ts';
 import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
   closeAllMt5Positions,
@@ -49,6 +56,16 @@ import {
   isMt5ApiConfigured,
   provisionAndDeployMt5Account,
 } from './mt5Api.ts';
+import {
+  checkCloudSyncTablesHealth,
+  deleteCloudJournalTrade,
+  hydrateUserFromCloud,
+  insertCloudJournalTrade,
+  insertCloudMt5Command,
+  syncUserStateToCloud,
+  upsertCloudOrder,
+} from './cloudSync.ts';
+import { runCloudAutoTradePass } from './autoTradeEngine.ts';
 
 try {
   initDatabase();
@@ -227,13 +244,20 @@ function extractSessionToken(req: Request): string | undefined {
 
 function getServerEnvDiagnostics() {
   const sb = getSupabaseEnvConfig();
-  const missingSessionSecret =
-    !process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 16 ? ['SESSION_SECRET'] : [];
+  const missingSessionSecret = hasValidSessionSecret() ? [] : ['SESSION_SECRET'];
+  const missingMetaApiEnvVars: string[] = [];
+  if (!isMt5ApiConfigured()) missingMetaApiEnvVars.push('METAAPI_TOKEN');
+  if (!isMetaApiProfileConfigured()) missingMetaApiEnvVars.push('METAAPI_PROVISIONING_PROFILE_ID');
 
   return {
     missingSupabaseEnvVars: sb.missingEnvVars,
     missingSessionSecret,
+    sessionSecretStrong: hasStrongSessionSecret(),
     hasSecretKeyMisplacedInUrl: sb.hasSecretKeyMisplacedInUrl,
+    supabaseUrlValid: Boolean(sb.url && sb.url.startsWith('https://')),
+    missingMetaApiEnvVars,
+    metaApiConfigured: isMt5ApiConfigured(),
+    metaApiProfileConfigured: isMetaApiProfileConfigured(),
   };
 }
 
@@ -331,6 +355,8 @@ async function resolveAuthenticatedUser(token: string | undefined): Promise<DbUs
     const resolved = byId.profile ? byId : await fetchSupabaseProfileByEmail(payload.email);
     if (resolved.profile) {
       user = upsertLocalMirrorUserFromProfile(resolved.profile);
+      await hydrateUserFromCloud(user.id, user.email);
+      user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser | undefined) || user;
     }
   }
   return user || null;
@@ -407,9 +433,10 @@ app.get('/api/health', (_req, res) => {
 
 app.get('/api/health/supabase', async (_req, res) => {
   try {
-    const health = await checkSupabaseHealth();
+    const [health, cloudSync] = await Promise.all([checkSupabaseHealth(), checkCloudSyncTablesHealth()]);
     res.json({
       ...health,
+      cloudSync,
       envDiagnostics: getServerEnvDiagnostics(),
     });
   } catch (err) {
@@ -508,7 +535,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         user_metadata: {
           full_name: name,
           exness_account_id: exnessAccountId,
-          exness_verified: true,
+          exness_verified: assignedRole === 'admin',
           referral_code: uniqueRefCode,
           referred_by_code: referralCodeUsed || undefined,
         },
@@ -532,7 +559,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         full_name: name,
         role: assignedRole,
         exness_account_id: exnessAccountId,
-        exness_verified: true,
+        exness_verified: assignedRole === 'admin',
         referral_code: uniqueRefCode,
         has_analyzer: assignedRole === 'admin',
         has_ea_bots: assignedRole === 'admin',
@@ -549,7 +576,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         return;
       }
 
-      const user = upsertLocalMirrorUserFromProfile(profile, referredById);
+      let user = upsertLocalMirrorUserFromProfile(profile, referredById);
+      await hydrateUserFromCloud(user.id, user.email).catch(() => {});
+      void syncUserStateToCloud(user.id);
+      user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser) || user;
       const sessionToken = setSessionCookie(req, res, user, createdAuth.user.id);
 
       try {
@@ -557,11 +587,11 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         const settings = getSettingsMap();
         await sendAutomatedEmail({
           to: email,
-          subject: 'Welcome to Grid Pips — Exness Workspace Activated',
+          subject: 'Welcome to Grid Pips — Exness Account Linked',
           category: 'welcome',
           textPreview: `Welcome ${name}! Your Exness ID (${exnessAccountId}) is linked. Access free tools, ICT/SMC education, and join ${settings.telegram_url}.`,
           html: `<h2>Welcome to Grid Pips, ${name}</h2>
-            <p>Your free trading workspace is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
+            <p>Your free trading account is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
             <p>Your Referral Code: <strong>${uniqueRefCode}</strong></p>
             <p>Join our live trading desk on Telegram: <a href="${settings.telegram_url}">${settings.telegram_url}</a></p>`,
         });
@@ -584,7 +614,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const info = db
       .prepare(
         `INSERT INTO users (name, email, password_hash, role, exness_account_id, exness_email, exness_verified, referral_code, referred_by, mt5_bridge_token, last_login_at)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, datetime('now'))`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
       )
       .run(
         name,
@@ -593,6 +623,7 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
         assignedRole,
         exnessAccountId,
         email,
+        assignedRole === 'admin' ? 1 : 0,
         uniqueRefCode,
         referredById,
         bridgeToken
@@ -605,6 +636,8 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
       JSON.stringify(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD'])
     );
 
+    await hydrateUserFromCloud(userId, email).catch(() => {});
+    void syncUserStateToCloud(userId);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
     const sessionToken = setSessionCookie(req, res, user);
 
@@ -613,11 +646,11 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     const settings = getSettingsMap();
     await sendAutomatedEmail({
       to: email,
-      subject: 'Welcome to Grid Pips — Exness Workspace Activated',
+      subject: 'Welcome to Grid Pips — Exness Account Linked',
       category: 'welcome',
       textPreview: `Welcome ${name}! Your Exness ID (${exnessAccountId}) is linked. Access free tools, ICT/SMC education, and join ${settings.telegram_url}.`,
       html: `<h2>Welcome to Grid Pips, ${name}</h2>
-        <p>Your free trading workspace is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
+        <p>Your free trading account is now active and linked to Exness Account ID <strong>${exnessAccountId}</strong>.</p>
         <p>Your Referral Code: <strong>${uniqueRefCode}</strong></p>
         <p>Join our live trading desk on Telegram: <a href="${settings.telegram_url}">${settings.telegram_url}</a></p>`,
     });
@@ -706,7 +739,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
             full_name: metaName,
             role,
             exness_account_id: metaExness.toUpperCase(),
-            exness_verified: true,
+            exness_verified: role === 'admin',
             referral_code: refCode.toUpperCase(),
             has_analyzer: role === 'admin',
             has_ea_bots: role === 'admin',
@@ -721,7 +754,9 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
         profile = upserted.profile;
       }
 
-      const user = upsertLocalMirrorUserFromProfile(profile);
+      let user = upsertLocalMirrorUserFromProfile(profile);
+      await hydrateUserFromCloud(user.id, user.email);
+      user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser | undefined) || user;
       if (user.is_suspended) {
         logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended user login attempt');
         res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
@@ -735,7 +770,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
           to: email,
           subject: 'Grid Pips Security Notice — New Sign-In Detected',
           category: 'security_alert',
-          textPreview: `A new sign-in to your Grid Pips workspace occurred from IP ${ip}. If this was not you, reset your password immediately.`,
+          textPreview: `A new sign-in to your Grid Pips account occurred from IP ${ip}. If this was not you, reset your password immediately.`,
           html: `<p>Hello ${user.name},</p><p>A new sign-in to your Grid Pips account was recorded from IP <code>${ip}</code>.</p>`,
         });
       } catch (noticeErr) {
@@ -767,7 +802,7 @@ app.post('/api/auth/login', authLimiter, async (req, res) => {
       to: email,
       subject: 'Grid Pips Security Notice — New Sign-In Detected',
       category: 'security_alert',
-      textPreview: `A new sign-in to your Grid Pips workspace occurred from IP ${ip}. If this was not you, reset your password immediately.`,
+      textPreview: `A new sign-in to your Grid Pips account occurred from IP ${ip}. If this was not you, reset your password immediately.`,
       html: `<p>Hello ${user.name},</p><p>A new sign-in to your Grid Pips account was recorded from IP <code>${ip}</code>.</p>`,
     });
 
@@ -848,6 +883,7 @@ app.patch('/api/auth/profile', requireAuth, async (req: AuthedRequest, res) => {
         has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
       });
     }
+    void syncUserStateToCloud(updated.id);
 
     res.json({ user: serializeUser(updated) });
   } catch (err) {
@@ -907,7 +943,7 @@ async function bridgeSupabaseUserToSession(params: {
       needsExnessOnboarding: true,
       email,
       name: displayName,
-      error: 'Link your Exness Partner Account ID to activate your Grid Pips workspace.',
+      error: 'Link your Exness Partner Account ID to activate your Grid Pips account.',
     });
     return;
   }
@@ -939,7 +975,7 @@ async function bridgeSupabaseUserToSession(params: {
         full_name: displayName,
         role,
         exness_account_id: exnessAccountId,
-        exness_verified: true,
+        exness_verified: role === 'admin',
         referral_code: uniqueRefCode,
         has_analyzer: role === 'admin',
         has_ea_bots: role === 'admin',
@@ -955,7 +991,10 @@ async function bridgeSupabaseUserToSession(params: {
     profile = upserted.profile;
   }
 
-  const user = upsertLocalMirrorUserFromProfile(profile, referredById);
+  let user = upsertLocalMirrorUserFromProfile(profile, referredById);
+  await hydrateUserFromCloud(user.id, user.email);
+  void syncUserStateToCloud(user.id);
+  user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser | undefined) || user;
   if (user.is_suspended) {
     logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
     res.status(403).json({ error: 'Your account has been suspended by an administrator.' });
@@ -1061,7 +1100,7 @@ app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
       user_metadata: {
         full_name: name,
         exness_account_id: exnessAccountId,
-        exness_verified: true,
+        exness_verified: role === 'admin',
         referral_code: uniqueRefCode,
         referred_by_code: referralCode || undefined,
       },
@@ -1078,7 +1117,7 @@ app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
       full_name: name,
       role,
       exness_account_id: exnessAccountId,
-      exness_verified: true,
+      exness_verified: role === 'admin',
       referral_code: uniqueRefCode,
       has_analyzer: role === 'admin',
       has_ea_bots: role === 'admin',
@@ -1090,7 +1129,10 @@ app.post('/api/auth/supabase/signup', authLimiter, async (req, res) => {
       return;
     }
 
-    const user = upsertLocalMirrorUserFromProfile(profile);
+    let user = upsertLocalMirrorUserFromProfile(profile);
+    await hydrateUserFromCloud(user.id, user.email);
+    void syncUserStateToCloud(user.id);
+    user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser | undefined) || user;
     const sessionToken = setSessionCookie(req, res, user, data.user.id);
     res.status(201).json({ user: serializeUser(user), profile, sessionToken });
   } catch (err) {
@@ -1536,6 +1578,7 @@ app.post('/api/orders/create', requireAuth, (req: AuthedRequest, res) => {
     );
 
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
+  void upsertCloudOrder(Number(info.lastInsertRowid));
   res.status(201).json({ order });
 });
 
@@ -1562,8 +1605,26 @@ async function fulfillOrder(orderId: number): Promise<void> {
     db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
   }
 
+  void upsertCloudOrder(orderId);
+  void syncUserStateToCloud(order.user_id);
+
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(order.user_id) as DbUser | undefined;
   if (user) {
+    const sbUid = await resolveUserSupabaseUid(user);
+    if (sbUid && getServerSupabaseAdminClient()) {
+      await upsertSupabaseProfile({
+        id: sbUid,
+        email: user.email,
+        full_name: user.name,
+        role: user.role,
+        exness_account_id: user.exness_account_id,
+        exness_verified: Boolean(user.exness_verified),
+        referral_code: user.referral_code,
+        has_analyzer: Boolean(user.has_analyzer) || user.role === 'admin',
+        has_ea_bots: Boolean(user.has_ea_bots) || user.role === 'admin',
+      }).catch(() => {});
+    }
+
     await sendAutomatedEmail({
       to: user.email,
       subject: `GRIDPIPs Receipt & Access Unlocked — ${order.order_number}`,
@@ -1574,8 +1635,8 @@ async function fulfillOrder(orderId: number): Promise<void> {
         <p>Your payment of <strong>$${order.amount_usd.toFixed(2)} USD (KES ${order.amount_kes})</strong> via <strong>${order.payment_method.toUpperCase()}</strong> for <strong>${order.product_name}</strong> is confirmed.</p>
         <p>${
           order.product_key === 'ea_bots'
-            ? 'Open the MQL5 EA Bots panel in your GRIDPIPs workspace to download the .mq5 source files, installation guide, and connect your MT5 bridge.'
-            : 'Open the ICT Strategy Market Analyzer in your GRIDPIPs workspace to scan live setups.'
+            ? 'Open the MQL5 EA Bots panel in your GRIDPIPs account to download the .mq5 source files, installation guide, and connect your MT5 bridge.'
+            : 'Open the ICT Strategy Market Analyzer in your GRIDPIPs account to scan live setups.'
         }</p>`,
     });
   }
@@ -1780,6 +1841,39 @@ app.get('/api/market/quotes', async (_req, res) => {
     console.error('TradingView live quotes error:', err);
     res.status(502).json({
       error: err instanceof Error ? err.message : 'Unable to fetch live TradingView market quotes.',
+    });
+  }
+});
+
+app.get('/api/market/mini-candles', async (req, res) => {
+  try {
+    const symbol = sanitizeText(req.query.symbol || 'XAUUSD', 16).toUpperCase() || 'XAUUSD';
+    const tf = sanitizeText(req.query.tf || '1D', 8).toUpperCase();
+    const intervalMap: Record<string, TvInterval> = {
+      '1D': '15',
+      '1W': '60',
+      '1M': '240',
+      '3M': 'D',
+      '1Y': 'W',
+    };
+    const interval: TvInterval = intervalMap[tf] || '15';
+    const payload = await fetchTradingViewChartData(symbol, interval);
+    res.json({
+      source: 'tradingview.com',
+      symbol: payload.symbol,
+      tvSymbol: payload.tvSymbol,
+      tf,
+      interval: payload.interval,
+      digits: payload.digits,
+      currentPrice: payload.currentPrice,
+      chgPct: payload.chgPct,
+      bars: payload.bars.slice(-12),
+      fetchedAt: payload.fetchedAt,
+    });
+  } catch (err) {
+    console.error('TradingView mini candles error:', err);
+    res.status(502).json({
+      error: err instanceof Error ? err.message : 'Unable to fetch live TradingView OHLC bars.',
     });
   }
 });
@@ -2043,6 +2137,7 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
   });
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+  void syncUserStateToCloud(user.id);
   res.json({
     user: serializeUser(updated),
     connectionMode: 'metaapi',
@@ -2111,6 +2206,7 @@ app.post('/api/ea/mt5/auto-trade', requireAuth, (req: AuthedRequest, res) => {
   );
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser;
+  void syncUserStateToCloud(user.id);
   res.json({ user: serializeUser(updated) });
 });
 
@@ -2159,6 +2255,7 @@ app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
         liveState.equity ?? 0,
         liveState.openPositions
       );
+      void syncUserStateToCloud(user.id);
     } catch (err) {
       res.status(502).json({
         error: err instanceof Error ? err.message : 'Unable to sync live MT5 account via MetaApi Cloud.',
@@ -2248,6 +2345,9 @@ app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => 
       (user.mt5_open_positions ?? 0) + 1
     );
 
+    void insertCloudMt5Command(user.email, Number(info.lastInsertRowid));
+    void syncUserStateToCloud(user.id);
+
     res.json({
       ok: true,
       mode: 'metaapi',
@@ -2257,10 +2357,11 @@ app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => 
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'MetaApi Cloud trade execution failed.';
-    db.prepare(
+    const failInfo = db.prepare(
       `INSERT INTO mt5_trade_commands (user_id, symbol, side, volume, stop_loss, take_profit, source_ea, execution_mode, status, error_message)
        VALUES (?, ?, ?, ?, ?, ?, ?, 'metaapi', 'failed', ?)`
     ).run(user.id, symbol, side, volume, stopLoss, takeProfit, sourceEa, msg);
+    void insertCloudMt5Command(user.email, Number(failInfo.lastInsertRowid));
     res.status(502).json({ error: msg });
   }
 });
@@ -2295,6 +2396,7 @@ app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) =
       user.mt5_equity ?? 0,
       0
     );
+    void syncUserStateToCloud(user.id);
     res.json({
       ok: true,
       closedCount: result.closedCount,
@@ -2303,6 +2405,47 @@ app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) =
   } catch (err) {
     res.status(502).json({
       error: err instanceof Error ? err.message : 'Unable to close open MT5 positions via MetaApi Cloud.',
+    });
+  }
+});
+
+app.post('/api/ea/mt5/run-auto-scan', requireAuth, async (req: AuthedRequest, res) => {
+  const user = req.currentUser!;
+  if (!user.has_ea_bots && user.role !== 'admin') {
+    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+    return;
+  }
+  try {
+    const dryRun = Boolean(req.body?.dryRun);
+    const bypassKillzone = Boolean(req.body?.bypassKillzone);
+    const result = await runCloudAutoTradePass({
+      userId: user.id,
+      dryRun,
+      bypassKillzone,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Cloud Auto-Trade engine scan failed.',
+    });
+  }
+});
+
+app.all('/api/ea/cron-tick', async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const bearer = extractBearerToken(req);
+    if (bearer !== cronSecret) {
+      res.status(401).json({ error: 'Unauthorized cron trigger.' });
+      return;
+    }
+  }
+  try {
+    const result = await runCloudAutoTradePass();
+    res.json({ ok: true, ...result });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Scheduled Cloud Auto-Trade pass failed.',
     });
   }
 });
@@ -2433,12 +2576,41 @@ app.post('/api/workspace/journal', requireAuth, (req: AuthedRequest, res) => {
       sanitizeText(b.lessons || '', 400),
       typeof b.imageData === 'string' && b.imageData.startsWith('data:image/') ? b.imageData.slice(0, 1500000) : null
     );
-  const trade = db.prepare('SELECT * FROM journal_trades WHERE id = ?').get(info.lastInsertRowid);
+  const trade = db.prepare('SELECT * FROM journal_trades WHERE id = ?').get(info.lastInsertRowid) as {
+    id: number;
+    instrument: string;
+    side: string;
+    entry_price: number | null;
+    sl: number | null;
+    tp: number | null;
+    size: number | null;
+    risk_pct: number | null;
+    rr: number | null;
+    pnl: number;
+    trade_date: string;
+    session: string | null;
+    strategy: string | null;
+    reason_entry: string | null;
+    reason_exit: string | null;
+    lessons: string | null;
+    image_data: string | null;
+  } | undefined;
+  if (trade) {
+    void insertCloudJournalTrade(req.currentUser!.email, trade);
+  }
   res.status(201).json({ trade });
 });
 
 app.delete('/api/workspace/journal/:id', requireAuth, (req: AuthedRequest, res) => {
+  const existing = db
+    .prepare('SELECT id, instrument, trade_date FROM journal_trades WHERE id = ? AND user_id = ?')
+    .get(Number(req.params.id), req.currentUser!.id) as
+    | { id: number; instrument: string; trade_date: string }
+    | undefined;
   db.prepare('DELETE FROM journal_trades WHERE id = ? AND user_id = ?').run(Number(req.params.id), req.currentUser!.id);
+  if (existing) {
+    void deleteCloudJournalTrade(req.currentUser!.email, existing);
+  }
   res.json({ ok: true });
 });
 
@@ -2466,6 +2638,7 @@ app.post('/api/workspace/paper', requireAuth, (req: AuthedRequest, res) => {
      VALUES (?, ?, ?, ?, datetime('now'))
      ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, positions_json = excluded.positions_json, history_json = excluded.history_json, updated_at = datetime('now')`
   ).run(req.currentUser!.id, balance, JSON.stringify(positions), JSON.stringify(history));
+  void syncUserStateToCloud(req.currentUser!.id);
   res.json({ ok: true });
 });
 
@@ -2481,6 +2654,7 @@ app.post('/api/workspace/plan', requireAuth, (req: AuthedRequest, res) => {
     `INSERT INTO trading_plans (user_id, plan_json, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(user_id) DO UPDATE SET plan_json = excluded.plan_json, updated_at = datetime('now')`
   ).run(req.currentUser!.id, JSON.stringify(req.body?.plan || {}));
+  void syncUserStateToCloud(req.currentUser!.id);
   res.json({ ok: true });
 });
 
@@ -2499,6 +2673,7 @@ app.post('/api/workspace/watchlist', requireAuth, (req: AuthedRequest, res) => {
     `INSERT INTO watchlists (user_id, symbols_json, updated_at) VALUES (?, ?, datetime('now'))
      ON CONFLICT(user_id) DO UPDATE SET symbols_json = excluded.symbols_json, updated_at = datetime('now')`
   ).run(req.currentUser!.id, JSON.stringify(symbols));
+  void syncUserStateToCloud(req.currentUser!.id);
   res.json({ symbols });
 });
 
@@ -2651,12 +2826,13 @@ app.post('/api/admin/orders/:id/status', requireAdmin, async (req: AuthedRequest
     await fulfillOrder(orderId);
   } else {
     db.prepare('UPDATE orders SET payment_status = ? WHERE id = ?').run(status, orderId);
+    void upsertCloudOrder(orderId);
   }
   logSecurityEvent('ADMIN_ORDER_UPDATE', 'info', getClientIp(req), req.currentUser!.email, `Order #${orderId} -> ${status}`);
   res.json({ ok: true });
 });
 
-app.post('/api/admin/users/:id/update', requireAdmin, (req: AuthedRequest, res) => {
+app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest, res) => {
   const userId = Number(req.params.id);
   const role = ['user', 'influencer', 'admin'].includes(req.body?.role) ? req.body.role : undefined;
   const isSuspended = typeof req.body?.isSuspended === 'boolean' ? (req.body.isSuspended ? 1 : 0) : undefined;
@@ -2671,8 +2847,27 @@ app.post('/api/admin/users/:id/update', requireAdmin, (req: AuthedRequest, res) 
   if (hasAnalyzer !== undefined) db.prepare('UPDATE users SET has_analyzer = ? WHERE id = ?').run(hasAnalyzer, userId);
   if (hasEaBots !== undefined) db.prepare('UPDATE users SET has_ea_bots = ? WHERE id = ?').run(hasEaBots, userId);
 
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser | undefined;
+  if (updated) {
+    const sbUid = await resolveUserSupabaseUid(updated);
+    if (sbUid && getServerSupabaseAdminClient()) {
+      await upsertSupabaseProfile({
+        id: sbUid,
+        email: updated.email,
+        full_name: updated.name,
+        role: updated.role,
+        exness_account_id: updated.exness_account_id,
+        exness_verified: Boolean(updated.exness_verified),
+        referral_code: updated.referral_code,
+        has_analyzer: Boolean(updated.has_analyzer) || updated.role === 'admin',
+        has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
+      }).catch(() => {});
+    }
+    void syncUserStateToCloud(updated.id);
+  }
+
   logSecurityEvent('ADMIN_USER_UPDATE', 'warning', getClientIp(req), req.currentUser!.email, `Updated user #${userId}`);
-  res.json({ ok: true });
+  res.json({ ok: true, user: updated ? serializeUser(updated) : undefined });
 });
 
 app.post('/api/admin/payouts/:id/status', requireAdmin, (req: AuthedRequest, res) => {

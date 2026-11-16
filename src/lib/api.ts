@@ -119,3 +119,37 @@ export const INITIAL_MARKET_QUOTES: MarketSymbolQuote[] = [
   { sym: 'BTCUSD', tvSymbol: 'BITSTAMP:BTCUSD', name: 'Bitcoin / US Dollar', price: 65362.76, chgPct: 0, digits: 2, assetClass: 'crypto' },
   { sym: 'ETHUSD', tvSymbol: 'BITSTAMP:ETHUSD', name: 'Ethereum / US Dollar', price: 1831.96, chgPct: 0, digits: 2, assetClass: 'crypto' },
 ];
+
+export interface MarketMiniBar {
+  timestampSec: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface AutoScanCandidate {
+  symbol: string;
+  timeframe: '15M' | '1H';
+  strategy: string;
+  side: 'BUY' | 'SELL';
+  entryPrice: number;
+  stopLoss: number;
+  tp1: number;
+  rrRatio: number;
+  volume: number;
+  confluences: string[];
+  status: 'executed' | 'skipped' | 'signal_ready' | 'failed';
+  reason: string;
+  orderId?: string;
+}
+
+export interface AutoTradeRunResult {
+  scannedAt: string;
+  metaApiConfigured: boolean;
+  usersChecked: number;
+  executedCount: number;
+  candidates: AutoScanCandidate[];
+}
+

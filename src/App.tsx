@@ -285,6 +285,7 @@ export default function App() {
         config={config}
         user={user}
         quotes={quotes}
+        marketStatus={marketStatus}
         onGoAuth={(mode) => {
           setAuthMode(mode);
           setScreen('auth');
@@ -925,9 +926,17 @@ const WorkspaceOverview: React.FC<{
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap"
+                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
               >
-                Exness ID <span className="font-mono font-semibold text-amber-700 ml-1">{user.exnessAccountId}</span>
+                <span>Exness ID</span>
+                <span className="font-mono font-semibold text-amber-700">{user.exnessAccountId}</span>
+                <span
+                  className={`font-semibold ${
+                    user.exnessVerified ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  · {user.exnessVerified ? 'Verified Partner' : 'Pending IB Review'}
+                </span>
               </button>
               <button
                 type="button"

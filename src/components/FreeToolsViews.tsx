@@ -964,6 +964,8 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
   const [size, setSize] = useState(10000);
   const [slPrice, setSlPrice] = useState('');
   const [tpPrice, setTpPrice] = useState('');
+  const [paperNotice, setPaperNotice] = useState('');
+  const closingIdsRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     apiFetch<{ balance: number; positions: PaperPosition[]; history: PaperHistoryItem[] }>('/api/workspace/paper')
@@ -975,27 +977,92 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
       .catch(() => {});
   }, []);
 
+  const selectedQuote = quotes.find((item) => item.sym === symbol);
+  const selectedFillPrice = selectedQuote
+    ? side === 'Buy'
+      ? Number(selectedQuote.ask || selectedQuote.price)
+      : Number(selectedQuote.bid || selectedQuote.price)
+    : 1;
+
   function calcLivePnl(p: PaperPosition): number {
     const q = quotes.find((item) => item.sym === p.symbol);
-    const cur = q ? q.price : p.entry;
+    const cur = q ? (p.side === 'Buy' ? Number(q.bid || q.price) : Number(q.ask || q.price)) : p.entry;
     const diff = p.side === 'Buy' ? cur - p.entry : p.entry - cur;
     return diff * p.size;
   }
 
-  async function savePaperState(nextBalance: number, nextPos: PaperPosition[], nextHist: PaperHistoryItem[]) {
-    setBalance(nextBalance);
-    setPositions(nextPos);
-    setHistory(nextHist);
-    await apiFetch('/api/workspace/paper', {
-      method: 'POST',
-      body: JSON.stringify({ balance: nextBalance, positions: nextPos, history: nextHist }),
-    });
-  }
+  const savePaperState = useCallback(
+    async (nextBalance: number, nextPos: PaperPosition[], nextHist: PaperHistoryItem[]) => {
+      setBalance(nextBalance);
+      setPositions(nextPos);
+      setHistory(nextHist);
+      await apiFetch('/api/workspace/paper', {
+        method: 'POST',
+        body: JSON.stringify({ balance: nextBalance, positions: nextPos, history: nextHist }),
+      }).catch(() => {});
+    },
+    []
+  );
+
+  // Automatic SL / TP trigger evaluation against live TradingView quotes
+  useEffect(() => {
+    if (!positions.length || !quotes.length) return;
+    const triggered: Array<{ pos: PaperPosition; exit: number; reason: 'TP Hit' | 'SL Hit' }> = [];
+
+    for (const p of positions) {
+      if (closingIdsRef.current.has(p.id)) continue;
+      const q = quotes.find((item) => item.sym === p.symbol);
+      if (!q || !Number.isFinite(q.price) || q.price <= 0) continue;
+      const cur = p.side === 'Buy' ? Number(q.bid || q.price) : Number(q.ask || q.price);
+
+      if (p.side === 'Buy') {
+        if (typeof p.sl === 'number' && cur <= p.sl) {
+          triggered.push({ pos: p, exit: p.sl, reason: 'SL Hit' });
+        } else if (typeof p.tp === 'number' && cur >= p.tp) {
+          triggered.push({ pos: p, exit: p.tp, reason: 'TP Hit' });
+        }
+      } else {
+        if (typeof p.sl === 'number' && cur >= p.sl) {
+          triggered.push({ pos: p, exit: p.sl, reason: 'SL Hit' });
+        } else if (typeof p.tp === 'number' && cur <= p.tp) {
+          triggered.push({ pos: p, exit: p.tp, reason: 'TP Hit' });
+        }
+      }
+    }
+
+    if (!triggered.length) return;
+
+    triggered.forEach((item) => closingIdsRef.current.add(item.pos.id));
+    const triggeredIds = new Set(triggered.map((t) => t.pos.id));
+    let nextBalance = balance;
+    const closedItems: PaperHistoryItem[] = [];
+    const notices: string[] = [];
+
+    for (const { pos, exit, reason } of triggered) {
+      const diff = pos.side === 'Buy' ? exit - pos.entry : pos.entry - exit;
+      const pnl = diff * pos.size;
+      nextBalance += pnl;
+      closedItems.push({
+        id: pos.id,
+        symbol: pos.symbol,
+        side: pos.side,
+        entry: pos.entry,
+        exit,
+        pnl,
+        closedAt: `${new Date().toLocaleTimeString()} (${reason})`,
+      });
+      notices.push(`${reason}: Closed ${pos.symbol} ${pos.side} @ ${exit} (${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)})`);
+    }
+
+    const nextPos = positions.filter((p) => !triggeredIds.has(p.id));
+    const nextHist = [...closedItems, ...history];
+    setPaperNotice(notices.join(' · '));
+    void savePaperState(nextBalance, nextPos, nextHist);
+  }, [quotes, positions, balance, history, savePaperState]);
 
   async function handleOpen(e: React.FormEvent) {
     e.preventDefault();
-    const q = quotes.find((item) => item.sym === symbol);
-    const entry = q ? q.price : 1;
+    const entry = selectedFillPrice;
     const pos: PaperPosition = {
       id: `${Date.now()}`,
       symbol,
@@ -1007,13 +1074,16 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
     };
     setSlPrice('');
     setTpPrice('');
+    setPaperNotice(`Opened ${side} ${size} units ${symbol} @ ${entry}`);
     await savePaperState(balance, [...positions, pos], history);
   }
 
   async function handleClose(pos: PaperPosition) {
+    closingIdsRef.current.add(pos.id);
     const q = quotes.find((item) => item.sym === pos.symbol);
-    const exit = q ? q.price : pos.entry;
-    const pnl = calcLivePnl(pos);
+    const exit = q ? (pos.side === 'Buy' ? Number(q.bid || q.price) : Number(q.ask || q.price)) : pos.entry;
+    const diff = pos.side === 'Buy' ? exit - pos.entry : pos.entry - exit;
+    const pnl = diff * pos.size;
     const histItem: PaperHistoryItem = {
       id: pos.id,
       symbol: pos.symbol,
@@ -1052,7 +1122,11 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
           </div>
         </div>
         <button
-          onClick={() => savePaperState(10000, [], [])}
+          onClick={() => {
+            closingIdsRef.current.clear();
+            setPaperNotice('Virtual paper account reset to $10,000.00');
+            savePaperState(10000, [], []);
+          }}
           className="px-4 py-2 border border-slate-300 bg-white text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
@@ -1060,9 +1134,33 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
         </button>
       </div>
 
+      {paperNotice && (
+        <div className="px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono rounded-lg flex items-center justify-between gap-3">
+          <span>{paperNotice}</span>
+          <button
+            type="button"
+            onClick={() => setPaperNotice('')}
+            className="text-emerald-700 hover:text-emerald-950 cursor-pointer"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <form onSubmit={handleOpen} className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5 space-y-4">
-          <h3 className="text-base font-bold text-slate-950">Open Virtual Trade</h3>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-slate-950">Open Virtual Trade</h3>
+            {selectedQuote && (
+              <span
+                className={`text-[11px] font-mono font-semibold ${
+                  selectedQuote.isMarketOpen === false ? 'text-amber-700' : 'text-emerald-700'
+                }`}
+              >
+                {selectedQuote.marketStatusLabel || 'Live'}
+              </span>
+            )}
+          </div>
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">Symbol</label>
             <select
@@ -1076,6 +1174,17 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
                 </option>
               ))}
             </select>
+            {selectedQuote && (
+              <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono text-slate-500">
+                <span>
+                  Bid: {Number(selectedQuote.bid || selectedQuote.price).toFixed(selectedQuote.digits)} · Ask:{' '}
+                  {Number(selectedQuote.ask || selectedQuote.price).toFixed(selectedQuote.digits)}
+                </span>
+                <span className="font-semibold text-slate-700">
+                  Fill @ {selectedFillPrice.toFixed(selectedQuote.digits)}
+                </span>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -1101,24 +1210,24 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss (Opt.)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss (Auto)</label>
               <input
                 type="number"
                 step="any"
                 value={slPrice}
                 onChange={(e) => setSlPrice(e.target.value)}
-                placeholder="Optional"
+                placeholder="Auto-trigger price"
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Take Profit (Opt.)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Take Profit (Auto)</label>
               <input
                 type="number"
                 step="any"
                 value={tpPrice}
                 onChange={(e) => setTpPrice(e.target.value)}
-                placeholder="Optional"
+                placeholder="Auto-trigger price"
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
               />
             </div>
@@ -1127,7 +1236,7 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
             type="submit"
             className="w-full py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer"
           >
-            Execute Paper Order
+            Execute {side} @ {selectedQuote ? selectedFillPrice.toFixed(selectedQuote.digits) : 'Market'}
           </button>
         </form>
 

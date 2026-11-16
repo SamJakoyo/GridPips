@@ -16,6 +16,14 @@ function getSessionSecret(): string {
   return DETERMINISTIC_DEV_FALLBACK;
 }
 
+export function hasValidSessionSecret(): boolean {
+  return Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 16);
+}
+
+export function hasStrongSessionSecret(): boolean {
+  return Boolean(process.env.SESSION_SECRET && process.env.SESSION_SECRET.trim().length >= 32);
+}
+
 export function extractBearerToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {

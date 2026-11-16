@@ -11,8 +11,9 @@ import {
   Zap,
   ShieldCheck,
   XCircle,
+  Radar,
 } from 'lucide-react';
-import { apiFetch } from '../lib/api';
+import { apiFetch, type AutoTradeRunResult } from '../lib/api';
 import type { PublicConfig, User } from '../types';
 
 interface EaBotsViewProps {
@@ -127,6 +128,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
 
   const [events, setEvents] = useState<Mt5TelemetryEvent[]>([]);
   const [commands, setCommands] = useState<Mt5TradeCommand[]>([]);
+  const [scanningAuto, setScanningAuto] = useState(false);
+  const [bypassKillzone, setBypassKillzone] = useState(false);
+  const [autoScanResult, setAutoScanResult] = useState<AutoTradeRunResult | null>(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [copiedCode, setCopiedCode] = useState(false);
@@ -379,6 +383,37 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
     }
   }
 
+  async function handleRunAutoScan(dryRun: boolean) {
+    setScanningAuto(true);
+    setStatusMessage('');
+    setErrorMessage('');
+    try {
+      const res = await apiFetch<AutoTradeRunResult>('/api/ea/mt5/run-auto-scan', {
+        method: 'POST',
+        body: JSON.stringify({ dryRun, bypassKillzone }),
+      });
+      setAutoScanResult(res);
+      if (res.executedCount > 0) {
+        setStatusMessage(
+          `Cloud Auto-Trade Engine executed ${res.executedCount} live order(s) across ${res.candidates.length} candidate setup(s).`
+        );
+      } else if (dryRun) {
+        setStatusMessage(
+          `Dry-run ICT/SMC scan complete (${res.candidates.length} setup(s) inspected; no live orders dispatched).`
+        );
+      } else {
+        setStatusMessage(
+          `Cloud Auto-Trade scan complete (${res.candidates.length} setup(s) inspected; 0 live orders placed).`
+        );
+      }
+      await fetchMt5Status(false);
+    } catch (err) {
+      setErrorMessage(err instanceof Error ? err.message : 'Failed to execute cloud auto-trade scan.');
+    } finally {
+      setScanningAuto(false);
+    }
+  }
+
   function copySource() {
     navigator.clipboard.writeText(fileContent);
     setCopiedCode(true);
@@ -517,6 +552,127 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
             {syncingLive ? 'Syncing...' : 'Sync MT5 Now'}
           </button>
         </div>
+      </div>
+
+      {/* Cloud Auto-Trade Engine (ICT / SMC Server Scanner) */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold text-blue-600 flex items-center gap-1.5">
+              <Radar className="w-4 h-4" />
+              <span>Cloud Auto-Trade Engine · Server-Side ICT &amp; SMC Execution</span>
+            </div>
+            <h3 className="text-base font-bold text-slate-950 mt-1">
+              Automated MetaApi Cloud Scanner (15M Silver Bullet &amp; 1H SMC Order Blocks)
+            </h3>
+            <p className="text-xs text-slate-600 mt-0.5 max-w-3xl">
+              Evaluates live TradingView market sessions, ICT Killzones, unmitigated FVGs and Order Blocks, dynamic risk-% position sizing, max 3 open positions, and 60-minute per-symbol cooldowns before routing orders directly via MetaApi.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <label className="inline-flex items-center gap-1.5 text-xs text-slate-700 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bypassKillzone}
+                onChange={(e) => setBypassKillzone(e.target.checked)}
+                className="rounded border-slate-300 text-blue-600"
+              />
+              <span>Override Killzone Wait</span>
+            </label>
+
+            <button
+              type="button"
+              disabled={scanningAuto}
+              onClick={() => handleRunAutoScan(true)}
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-900 text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+            >
+              {scanningAuto ? 'Scanning...' : 'Test Signal Scan (Dry Run)'}
+            </button>
+
+            <button
+              type="button"
+              disabled={scanningAuto}
+              onClick={() => handleRunAutoScan(false)}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap disabled:opacity-60"
+            >
+              {scanningAuto ? 'Running Scan...' : 'Run Cloud EA Scan Now'}
+            </button>
+          </div>
+        </div>
+
+        {autoScanResult && (
+          <div className="pt-3 border-t border-slate-100 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-600">
+              <span>
+                Scanned {autoScanResult.candidates.length} setup(s) · Live Executed: {autoScanResult.executedCount} · MetaApi:{' '}
+                {autoScanResult.metaApiConfigured ? 'Configured' : 'Pending Env'}
+              </span>
+              <span>{new Date(autoScanResult.scannedAt).toLocaleTimeString()}</span>
+            </div>
+
+            {autoScanResult.candidates.length === 0 ? (
+              <p className="text-xs text-slate-500">
+                No qualified setups triggered during this scan. Try enabling Override Killzone Wait for dry-run inspection outside London/NY Killzone hours.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="py-2 pr-3">Pair · TF</th>
+                      <th className="py-2 pr-3">Strategy</th>
+                      <th className="py-2 pr-3">Side</th>
+                      <th className="py-2 pr-3">Lots</th>
+                      <th className="py-2 pr-3">Entry / SL / TP1</th>
+                      <th className="py-2 pr-3">R:R</th>
+                      <th className="py-2 pr-3">Status</th>
+                      <th className="py-2">Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 font-mono">
+                    {autoScanResult.candidates.map((c, idx) => (
+                      <tr key={`${c.symbol}-${c.timeframe}-${idx}`}>
+                        <td className="py-2 pr-3 font-bold text-slate-950">
+                          {c.symbol} · {c.timeframe}
+                        </td>
+                        <td className="py-2 pr-3 font-sans text-slate-700">{c.strategy}</td>
+                        <td
+                          className={`py-2 pr-3 font-bold ${
+                            c.side === 'BUY' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}
+                        >
+                          {c.side}
+                        </td>
+                        <td className="py-2 pr-3">{c.volume.toFixed(2)}</td>
+                        <td className="py-2 pr-3 text-slate-700">
+                          {c.entryPrice} / {c.stopLoss} / {c.tp1}
+                        </td>
+                        <td className="py-2 pr-3">{c.rrRatio.toFixed(2)}R</td>
+                        <td className="py-2 pr-3">
+                          <span
+                            className={`font-semibold uppercase ${
+                              c.status === 'executed'
+                                ? 'text-emerald-700'
+                                : c.status === 'signal_ready'
+                                ? 'text-blue-700'
+                                : c.status === 'failed'
+                                ? 'text-rose-700'
+                                : 'text-amber-700'
+                            }`}
+                          >
+                            {c.status}
+                          </span>
+                        </td>
+                        <td className="py-2 font-sans text-slate-600">{c.reason}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

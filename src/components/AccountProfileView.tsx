@@ -153,9 +153,18 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
               {copiedKey === 'exnessId' ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
             </button>
           </div>
-          <div className="text-xs text-slate-600 mt-2">
-            {user.exnessVerified ? 'IB verification active' : 'Verification pending'}
+          <div
+            className={`text-xs font-semibold mt-2 ${
+              user.exnessVerified ? 'text-emerald-700' : 'text-amber-700'
+            }`}
+          >
+            {user.exnessVerified ? 'Verified Exness Partner' : 'Pending IB Review'}
           </div>
+          {!user.exnessVerified && (
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              Awaiting partner confirmation in Admin Console
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-200 p-5">

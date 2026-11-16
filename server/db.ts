@@ -25,7 +25,7 @@ export function initDatabase(): void {
       role TEXT NOT NULL DEFAULT 'user',
       exness_account_id TEXT NOT NULL,
       exness_email TEXT,
-      exness_verified INTEGER NOT NULL DEFAULT 1,
+      exness_verified INTEGER NOT NULL DEFAULT 0,
       referral_code TEXT NOT NULL UNIQUE,
       referred_by INTEGER,
       has_analyzer INTEGER NOT NULL DEFAULT 0,
