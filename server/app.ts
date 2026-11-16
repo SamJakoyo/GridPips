@@ -51,6 +51,7 @@ import { getForexFactoryLiveFeed } from './forexFactory.ts';
 import {
   closeAllMt5Positions,
   executeMt5TradeOrder,
+  fetchKnownExnessServersFromMetaApi,
   fetchMt5AccountState,
   isMetaApiProfileConfigured,
   isMt5ApiConfigured,
@@ -1994,6 +1995,15 @@ app.get('/api/ea/mt5/status', requireAuth, (req: AuthedRequest, res) => {
   });
 });
 
+app.get('/api/ea/mt5/servers', requireAuth, async (_req: AuthedRequest, res) => {
+  try {
+    const servers = await fetchKnownExnessServersFromMetaApi();
+    res.json({ servers });
+  } catch {
+    res.json({ servers: [] });
+  }
+});
+
 app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
   if (!user.has_ea_bots && user.role !== 'admin') {
@@ -2032,9 +2042,9 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
     return;
   }
 
-  if (/^Exness-MT5(Real|Trial)$/i.test(mt5Server)) {
+  if (/^Exness([A-Z]{2})?-MT5(Real|Trial)$/i.test(mt5Server)) {
     res.status(400).json({
-      error: `${mt5Server} is only the server prefix. Enter the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8).`,
+      error: `${mt5Server} is only the server prefix. Enter the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8 or ExnessKE-MT5Real4).`,
     });
     return;
   }

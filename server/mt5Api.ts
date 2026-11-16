@@ -100,6 +100,47 @@ async function resolveAccountRegion(accountId: string, knownRegion?: string | nu
   return { region: resolved, detail };
 }
 
+let cachedMetaApiExnessServers: { fetchedAt: number; servers: string[] } | null = null;
+
+export async function fetchKnownExnessServersFromMetaApi(): Promise<string[]> {
+  if (!isMt5ApiConfigured()) return [];
+  const now = Date.now();
+  if (cachedMetaApiExnessServers && now - cachedMetaApiExnessServers.fetchedAt < 15 * 60 * 1000) {
+    return cachedMetaApiExnessServers.servers;
+  }
+
+  const baseUrl = getProvisioningUrl();
+  const discovered = new Set<string>();
+  const queries = ['Exness', 'ExnessSC', 'ExnessKE', 'ExnessVG'];
+
+  await Promise.all(
+    queries.map(async (q) => {
+      try {
+        const res = await metaApiFetch<Record<string, string[]>>(
+          `${baseUrl}/users/current/known-mt-servers/5/${encodeURIComponent(q)}`
+        );
+        if (res && typeof res === 'object') {
+          for (const serverList of Object.values(res)) {
+            if (Array.isArray(serverList)) {
+              for (const srv of serverList) {
+                if (typeof srv === 'string' && srv.trim()) {
+                  discovered.add(srv.trim());
+                }
+              }
+            }
+          }
+        }
+      } catch {
+        // ignore unsupported query or temporary MetaApi lookup issue
+      }
+    })
+  );
+
+  const servers = Array.from(discovered).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  cachedMetaApiExnessServers = { fetchedAt: now, servers };
+  return servers;
+}
+
 export async function provisionAndDeployMt5Account(params: {
   login: string;
   password: string;

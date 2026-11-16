@@ -14,6 +14,11 @@ import {
   Radar,
 } from 'lucide-react';
 import { apiFetch, type AutoTradeRunResult } from '../lib/api';
+import {
+  ALL_EXNESS_MT5_SERVERS,
+  BARE_EXNESS_SERVER_PREFIX_RE,
+  EXNESS_MT5_SERVER_GROUPS,
+} from '../lib/exnessServers';
 import type { PublicConfig, User } from '../types';
 
 interface EaBotsViewProps {
@@ -50,19 +55,6 @@ interface Mt5TradeCommand {
   executed_at: string | null;
 }
 
-const PRESET_SERVERS = [
-  'Exness-MT5Real2',
-  'Exness-MT5Real5',
-  'Exness-MT5Real8',
-  'Exness-MT5Real9',
-  'Exness-MT5Real14',
-  'Exness-MT5Real18',
-  'Exness-MT5Trial5',
-  'Exness-MT5Trial8',
-  'CUSTOM',
-];
-
-const BARE_SERVER_PREFIX_RE = /^Exness-MT5(Real|Trial)$/i;
 const NUMERIC_MT5_LOGIN_RE = /^\d{4,16}$/;
 
 const TRADE_SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'NAS100', 'US30', 'BTCUSD'];
@@ -76,18 +68,27 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   const [activeFile, setActiveFile] = useState<'silverbullet' | 'orderblock' | 'guide'>('silverbullet');
   const [fileContent, setFileContent] = useState('');
   const [fileName, setFileName] = useState('');
+  const [discoveredServers, setDiscoveredServers] = useState<string[]>([]);
+  const [serverFilter, setServerFilter] = useState('');
+
+  const allKnownPresetServers = React.useMemo(
+    () => Array.from(new Set([...ALL_EXNESS_MT5_SERVERS, ...discoveredServers])),
+    [discoveredServers]
+  );
 
   const rawSavedServer = (user.mt5Server || '').trim();
-  const hasValidSavedServer = Boolean(rawSavedServer && !BARE_SERVER_PREFIX_RE.test(rawSavedServer));
+  const hasValidSavedServer = Boolean(
+    rawSavedServer && !BARE_EXNESS_SERVER_PREFIX_RE.test(rawSavedServer)
+  );
   const [serverPreset, setServerPreset] = useState(
     !hasValidSavedServer
       ? ''
-      : PRESET_SERVERS.includes(rawSavedServer)
+      : ALL_EXNESS_MT5_SERVERS.includes(rawSavedServer)
       ? rawSavedServer
       : 'CUSTOM'
   );
   const [customServer, setCustomServer] = useState(
-    hasValidSavedServer && !PRESET_SERVERS.includes(rawSavedServer) ? rawSavedServer : ''
+    hasValidSavedServer && !ALL_EXNESS_MT5_SERVERS.includes(rawSavedServer) ? rawSavedServer : ''
   );
   const savedNumericLogin =
     user.mt5Login && NUMERIC_MT5_LOGIN_RE.test(user.mt5Login.trim()) ? user.mt5Login.trim() : '';
@@ -184,6 +185,28 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
     return () => clearInterval(id);
   }, [user.hasEaBots, fetchMt5Status]);
 
+  useEffect(() => {
+    if (!user.hasEaBots) return;
+    apiFetch<{ servers?: string[] }>('/api/ea/mt5/servers')
+      .then((res) => {
+        if (Array.isArray(res.servers)) {
+          setDiscoveredServers(res.servers.filter((s) => !ALL_EXNESS_MT5_SERVERS.includes(s)));
+        }
+      })
+      .catch(() => {});
+  }, [user.hasEaBots]);
+
+  useEffect(() => {
+    if (
+      hasValidSavedServer &&
+      serverPreset === 'CUSTOM' &&
+      allKnownPresetServers.includes(rawSavedServer)
+    ) {
+      setServerPreset(rawSavedServer);
+      setCustomServer('');
+    }
+  }, [allKnownPresetServers, hasValidSavedServer, rawSavedServer, serverPreset]);
+
   if (!user.hasEaBots) {
     return (
       <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-8">
@@ -241,9 +264,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
       return;
     }
 
-    if (BARE_SERVER_PREFIX_RE.test(cleanServer)) {
+    if (BARE_EXNESS_SERVER_PREFIX_RE.test(cleanServer)) {
       setErrorMessage(
-        `${cleanServer} is only the prefix. Pick the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8).`
+        `${cleanServer} is only the prefix. Pick the exact numbered server shown in the client's MT5 terminal (e.g. Exness-MT5Real8 or ExnessKE-MT5Real4).`
       );
       return;
     }
@@ -725,9 +748,21 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Exact MT5 Broker Server
-                </label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Exact MT5 Broker Server
+                  </label>
+                  <span className="text-[11px] font-mono text-slate-500">
+                    {allKnownPresetServers.length} Exness servers
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={serverFilter}
+                  onChange={(e) => setServerFilter(e.target.value)}
+                  placeholder="Quick filter (e.g. Real37, Trial8, KE, SC, VG)..."
+                  className="mb-2 w-full px-3 py-1.5 text-xs border border-slate-200 rounded-lg bg-slate-50 font-mono"
+                />
                 <select
                   required
                   value={serverPreset}
@@ -737,11 +772,39 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                   <option value="" disabled>
                     -- Select numbered MT5 server (e.g. Exness-MT5Real8) --
                   </option>
-                  {PRESET_SERVERS.map((srv) => (
-                    <option key={srv} value={srv}>
-                      {srv === 'CUSTOM' ? 'Other / Custom Numbered MT5 Server...' : srv}
-                    </option>
-                  ))}
+                  {EXNESS_MT5_SERVER_GROUPS.map((group) => {
+                    const q = serverFilter.trim().toLowerCase();
+                    const filtered = q
+                      ? group.servers.filter((s) => s.toLowerCase().includes(q))
+                      : group.servers;
+                    if (filtered.length === 0) return null;
+                    return (
+                      <optgroup key={group.label} label={group.label}>
+                        {filtered.map((srv) => (
+                          <option key={srv} value={srv}>
+                            {srv}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
+                  {discoveredServers.length > 0 && (() => {
+                    const q = serverFilter.trim().toLowerCase();
+                    const filteredDiscovered = q
+                      ? discoveredServers.filter((s) => s.toLowerCase().includes(q))
+                      : discoveredServers;
+                    if (filteredDiscovered.length === 0) return null;
+                    return (
+                      <optgroup label="MetaApi Discovered Exness Servers">
+                        {filteredDiscovered.map((srv) => (
+                          <option key={srv} value={srv}>
+                            {srv}
+                          </option>
+                        ))}
+                      </optgroup>
+                    );
+                  })()}
+                  <option value="CUSTOM">Other / Custom Numbered MT5 Server...</option>
                 </select>
                 {serverPreset === 'CUSTOM' && (
                   <input
@@ -749,12 +812,12 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                     required
                     value={customServer}
                     onChange={(e) => setCustomServer(e.target.value)}
-                    placeholder="Exact numbered MT5 server (e.g. Exness-MT5Real8)"
+                    placeholder="Exact numbered MT5 server (e.g. Exness-MT5Real55)"
                     className="mt-2 w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
                   />
                 )}
                 <p className="text-[11px] text-slate-500 mt-1">
-                  Exness servers are numbered (e.g. <span className="font-mono">Exness-MT5Real8</span>). Match the exact server shown in the client&apos;s MT5 terminal.
+                  Includes Global (<span className="font-mono">Exness-MT5Real1–50</span> / <span className="font-mono">Trial1–30</span>) and regional (<span className="font-mono">ExnessKE</span>, <span className="font-mono">ExnessSC</span>, <span className="font-mono">ExnessVG</span>, <span className="font-mono">ExnessZA</span>, <span className="font-mono">ExnessMU</span>, <span className="font-mono">ExnessBV</span>, <span className="font-mono">ExnessCY</span>, <span className="font-mono">ExnessJO</span>) servers, plus custom entry.
                 </p>
               </div>
 
