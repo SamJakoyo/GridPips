@@ -64,9 +64,20 @@ import {
   insertCloudJournalTrade,
   insertCloudMt5Command,
   syncUserStateToCloud,
+  upsertCloudMpesaTransaction,
   upsertCloudOrder,
 } from './cloudSync.ts';
 import { runCloudAutoTradePass } from './autoTradeEngine.ts';
+import {
+  clearDarajaTokenCache,
+  getDarajaConfigStatus,
+  initiateDarajaStkPush,
+  isSafaricomCallbackIp,
+  mapDarajaResultMessage,
+  parseDarajaCallback,
+  queryDarajaStkStatus,
+  testDarajaConnection,
+} from './daraja.ts';
 
 try {
   initDatabase();
@@ -176,6 +187,7 @@ interface DbUser {
   mt5_active_bot?: string | null;
   mt5_risk_percent?: number | null;
   mt5_connection_mode?: string | null;
+  wallet_balance_kes?: number | null;
   is_suspended: number;
   created_at: string;
   last_login_at: string | null;
@@ -217,6 +229,7 @@ function serializeUser(u: DbUser) {
     mt5ConnectionMode: 'metaapi' as const,
     mt5ApiConfigured: apiReady,
     mt5ProvisioningProfileConfigured: profileReady,
+    walletBalanceKes: Number(u.wallet_balance_kes || 0),
     isSuspended: Boolean(u.is_suspended),
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
@@ -250,6 +263,9 @@ function getServerEnvDiagnostics() {
   if (!isMt5ApiConfigured()) missingMetaApiEnvVars.push('METAAPI_TOKEN');
   if (!isMetaApiProfileConfigured()) missingMetaApiEnvVars.push('METAAPI_PROVISIONING_PROFILE_ID');
 
+  const settings = getSettingsMap();
+  const daraja = getDarajaConfigStatus(settings);
+
   return {
     missingSupabaseEnvVars: sb.missingEnvVars,
     missingSessionSecret,
@@ -259,6 +275,10 @@ function getServerEnvDiagnostics() {
     missingMetaApiEnvVars,
     metaApiConfigured: isMt5ApiConfigured(),
     metaApiProfileConfigured: isMetaApiProfileConfigured(),
+    missingMpesaDarajaEnvVars: daraja.missingEnvVars,
+    mpesaDarajaConfigured: daraja.configured,
+    mpesaDarajaEnv: daraja.env,
+    mpesaTransactionType: daraja.transactionType,
   };
 }
 
@@ -446,12 +466,27 @@ app.get('/api/health/supabase', async (_req, res) => {
   }
 });
 
+app.get('/robots.txt', (req, res) => {
+  const origin = resolvePublicAppOrigin(req);
+  res.type('text/plain').send(
+    `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${origin}/sitemap.xml\n`
+  );
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  const origin = resolvePublicAppOrigin(req);
+  res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url>\n    <loc>${origin}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n</urlset>\n`
+  );
+});
+
 app.get('/api/config/public', (_req, res) => {
   const s = getSettingsMap();
   const analyzerPriceUsd = Number(s.analyzer_price_usd || 5.25);
   const eaBotsPriceUsd = Number(s.ea_bots_price_usd || 5.25);
   const usdKesRate = Number(s.usd_kes_rate || 130);
   const sb = getSupabaseEnvConfig();
+  const daraja = getDarajaConfigStatus(s);
   res.json({
     exnessIbUrl: s.exness_ib_url,
     telegramUrl: s.telegram_url,
@@ -461,8 +496,12 @@ app.get('/api/config/public', (_req, res) => {
     usdKesRate,
     analyzerPriceKes: Math.round(analyzerPriceUsd * usdKesRate),
     eaBotsPriceKes: Math.round(eaBotsPriceUsd * usdKesRate),
-    mpesaTillNumber: s.mpesa_till_number || '5984120',
+    mpesaTillNumber: s.mpesa_till_number || daraja.partyB || daraja.shortCode || '1921416',
+    mpesaPartyB: s.mpesa_party_b || daraja.partyB || s.mpesa_till_number || '1921416',
+    mpesaTransactionType: daraja.transactionType,
     mpesaMerchantName: s.mpesa_merchant_name || 'GRIDPIPs Trading',
+    mpesaConfigured: daraja.configured,
+    mpesaEnv: daraja.env,
     commissionPct: Number(s.influencer_commission_pct || 20),
     supabaseConfigured: sb.configured,
     supabaseStatus: sb.status,
@@ -1508,7 +1547,7 @@ app.delete('/api/supabase/playbooks/:id', requireAuth, async (req: AuthedRequest
   }
 });
 
-// ---------------- Orders & Payments (MegaPay M-Pesa Till + Crypto Gateway) ----------------
+// ---------------- Orders & Payments (Safaricom M-Pesa Daraja + Crypto Gateway) ----------------
 function normalizeKenyanPhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, '');
   if (/^254[17]\d{8}$/.test(digits)) return digits;
@@ -1545,15 +1584,44 @@ app.post('/api/orders/create', requireAuth, (req: AuthedRequest, res) => {
       ? 'GRIDPIPs MQL5 EA Bots Pack + MT5 Bridge'
       : 'GRIDPIPs ICT Strategy Market Analyzer';
 
-  const orderNumber = `GP-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
-  const commissionUsd = user.referred_by ? Number(((amountUsd * commissionPct) / 100).toFixed(2)) : 0;
-
   let depositAddress: string | null = null;
   if (paymentMethod === 'crypto') {
     if (cryptoCurrency === 'BTC') depositAddress = settings.btc_address;
     else if (cryptoNetwork === 'ERC20') depositAddress = settings.usdt_erc20_address;
     else depositAddress = settings.usdt_trc20_address;
   }
+
+  // Reuse recent unpaid pending order for the same product to prevent duplicate clutter
+  const existingPending = db
+    .prepare(
+      `SELECT * FROM orders
+       WHERE user_id = ? AND product_key = ? AND payment_status = 'pending'
+       ORDER BY id DESC LIMIT 1`
+    )
+    .get(user.id, productKey) as { id: number } | undefined;
+
+  if (existingPending) {
+    db.prepare(
+      `UPDATE orders
+       SET amount_usd = ?, amount_kes = ?, payment_method = ?, crypto_currency = ?, crypto_network = ?, crypto_address = ?
+       WHERE id = ?`
+    ).run(
+      amountUsd,
+      amountKes,
+      paymentMethod,
+      paymentMethod === 'crypto' ? cryptoCurrency : null,
+      paymentMethod === 'crypto' ? cryptoNetwork : null,
+      depositAddress,
+      existingPending.id
+    );
+    const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(existingPending.id);
+    void upsertCloudOrder(existingPending.id);
+    res.status(200).json({ order: updatedOrder });
+    return;
+  }
+
+  const orderNumber = `GP-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
+  const commissionUsd = user.referred_by ? Number(((amountUsd * commissionPct) / 100).toFixed(2)) : 0;
 
   const info = db
     .prepare(
@@ -1594,11 +1662,17 @@ async function fulfillOrder(orderId: number): Promise<void> {
         amount_usd: number;
         amount_kes: number;
         payment_method: string;
+        payment_status: string;
       }
     | undefined;
   if (!order) return;
 
-  db.prepare("UPDATE orders SET payment_status = 'paid', paid_at = datetime('now') WHERE id = ?").run(orderId);
+  const alreadyPaid = order.payment_status === 'paid';
+  if (!alreadyPaid) {
+    db.prepare(
+      "UPDATE orders SET payment_status = 'paid', mpesa_result_code = COALESCE(mpesa_result_code, '0'), paid_at = COALESCE(paid_at, datetime('now')) WHERE id = ?"
+    ).run(orderId);
+  }
 
   if (order.product_key === 'analyzer') {
     db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(order.user_id);
@@ -1608,6 +1682,8 @@ async function fulfillOrder(orderId: number): Promise<void> {
 
   void upsertCloudOrder(orderId);
   void syncUserStateToCloud(order.user_id);
+
+  if (alreadyPaid) return;
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(order.user_id) as DbUser | undefined;
   if (user) {
@@ -1643,153 +1719,1158 @@ async function fulfillOrder(orderId: number): Promise<void> {
   }
 }
 
+interface DbMpesaTx {
+  id: number;
+  tx_reference: string;
+  user_id: number;
+  order_id: number | null;
+  purpose: string;
+  business_short_code: string;
+  party_b: string;
+  transaction_type: string;
+  phone_number: string;
+  amount_kes: number;
+  merchant_request_id: string | null;
+  checkout_request_id: string | null;
+  mpesa_receipt_number: string | null;
+  result_code: string | null;
+  result_desc: string | null;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  credited_to_wallet: number;
+  transaction_date: string | null;
+  callback_received_at: string | null;
+  source_ip: string | null;
+  raw_callback_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+const settleMpesaTxAndCreditWallet = db.transaction(
+  (params: {
+    txId: number;
+    receiptNumber: string | null;
+    resultDesc: string;
+    phoneNumber: string | null;
+    transactionDate: string | null;
+    sourceIp: string | null;
+    rawCallbackJson: string | null;
+    fromCallback: boolean;
+  }): { newlyCompleted: boolean; newlyCredited: boolean; userId: number; amountKes: number; purpose: string; orderId: number | null } => {
+    const tx = db.prepare('SELECT * FROM mpesa_transactions WHERE id = ?').get(params.txId) as DbMpesaTx | undefined;
+    if (!tx) {
+      return { newlyCompleted: false, newlyCredited: false, userId: 0, amountKes: 0, purpose: '', orderId: null };
+    }
+
+    const wasPending = tx.status === 'pending';
+    if (params.fromCallback) {
+      db.prepare(
+        `UPDATE mpesa_transactions
+         SET status = 'completed',
+             result_code = '0',
+             result_desc = ?,
+             mpesa_receipt_number = COALESCE(?, mpesa_receipt_number),
+             phone_number = COALESCE(?, phone_number),
+             transaction_date = COALESCE(?, transaction_date),
+             callback_received_at = COALESCE(callback_received_at, datetime('now')),
+             source_ip = COALESCE(source_ip, ?),
+             raw_callback_json = COALESCE(raw_callback_json, ?),
+             updated_at = datetime('now')
+         WHERE id = ?`
+      ).run(
+        params.resultDesc,
+        params.receiptNumber,
+        params.phoneNumber,
+        params.transactionDate,
+        params.sourceIp,
+        params.rawCallbackJson,
+        tx.id
+      );
+    } else {
+      db.prepare(
+        `UPDATE mpesa_transactions
+         SET status = 'completed',
+             result_code = '0',
+             result_desc = ?,
+             mpesa_receipt_number = COALESCE(?, mpesa_receipt_number),
+             updated_at = datetime('now')
+         WHERE id = ?`
+      ).run(params.resultDesc, params.receiptNumber, tx.id);
+    }
+
+    let newlyCredited = false;
+    if (tx.purpose === 'wallet_deposit') {
+      const creditRes = db
+        .prepare(
+          `UPDATE mpesa_transactions
+           SET credited_to_wallet = 1,
+               updated_at = datetime('now')
+           WHERE id = ? AND credited_to_wallet = 0`
+        )
+        .run(tx.id);
+      if (creditRes.changes === 1) {
+        db.prepare('UPDATE users SET wallet_balance_kes = wallet_balance_kes + ? WHERE id = ?').run(
+          tx.amount_kes,
+          tx.user_id
+        );
+        newlyCredited = true;
+      }
+    }
+
+    return {
+      newlyCompleted: wasPending,
+      newlyCredited,
+      userId: tx.user_id,
+      amountKes: tx.amount_kes,
+      purpose: tx.purpose,
+      orderId: tx.order_id,
+    };
+  }
+);
+
+function resolveDarajaCallbackUrl(req: Request): string {
+  const configured = (process.env.MPESA_CALLBACK_URL || '').trim();
+  if (configured) return configured;
+  return `${resolvePublicAppOrigin(req)}/api/payments/mpesa/callback`;
+}
+
 app.post('/api/orders/:id/mpesa/stk', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
   const phone = normalizeKenyanPhone(sanitizeText(req.body?.phone, 25));
   if (!phone) {
-    res.status(400).json({ error: 'Enter a valid Safaricom/Airtel Kenya number (e.g. 0712345678 or 254712345678).' });
+    res.status(400).json({ error: 'Enter a valid Safaricom M-Pesa phone number (e.g. 0712345678 or 254712345678).' });
     return;
   }
 
   const order = db
     .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
-    .get(orderId, req.currentUser!.id) as { id: number; order_number: string; amount_kes: number } | undefined;
+    .get(orderId, req.currentUser!.id) as
+    | {
+        id: number;
+        order_number: string;
+        product_key: string;
+        amount_kes: number;
+        payment_status: string;
+      }
+    | undefined;
 
   if (!order) {
     res.status(404).json({ error: 'Order not found.' });
     return;
   }
 
+  if (order.payment_status === 'paid') {
+    res.status(400).json({ error: 'This order is already paid and unlocked.' });
+    return;
+  }
+
   const settings = getSettingsMap();
-  const tillNumber = settings.mpesa_till_number || '5984120';
-  const apiKey = process.env.MEGAPAY_API_KEY;
-  const megaEmail = process.env.MEGAPAY_EMAIL;
+  const daraja = getDarajaConfigStatus(settings);
+  if (!daraja.configured) {
+    res.status(400).json({
+      error: `Safaricom M-Pesa Daraja STK Push is not configured on the server yet (missing: ${daraja.missingEnvVars.join(', ')}). Use manual Till / Paybill confirmation below or Crypto checkout.`,
+      missingEnvVars: daraja.missingEnvVars,
+    });
+    return;
+  }
 
-  let checkoutId = `MP-${Date.now().toString(36).toUpperCase()}`;
-  let mode: 'live' | 'sandbox' = 'sandbox';
-  let statusMessage = `STK Push sent to +${phone} for KES ${order.amount_kes} (MegaPay Till ${tillNumber}). Enter your M-Pesa PIN, then confirm below.`;
+  const callbackUrl = resolveDarajaCallbackUrl(req);
 
-  if (apiKey && megaEmail) {
-    try {
-      const megaResp = await fetch(settings.megapay_api_url || 'https://megapay.co.ke/api/v1/initiatestk', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: apiKey,
-          email: megaEmail,
-          amount: String(order.amount_kes),
-          msisdn: phone,
-          reference: order.order_number,
-          till_number: tillNumber,
-        }),
-      });
-      const megaJson = (await megaResp.json().catch(() => ({}))) as {
-        CheckoutRequestID?: string;
-        transaction_request_id?: string;
-        message?: string;
-      };
-      if (megaResp.ok && (megaJson.CheckoutRequestID || megaJson.transaction_request_id)) {
-        checkoutId = String(megaJson.CheckoutRequestID || megaJson.transaction_request_id);
-        mode = 'live';
-        statusMessage = `Live MegaPay STK prompt dispatched to +${phone} for KES ${order.amount_kes}. Complete M-Pesa PIN on your handset.`;
+  try {
+    const stkResult = await initiateDarajaStkPush({
+      phone,
+      amountKes: order.amount_kes,
+      accountReference: order.order_number,
+      transactionDesc: order.product_key === 'ea_bots' ? 'GRIDPIPs EAs' : 'GRIDPIPs ICT',
+      callbackUrl,
+      settings,
+    });
+
+    db.prepare(
+      `UPDATE orders
+       SET payment_method = 'mpesa',
+           payment_status = 'processing',
+           mpesa_phone = ?,
+           mpesa_checkout_id = ?,
+           mpesa_merchant_request_id = ?,
+           mpesa_result_code = NULL,
+           mpesa_result_desc = ?
+       WHERE id = ?`
+    ).run(
+      phone,
+      stkResult.checkoutRequestId,
+      stkResult.merchantRequestId || null,
+      stkResult.customerMessage,
+      order.id
+    );
+
+    const txRef = `${order.order_number}-${Date.now().toString(36).toUpperCase()}`;
+    const txInfo = db
+      .prepare(
+        `INSERT INTO mpesa_transactions (
+          tx_reference, user_id, order_id, purpose, business_short_code, party_b, transaction_type,
+          phone_number, amount_kes, merchant_request_id, checkout_request_id, result_desc, status
+        ) VALUES (?, ?, ?, 'order_payment', ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+      )
+      .run(
+        txRef,
+        req.currentUser!.id,
+        order.id,
+        stkResult.shortCode,
+        stkResult.partyB,
+        stkResult.transactionType,
+        phone,
+        order.amount_kes,
+        stkResult.merchantRequestId || null,
+        stkResult.checkoutRequestId,
+        stkResult.customerMessage
+      );
+
+    void upsertCloudOrder(order.id);
+    void upsertCloudMpesaTransaction(Number(txInfo.lastInsertRowid));
+    logSecurityEvent(
+      'DARAJA_STK_INITIATED',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} · +${phone} · CheckoutID ${stkResult.checkoutRequestId} (${daraja.env})`
+    );
+
+    const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    res.json({
+      order: updated,
+      mode: daraja.env,
+      transactionType: stkResult.transactionType,
+      shortCode: stkResult.shortCode,
+      partyB: stkResult.partyB,
+      checkoutId: stkResult.checkoutRequestId,
+      merchantRequestId: stkResult.merchantRequestId,
+      message: stkResult.customerMessage,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Unable to send Safaricom M-Pesa Daraja STK prompt.';
+    logSecurityEvent(
+      'DARAJA_STK_ERROR',
+      'warning',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number}: ${msg}`
+    );
+    res.status(502).json({ error: msg });
+  }
+});
+
+app.post('/api/orders/:id/wallet/pay', requireAuth, async (req: AuthedRequest, res) => {
+  const orderId = Number(req.params.id);
+  const order = db
+    .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+    .get(orderId, req.currentUser!.id) as
+    | { id: number; order_number: string; user_id: number; amount_kes: number; payment_status: string }
+    | undefined;
+
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+  if (order.payment_status === 'paid') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({ status: 'paid', order, user: serializeUser(user), message: 'Order already paid.' });
+    return;
+  }
+
+  const deductWalletTx = db.transaction(() => {
+    const debit = db
+      .prepare('UPDATE users SET wallet_balance_kes = wallet_balance_kes - ? WHERE id = ? AND wallet_balance_kes >= ?')
+      .run(order.amount_kes, req.currentUser!.id, order.amount_kes);
+    if (debit.changes !== 1) {
+      return false;
+    }
+    db.prepare(
+      `UPDATE orders
+       SET payment_method = 'mpesa',
+           mpesa_receipt = COALESCE(mpesa_receipt, ?),
+           mpesa_result_code = '0',
+           mpesa_result_desc = 'Settled from confirmed M-Pesa KES Wallet balance.'
+       WHERE id = ?`
+    ).run(`WALLET-${order.order_number}`, order.id);
+    return true;
+  });
+
+  if (!deductWalletTx()) {
+    const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.status(400).json({
+      error: `Insufficient confirmed KES wallet balance (Available: KES ${Number(freshUser.wallet_balance_kes || 0).toLocaleString()} · Required: KES ${order.amount_kes.toLocaleString()}).`,
+    });
+    return;
+  }
+
+  await fulfillOrder(order.id);
+  logSecurityEvent(
+    'WALLET_ORDER_PAID',
+    'info',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Paid order ${order.order_number} (KES ${order.amount_kes}) from confirmed KES wallet`
+  );
+  const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  const updatedUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+  res.json({
+    status: 'paid',
+    order: updatedOrder,
+    user: serializeUser(updatedUser),
+    message: 'Payment settled from your verified KES wallet balance and license unlocked.',
+  });
+});
+
+app.get('/api/orders/:id/mpesa/status', requireAuth, async (req: AuthedRequest, res) => {
+  const orderId = Number(req.params.id);
+  const order = db
+    .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+    .get(orderId, req.currentUser!.id) as
+    | {
+        id: number;
+        order_number: string;
+        payment_status: string;
+        mpesa_checkout_id: string | null;
+        mpesa_receipt: string | null;
+        mpesa_result_code: string | null;
+        mpesa_result_desc: string | null;
       }
+    | undefined;
+
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+
+  if (order.payment_status === 'paid') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({
+      status: 'paid',
+      order,
+      user: serializeUser(user),
+      message: 'Payment confirmed and license unlocked.',
+    });
+    return;
+  }
+
+  if (order.payment_status === 'failed') {
+    res.json({
+      status: 'failed',
+      order,
+      message: order.mpesa_result_desc || 'M-Pesa transaction did not complete. You can retry STK Push.',
+    });
+    return;
+  }
+
+  const settings = getSettingsMap();
+  const daraja = getDarajaConfigStatus(settings);
+  if (order.mpesa_checkout_id && daraja.configured) {
+    try {
+      const queryRes = await queryDarajaStkStatus(order.mpesa_checkout_id, settings);
+      const matchingTx = db
+        .prepare('SELECT id FROM mpesa_transactions WHERE checkout_request_id = ?')
+        .get(order.mpesa_checkout_id) as { id: number } | undefined;
+
+      if (queryRes.state === 'paid') {
+        db.prepare(
+          "UPDATE orders SET mpesa_result_code = '0', mpesa_result_desc = ? WHERE id = ?"
+        ).run(queryRes.resultDesc, order.id);
+        if (matchingTx) {
+          settleMpesaTxAndCreditWallet({
+            txId: matchingTx.id,
+            receiptNumber: order.mpesa_receipt || null,
+            resultDesc: queryRes.resultDesc,
+            phoneNumber: null,
+            transactionDate: null,
+            sourceIp: null,
+            rawCallbackJson: null,
+            fromCallback: false,
+          });
+          void upsertCloudMpesaTransaction(matchingTx.id);
+        }
+        await fulfillOrder(order.id);
+        const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+        res.json({
+          status: 'paid',
+          order: updatedOrder,
+          user: serializeUser(user),
+          message: queryRes.resultDesc,
+        });
+        return;
+      }
+      if (queryRes.state === 'failed') {
+        const txStatus = queryRes.resultCode === '1032' ? 'cancelled' : 'failed';
+        db.prepare(
+          "UPDATE orders SET payment_status = 'failed', mpesa_result_code = ?, mpesa_result_desc = ? WHERE id = ?"
+        ).run(queryRes.resultCode, queryRes.resultDesc, order.id);
+        if (matchingTx) {
+          db.prepare(
+            `UPDATE mpesa_transactions
+             SET status = ?, result_code = ?, result_desc = ?, updated_at = datetime('now')
+             WHERE id = ? AND status = 'pending'`
+          ).run(txStatus, queryRes.resultCode, queryRes.resultDesc, matchingTx.id);
+          void upsertCloudMpesaTransaction(matchingTx.id);
+        }
+        void upsertCloudOrder(order.id);
+        const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+        res.json({
+          status: 'failed',
+          order: updatedOrder,
+          message: queryRes.resultDesc,
+        });
+        return;
+      }
+      res.json({
+        status: 'processing',
+        order,
+        message: queryRes.resultDesc,
+      });
+      return;
     } catch (err) {
-      console.warn('MegaPay live STK fallback to Till manual verification:', err);
+      res.json({
+        status: 'processing',
+        order,
+        message:
+          err instanceof Error
+            ? `Checking Safaricom status (${err.message})...`
+            : 'Awaiting M-Pesa confirmation...',
+      });
+      return;
     }
   }
 
-  db.prepare(
-    "UPDATE orders SET payment_method = 'mpesa', payment_status = 'processing', mpesa_phone = ?, mpesa_checkout_id = ? WHERE id = ?"
-  ).run(phone, checkoutId, order.id);
-
-  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
   res.json({
-    order: updated,
-    mode,
-    tillNumber,
-    checkoutId,
-    message: statusMessage,
+    status: order.payment_status === 'processing' ? 'processing' : 'pending',
+    order,
+    message: order.mpesa_result_desc || 'Awaiting payment verification.',
   });
 });
 
 app.post('/api/orders/:id/mpesa/confirm', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
-  const rawReceipt = sanitizeText(req.body?.mpesaReceipt, 40).toUpperCase();
-  const simulateStk = Boolean(req.body?.simulateStk);
+  const rawReceipt = sanitizeText(req.body?.mpesaReceipt, 24).toUpperCase().replace(/\s+/g, '');
 
   const order = db
     .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
-    .get(orderId, req.currentUser!.id) as { id: number; mpesa_phone: string | null } | undefined;
+    .get(orderId, req.currentUser!.id) as
+    | { id: number; order_number: string; payment_status: string; amount_kes: number }
+    | undefined;
 
   if (!order) {
     res.status(404).json({ error: 'Order not found.' });
     return;
   }
 
-  const receipt = simulateStk && !rawReceipt
-    ? `MP${Date.now().toString(36).toUpperCase().slice(-8)}`
-    : rawReceipt;
-
-  if (receipt.length < 6) {
-    res.status(400).json({ error: 'Enter your M-Pesa confirmation code (minimum 6 characters, e.g. UAJ8K4M92P).' });
+  if (order.payment_status === 'paid') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({ order, user: serializeUser(user), status: 'paid' });
     return;
   }
 
-  db.prepare("UPDATE orders SET payment_method = 'mpesa', mpesa_receipt = ? WHERE id = ?").run(receipt, order.id);
-  await fulfillOrder(order.id);
+  if (!/^[A-Z0-9]{8,14}$/.test(rawReceipt)) {
+    res.status(400).json({
+      error: 'Enter a valid Safaricom M-Pesa SMS confirmation code (8–14 letters/digits, e.g. UAJ8K4M92P).',
+    });
+    return;
+  }
+
+  const duplicate = db
+    .prepare('SELECT id FROM orders WHERE mpesa_receipt = ? AND id != ?')
+    .get(rawReceipt, order.id) as { id: number } | undefined;
+  const duplicateTx = db
+    .prepare('SELECT id FROM mpesa_transactions WHERE mpesa_receipt_number = ?')
+    .get(rawReceipt) as { id: number } | undefined;
+  if (duplicate || duplicateTx) {
+    res.status(409).json({
+      error: 'This M-Pesa confirmation code has already been used.',
+    });
+    return;
+  }
+
+  db.prepare(
+    `UPDATE orders
+     SET payment_method = 'mpesa',
+         payment_status = 'processing',
+         mpesa_receipt = ?,
+         mpesa_result_desc = ?
+     WHERE id = ?`
+  ).run(
+    rawReceipt,
+    'Manual M-Pesa confirmation code submitted — awaiting merchant settlement review.',
+    order.id
+  );
+
+  // Admins verifying their own account unlock immediately; regular users await settlement confirmation
+  if (req.currentUser!.role === 'admin') {
+    await fulfillOrder(order.id);
+  } else {
+    void upsertCloudOrder(order.id);
+    logSecurityEvent(
+      'MPESA_MANUAL_RECEIPT_SUBMITTED',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} · Receipt ${rawReceipt} (KES ${order.amount_kes})`
+    );
+  }
+
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id) as {
+    payment_status: string;
+  };
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+  res.json({
+    order: updated,
+    user: serializeUser(user),
+    status: updated.payment_status,
+    message:
+      updated.payment_status === 'paid'
+        ? 'M-Pesa receipt verified and access unlocked.'
+        : `M-Pesa code ${rawReceipt} submitted for verification. Once confirmed, your license unlocks automatically.`,
+  });
+});
+
+app.post('/api/orders/:id/mpesa/reset', requireAuth, (req: AuthedRequest, res) => {
+  const orderId = Number(req.params.id);
+  const order = db
+    .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+    .get(orderId, req.currentUser!.id) as
+    | { id: number; payment_status: string; mpesa_checkout_id: string | null }
+    | undefined;
+
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+  if (order.payment_status === 'paid') {
+    res.status(400).json({ error: 'Paid orders cannot be reset.' });
+    return;
+  }
+
+  if (order.mpesa_checkout_id) {
+    db.prepare(
+      `UPDATE mpesa_transactions
+       SET status = 'cancelled',
+           result_desc = 'Reset by customer before completion.',
+           updated_at = datetime('now')
+       WHERE checkout_request_id = ? AND status = 'pending'`
+    ).run(order.mpesa_checkout_id);
+  }
+
+  db.prepare(
+    `UPDATE orders
+     SET payment_status = 'pending',
+         mpesa_checkout_id = NULL,
+         mpesa_merchant_request_id = NULL,
+         mpesa_result_code = NULL,
+         mpesa_result_desc = NULL
+     WHERE id = ?`
+  ).run(order.id);
+  void upsertCloudOrder(order.id);
 
   const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
-  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
-  res.json({ order: updated, user: serializeUser(user) });
+  res.json({ order: updated });
 });
 
-app.post('/api/payments/megapay/webhook', async (req, res) => {
-  try {
-    const body = req.body || {};
-    const reference = sanitizeText(body.reference || body.AccountReference || '', 60);
-    const checkoutId = sanitizeText(body.CheckoutRequestID || body.transaction_request_id || '', 80);
-    const receipt = sanitizeText(body.MpesaReceiptNumber || body.TransactionReceipt || body.receipt || '', 40);
-    const resultCode = Number(body.ResponseCode ?? body.ResultCode ?? -1);
+// ---------------- Customer Wallet Deposits (Safaricom Daraja STK Push) ----------------
+app.get('/api/wallet/summary', requireAuth, (req: AuthedRequest, res) => {
+  const freshUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+  const transactions = db
+    .prepare(
+      `SELECT * FROM mpesa_transactions
+       WHERE user_id = ?
+       ORDER BY id DESC LIMIT 50`
+    )
+    .all(req.currentUser!.id);
+  res.json({
+    walletBalanceKes: Number(freshUser.wallet_balance_kes || 0),
+    transactions,
+  });
+});
 
-    if (resultCode === 0 && (reference || checkoutId)) {
-      const order = db
-        .prepare('SELECT id FROM orders WHERE order_number = ? OR mpesa_checkout_id = ?')
-        .get(reference, checkoutId) as { id: number } | undefined;
-      if (order) {
-        if (receipt) {
-          db.prepare('UPDATE orders SET mpesa_receipt = ? WHERE id = ?').run(receipt, order.id);
-        }
-        await fulfillOrder(order.id);
-      }
-    }
-    res.json({ received: true });
+app.post('/api/wallet/mpesa/deposit', requireAuth, async (req: AuthedRequest, res) => {
+  const phone = normalizeKenyanPhone(sanitizeText(req.body?.phone, 25));
+  const rawAmount = Number(req.body?.amountKes);
+  const amountKes = Math.round(rawAmount);
+
+  if (!phone) {
+    res.status(400).json({ error: 'Enter a valid Safaricom M-Pesa phone number (e.g. 0712345678 or 254712345678).' });
+    return;
+  }
+  if (!Number.isFinite(rawAmount) || amountKes < 10 || amountKes > 150000) {
+    res.status(400).json({ error: 'Deposit amount must be between KES 10 and KES 150,000.' });
+    return;
+  }
+
+  const settings = getSettingsMap();
+  const daraja = getDarajaConfigStatus(settings);
+  if (!daraja.configured) {
+    res.status(400).json({
+      error: `Safaricom M-Pesa Daraja STK Push is not configured on the server yet (missing: ${daraja.missingEnvVars.join(', ')}).`,
+      missingEnvVars: daraja.missingEnvVars,
+    });
+    return;
+  }
+
+  const txReference = `GPW-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
+  const callbackUrl = resolveDarajaCallbackUrl(req);
+
+  try {
+    const stkResult = await initiateDarajaStkPush({
+      phone,
+      amountKes,
+      accountReference: txReference,
+      transactionDesc: 'GRIDPIPs Wallet',
+      callbackUrl,
+      settings,
+    });
+
+    const info = db
+      .prepare(
+        `INSERT INTO mpesa_transactions (
+          tx_reference, user_id, order_id, purpose, business_short_code, party_b, transaction_type,
+          phone_number, amount_kes, merchant_request_id, checkout_request_id, result_desc, status
+        ) VALUES (?, ?, NULL, 'wallet_deposit', ?, ?, ?, ?, ?, ?, ?, ?, 'pending')`
+      )
+      .run(
+        txReference,
+        req.currentUser!.id,
+        stkResult.shortCode,
+        stkResult.partyB,
+        stkResult.transactionType,
+        phone,
+        amountKes,
+        stkResult.merchantRequestId || null,
+        stkResult.checkoutRequestId,
+        stkResult.customerMessage
+      );
+
+    const txId = Number(info.lastInsertRowid);
+    void upsertCloudMpesaTransaction(txId);
+    logSecurityEvent(
+      'DARAJA_WALLET_STK_INITIATED',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Wallet deposit ${txReference} · KES ${amountKes} · +${phone} · CheckoutID ${stkResult.checkoutRequestId}`
+    );
+
+    const transaction = db.prepare('SELECT * FROM mpesa_transactions WHERE id = ?').get(txId);
+    res.status(201).json({
+      transaction,
+      mode: daraja.env,
+      transactionType: stkResult.transactionType,
+      shortCode: stkResult.shortCode,
+      partyB: stkResult.partyB,
+      checkoutId: stkResult.checkoutRequestId,
+      merchantRequestId: stkResult.merchantRequestId,
+      message: stkResult.customerMessage,
+    });
   } catch (err) {
-    console.error('MegaPay webhook error:', err);
-    res.status(500).json({ error: 'Webhook processing error' });
+    const msg = err instanceof Error ? err.message : 'Unable to send Safaricom M-Pesa Daraja STK prompt.';
+    logSecurityEvent(
+      'DARAJA_WALLET_STK_ERROR',
+      'warning',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Wallet deposit KES ${amountKes}: ${msg}`
+    );
+    res.status(502).json({ error: msg });
   }
 });
+
+app.get('/api/wallet/mpesa/:id/status', requireAuth, async (req: AuthedRequest, res) => {
+  const txId = Number(req.params.id);
+  const tx = db
+    .prepare('SELECT * FROM mpesa_transactions WHERE id = ? AND user_id = ?')
+    .get(txId, req.currentUser!.id) as DbMpesaTx | undefined;
+
+  if (!tx) {
+    res.status(404).json({ error: 'M-Pesa transaction not found.' });
+    return;
+  }
+
+  if (tx.status === 'completed') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({
+      status: 'completed',
+      transaction: tx,
+      user: serializeUser(user),
+      walletBalanceKes: Number(user.wallet_balance_kes || 0),
+      message: tx.result_desc || 'Deposit confirmed and credited to your wallet.',
+    });
+    return;
+  }
+
+  if (tx.status === 'failed' || tx.status === 'cancelled') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({
+      status: tx.status,
+      transaction: tx,
+      user: serializeUser(user),
+      walletBalanceKes: Number(user.wallet_balance_kes || 0),
+      message: tx.result_desc || 'M-Pesa deposit was not completed.',
+    });
+    return;
+  }
+
+  const settings = getSettingsMap();
+  const daraja = getDarajaConfigStatus(settings);
+  if (tx.checkout_request_id && daraja.configured) {
+    try {
+      const queryRes = await queryDarajaStkStatus(tx.checkout_request_id, settings);
+      if (queryRes.state === 'paid') {
+        const outcome = settleMpesaTxAndCreditWallet({
+          txId: tx.id,
+          receiptNumber: tx.mpesa_receipt_number,
+          resultDesc: queryRes.resultDesc,
+          phoneNumber: null,
+          transactionDate: null,
+          sourceIp: null,
+          rawCallbackJson: null,
+          fromCallback: false,
+        });
+        void upsertCloudMpesaTransaction(tx.id);
+        if (outcome.newlyCredited) {
+          void syncUserStateToCloud(req.currentUser!.id);
+          logSecurityEvent(
+            'WALLET_CREDITED_STK_QUERY',
+            'info',
+            getClientIp(req),
+            req.currentUser!.email,
+            `Wallet credited KES ${tx.amount_kes} via Daraja STK Query (${tx.tx_reference})`
+          );
+        }
+        const updatedTx = db.prepare('SELECT * FROM mpesa_transactions WHERE id = ?').get(tx.id);
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+        res.json({
+          status: 'completed',
+          transaction: updatedTx,
+          user: serializeUser(user),
+          walletBalanceKes: Number(user.wallet_balance_kes || 0),
+          message: queryRes.resultDesc,
+        });
+        return;
+      }
+      if (queryRes.state === 'failed') {
+        const nextStatus = queryRes.resultCode === '1032' ? 'cancelled' : 'failed';
+        db.prepare(
+          `UPDATE mpesa_transactions
+           SET status = ?, result_code = ?, result_desc = ?, updated_at = datetime('now')
+           WHERE id = ? AND status = 'pending'`
+        ).run(nextStatus, queryRes.resultCode, queryRes.resultDesc, tx.id);
+        void upsertCloudMpesaTransaction(tx.id);
+        const updatedTx = db.prepare('SELECT * FROM mpesa_transactions WHERE id = ?').get(tx.id);
+        const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+        res.json({
+          status: nextStatus,
+          transaction: updatedTx,
+          user: serializeUser(user),
+          walletBalanceKes: Number(user.wallet_balance_kes || 0),
+          message: queryRes.resultDesc,
+        });
+        return;
+      }
+      res.json({
+        status: 'pending',
+        transaction: tx,
+        message: queryRes.resultDesc,
+      });
+      return;
+    } catch (err) {
+      res.json({
+        status: 'pending',
+        transaction: tx,
+        message:
+          err instanceof Error
+            ? `Checking Safaricom status (${err.message})...`
+            : 'Awaiting M-Pesa confirmation...',
+      });
+      return;
+    }
+  }
+
+  res.json({
+    status: 'pending',
+    transaction: tx,
+    message: tx.result_desc || 'Awaiting M-Pesa confirmation...',
+  });
+});
+
+async function handleDarajaCallback(req: Request, res: Response) {
+  const clientIp = getClientIp(req);
+  try {
+    // 1. Optional shared callback secret enforcement when MPESA_CALLBACK_SECRET is set
+    const callbackSecret = (process.env.MPESA_CALLBACK_SECRET || '').trim();
+    if (callbackSecret) {
+      const providedToken = String(req.query.token || req.headers['x-mpesa-callback-secret'] || '').trim();
+      if (providedToken !== callbackSecret) {
+        logSecurityEvent(
+          'DARAJA_CALLBACK_AUTH_REJECTED',
+          'critical',
+          clientIp,
+          null,
+          'Rejected M-Pesa callback with missing or invalid secret token'
+        );
+        res.status(403).json({ ResultCode: 1, ResultDesc: 'Forbidden' });
+        return;
+      }
+    }
+
+    const parsed = parseDarajaCallback(req.body);
+    if (!parsed) {
+      logSecurityEvent(
+        'DARAJA_CALLBACK_MALFORMED',
+        'warning',
+        clientIp,
+        null,
+        'Ignored malformed or unrecognized M-Pesa Daraja callback payload'
+      );
+      res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      return;
+    }
+
+    const tx = db
+      .prepare('SELECT * FROM mpesa_transactions WHERE checkout_request_id = ?')
+      .get(parsed.checkoutRequestId) as DbMpesaTx | undefined;
+    const order = db
+      .prepare('SELECT * FROM orders WHERE mpesa_checkout_id = ?')
+      .get(parsed.checkoutRequestId) as
+      | {
+          id: number;
+          order_number: string;
+          amount_kes: number;
+          payment_status: string;
+          mpesa_merchant_request_id: string | null;
+        }
+      | undefined;
+
+    // 2. Reject fabricated / unknown CheckoutRequestID payloads
+    if (!tx && !order) {
+      logSecurityEvent(
+        'DARAJA_CALLBACK_UNKNOWN_CHECKOUT',
+        'warning',
+        clientIp,
+        null,
+        `Ignored callback for unknown CheckoutRequestID ${parsed.checkoutRequestId}`
+      );
+      res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      return;
+    }
+
+    // 3. Cross-check MerchantRequestID matches initiated STK Push record
+    const expectedMerchantId = tx?.merchant_request_id || order?.mpesa_merchant_request_id || '';
+    if (expectedMerchantId && parsed.merchantRequestId && expectedMerchantId !== parsed.merchantRequestId) {
+      logSecurityEvent(
+        'DARAJA_CALLBACK_MERCHANT_MISMATCH',
+        'critical',
+        clientIp,
+        null,
+        `MerchantRequestID mismatch on ${parsed.checkoutRequestId} (expected ${expectedMerchantId}, got ${parsed.merchantRequestId})`
+      );
+      res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+      return;
+    }
+
+    const rawCallbackJson = JSON.stringify(req.body).slice(0, 8000);
+    const settings = getSettingsMap();
+    const daraja = getDarajaConfigStatus(settings);
+    const fromSafaricomIp = isSafaricomCallbackIp(clientIp);
+
+    // 4. Fraud protection: if source IP is not Safaricom's allowlisted IPs, cross-verify with Daraja STK Query API before accepting success
+    if (parsed.resultCode === 0 && !fromSafaricomIp) {
+      if (!daraja.configured) {
+        logSecurityEvent(
+          'DARAJA_CALLBACK_UNVERIFIED_SOURCE',
+          'critical',
+          clientIp,
+          null,
+          `Blocked unverified success callback from ${clientIp} for ${parsed.checkoutRequestId} while Daraja credentials are missing`
+        );
+        res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+      try {
+        const verified = await queryDarajaStkStatus(parsed.checkoutRequestId, settings);
+        if (verified.state !== 'paid') {
+          logSecurityEvent(
+            'DARAJA_CALLBACK_FRAUD_BLOCKED',
+            'critical',
+            clientIp,
+            null,
+            `Blocked spoofed callback for ${parsed.checkoutRequestId} from ${clientIp}; Daraja query state=${verified.state} (${verified.resultDesc})`
+          );
+          res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+          return;
+        }
+      } catch (verifyErr) {
+        logSecurityEvent(
+          'DARAJA_CALLBACK_VERIFY_ERROR',
+          'warning',
+          clientIp,
+          null,
+          `Unable to cross-verify callback for ${parsed.checkoutRequestId} from ${clientIp}: ${verifyErr instanceof Error ? verifyErr.message : 'error'}`
+        );
+        res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+    }
+
+    const expectedAmountKes = tx ? tx.amount_kes : order ? order.amount_kes : 0;
+
+    if (parsed.resultCode === 0) {
+      // 5. Require M-Pesa Receipt Number and enforce strict uniqueness (no replay receipts)
+      if (!parsed.mpesaReceiptNumber) {
+        logSecurityEvent(
+          'DARAJA_CALLBACK_MISSING_RECEIPT',
+          'warning',
+          clientIp,
+          null,
+          `Success callback for ${parsed.checkoutRequestId} missing MpesaReceiptNumber — skipped settlement`
+        );
+        res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+
+      const duplicateReceiptTx = db
+        .prepare(
+          'SELECT id, checkout_request_id FROM mpesa_transactions WHERE mpesa_receipt_number = ? AND (checkout_request_id IS NULL OR checkout_request_id != ?)'
+        )
+        .get(parsed.mpesaReceiptNumber, parsed.checkoutRequestId) as { id: number } | undefined;
+      const duplicateReceiptOrder = db
+        .prepare(
+          'SELECT id, order_number FROM orders WHERE mpesa_receipt = ? AND (mpesa_checkout_id IS NULL OR mpesa_checkout_id != ?)'
+        )
+        .get(parsed.mpesaReceiptNumber, parsed.checkoutRequestId) as { id: number } | undefined;
+
+      if (duplicateReceiptTx || duplicateReceiptOrder) {
+        logSecurityEvent(
+          'DARAJA_DUPLICATE_RECEIPT_BLOCKED',
+          'critical',
+          clientIp,
+          null,
+          `Blocked duplicate M-Pesa receipt ${parsed.mpesaReceiptNumber} on ${parsed.checkoutRequestId}`
+        );
+        res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+
+      // 6. Validate amount meets expected order/deposit amount
+      const amountOk = parsed.amount === null || parsed.amount >= Math.max(1, expectedAmountKes - 1);
+      if (!amountOk) {
+        const mismatchMsg = `Received KES ${parsed.amount} which is less than expected KES ${expectedAmountKes}.`;
+        if (tx) {
+          db.prepare(
+            `UPDATE mpesa_transactions
+             SET status = 'failed',
+                 result_code = 'AMOUNT_MISMATCH',
+                 result_desc = ?,
+                 mpesa_receipt_number = COALESCE(?, mpesa_receipt_number),
+                 callback_received_at = datetime('now'),
+                 source_ip = ?,
+                 raw_callback_json = ?,
+                 updated_at = datetime('now')
+             WHERE id = ?`
+          ).run(mismatchMsg, parsed.mpesaReceiptNumber, clientIp, rawCallbackJson, tx.id);
+          void upsertCloudMpesaTransaction(tx.id);
+        }
+        if (order) {
+          db.prepare(
+            `UPDATE orders
+             SET payment_status = 'failed',
+                 mpesa_result_code = 'AMOUNT_MISMATCH',
+                 mpesa_result_desc = ?
+             WHERE id = ?`
+          ).run(mismatchMsg, order.id);
+          void upsertCloudOrder(order.id);
+        }
+        logSecurityEvent('DARAJA_AMOUNT_MISMATCH', 'critical', clientIp, null, mismatchMsg);
+        res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+        return;
+      }
+
+      // 7. Atomic settlement & wallet balance crediting (idempotent)
+      if (tx) {
+        const outcome = settleMpesaTxAndCreditWallet({
+          txId: tx.id,
+          receiptNumber: parsed.mpesaReceiptNumber,
+          resultDesc: parsed.resultDesc || 'Payment confirmed via Safaricom Daraja callback',
+          phoneNumber: parsed.phoneNumber,
+          transactionDate: parsed.transactionDate,
+          sourceIp: clientIp,
+          rawCallbackJson,
+          fromCallback: true,
+        });
+        void upsertCloudMpesaTransaction(tx.id);
+        if (outcome.newlyCredited) {
+          void syncUserStateToCloud(outcome.userId);
+          const owner = db.prepare('SELECT email FROM users WHERE id = ?').get(outcome.userId) as
+            | { email: string }
+            | undefined;
+          logSecurityEvent(
+            'WALLET_CREDITED_DARAJA_CALLBACK',
+            'info',
+            clientIp,
+            owner?.email || null,
+            `Wallet credited KES ${outcome.amountKes} · Ref ${tx.tx_reference} · Receipt ${parsed.mpesaReceiptNumber}`
+          );
+          if (owner?.email) {
+            void sendAutomatedEmail({
+              to: owner.email,
+              subject: `GRIDPIPs Wallet Deposit Confirmed — ${tx.tx_reference}`,
+              category: 'wallet_deposit',
+              textPreview: `M-Pesa receipt ${parsed.mpesaReceiptNumber} for KES ${outcome.amountKes} has been credited to your GRIDPIPs KES Wallet.`,
+              html: `<h2>M-Pesa Wallet Deposit Confirmed</h2>
+                <p>Reference: <strong>${tx.tx_reference}</strong></p>
+                <p>M-Pesa Receipt: <strong>${parsed.mpesaReceiptNumber}</strong></p>
+                <p>Amount Credited: <strong>KES ${outcome.amountKes.toLocaleString()}</strong></p>`,
+            });
+          }
+        }
+      }
+
+      if (order) {
+        db.prepare(
+          `UPDATE orders
+           SET payment_method = 'mpesa',
+               mpesa_receipt = COALESCE(?, mpesa_receipt),
+               mpesa_phone = COALESCE(?, mpesa_phone),
+               mpesa_merchant_request_id = COALESCE(?, mpesa_merchant_request_id),
+               mpesa_result_code = '0',
+               mpesa_result_desc = ?
+           WHERE id = ?`
+        ).run(
+          parsed.mpesaReceiptNumber,
+          parsed.phoneNumber,
+          parsed.merchantRequestId || null,
+          parsed.resultDesc || 'Confirmed via Safaricom Daraja callback',
+          order.id
+        );
+        await fulfillOrder(order.id);
+        logSecurityEvent(
+          'DARAJA_CALLBACK_PAID',
+          'info',
+          clientIp,
+          null,
+          `Order ${order.order_number} paid · Receipt ${parsed.mpesaReceiptNumber}`
+        );
+      }
+    } else {
+      // Failed or user-cancelled STK Push
+      const readableDesc = mapDarajaResultMessage(String(parsed.resultCode), parsed.resultDesc);
+      const nextStatus = parsed.resultCode === 1032 ? 'cancelled' : 'failed';
+
+      if (tx && tx.status === 'pending') {
+        db.prepare(
+          `UPDATE mpesa_transactions
+           SET status = ?,
+               result_code = ?,
+               result_desc = ?,
+               callback_received_at = datetime('now'),
+               source_ip = ?,
+               raw_callback_json = ?,
+               updated_at = datetime('now')
+           WHERE id = ? AND status = 'pending'`
+        ).run(nextStatus, String(parsed.resultCode), readableDesc, clientIp, rawCallbackJson, tx.id);
+        void upsertCloudMpesaTransaction(tx.id);
+      }
+
+      if (order && order.payment_status !== 'paid') {
+        db.prepare(
+          `UPDATE orders
+           SET payment_status = 'failed',
+               mpesa_result_code = ?,
+               mpesa_result_desc = ?
+           WHERE id = ?`
+        ).run(String(parsed.resultCode), readableDesc, order.id);
+        void upsertCloudOrder(order.id);
+      }
+
+      logSecurityEvent(
+        nextStatus === 'cancelled' ? 'DARAJA_CALLBACK_CANCELLED' : 'DARAJA_CALLBACK_FAILED',
+        'warning',
+        clientIp,
+        null,
+        `Checkout ${parsed.checkoutRequestId} ${nextStatus} (${parsed.resultCode}): ${readableDesc}`
+      );
+    }
+
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  } catch (err) {
+    console.error('M-Pesa Daraja callback error:', err);
+    res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
+  }
+}
+
+app.post('/api/payments/mpesa/callback', handleDarajaCallback);
+app.post('/api/mpesa/callback', handleDarajaCallback);
 
 app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
-  const txHash = sanitizeText(req.body?.txHash, 120);
+  const txHash = sanitizeText(req.body?.txHash, 120).replace(/\s+/g, '');
   const order = db
     .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
-    .get(orderId, req.currentUser!.id) as { id: number } | undefined;
+    .get(orderId, req.currentUser!.id) as
+    | { id: number; order_number: string; payment_status: string; amount_usd: number }
+    | undefined;
 
   if (!order) {
     res.status(404).json({ error: 'Order not found.' });
     return;
   }
-  if (txHash.length < 16) {
-    res.status(400).json({ error: 'Please paste a valid blockchain transaction hash (min 16 characters).' });
+  if (order.payment_status === 'paid') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({ order, user: serializeUser(user), status: 'paid' });
+    return;
+  }
+  if (!/^[a-zA-Z0-9]{20,110}$/.test(txHash)) {
+    res.status(400).json({ error: 'Paste a valid blockchain transaction hash (20+ alphanumeric characters).' });
     return;
   }
 
-  db.prepare('UPDATE orders SET crypto_tx_hash = ? WHERE id = ?').run(txHash, order.id);
-  await fulfillOrder(order.id);
-  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+  const duplicate = db
+    .prepare('SELECT id FROM orders WHERE crypto_tx_hash = ? AND id != ?')
+    .get(txHash, order.id) as { id: number } | undefined;
+  if (duplicate) {
+    res.status(409).json({ error: 'This transaction hash has already been submitted on another order.' });
+    return;
+  }
+
+  db.prepare(
+    `UPDATE orders
+     SET payment_method = 'crypto',
+         payment_status = 'processing',
+         crypto_tx_hash = ?,
+         mpesa_result_desc = ?
+     WHERE id = ?`
+  ).run(txHash, 'On-chain TXID submitted — awaiting confirmation.', order.id);
+
+  if (req.currentUser!.role === 'admin') {
+    await fulfillOrder(order.id);
+  } else {
+    void upsertCloudOrder(order.id);
+    logSecurityEvent(
+      'CRYPTO_TX_SUBMITTED',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} · TX ${txHash} ($${order.amount_usd})`
+    );
+  }
+
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id) as {
+    payment_status: string;
+  };
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
-  res.json({ order: updated, user: serializeUser(user) });
+  res.json({
+    order: updated,
+    user: serializeUser(user),
+    status: updated.payment_status,
+    message:
+      updated.payment_status === 'paid'
+        ? 'On-chain transaction verified and access unlocked.'
+        : 'Transaction hash recorded and queued for on-chain confirmation.',
+  });
 });
 
 // ---------------- ICT Strategy Market Analyzer ($5.25 Gated) ----------------
@@ -2788,7 +3869,7 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   const usersCount = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }).cnt;
   const users = db
     .prepare(
-      'SELECT id, name, email, role, exness_account_id, exness_verified, referral_code, has_analyzer, has_ea_bots, mt5_connected, mt5_login, is_suspended, created_at, last_login_at FROM users ORDER BY id DESC LIMIT 100'
+      'SELECT id, name, email, role, exness_account_id, exness_verified, referral_code, has_analyzer, has_ea_bots, mt5_connected, mt5_login, wallet_balance_kes, is_suspended, created_at, last_login_at FROM users ORDER BY id DESC LIMIT 100'
     )
     .all();
   const orders = db
@@ -2798,6 +3879,30 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
        ORDER BY o.id DESC LIMIT 100`
     )
     .all();
+  const mpesaTransactions = db
+    .prepare(
+      `SELECT m.*, u.name as user_name, u.email as user_email
+       FROM mpesa_transactions m JOIN users u ON m.user_id = u.id
+       ORDER BY m.id DESC LIMIT 150`
+    )
+    .all();
+  const mpesaMetricsRow = db
+    .prepare(
+      `SELECT
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN amount_kes ELSE 0 END), 0) as totalDepositedKes,
+        COALESCE(SUM(CASE WHEN status = 'completed' AND purpose = 'wallet_deposit' THEN amount_kes ELSE 0 END), 0) as walletDepositedKes,
+        COALESCE(SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END), 0) as completedCount,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END), 0) as pendingCount,
+        COALESCE(SUM(CASE WHEN status IN ('failed', 'cancelled') THEN 1 ELSE 0 END), 0) as failedOrCancelledCount
+       FROM mpesa_transactions`
+    )
+    .get() as {
+    totalDepositedKes: number;
+    walletDepositedKes: number;
+    completedCount: number;
+    pendingCount: number;
+    failedOrCancelledCount: number;
+  };
   const payouts = db
     .prepare(
       `SELECT p.*, u.name as user_name, u.email as user_email
@@ -2808,6 +3913,24 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
   const securityLogs = db.prepare('SELECT * FROM security_logs ORDER BY id DESC LIMIT 80').all();
   const emailLogs = db.prepare('SELECT * FROM email_logs ORDER BY id DESC LIMIT 60').all();
   const settings = getSettingsMap();
+  const darajaStatus = getDarajaConfigStatus(settings);
+  const rawEnv = (process.env.MPESA_ENV || '').trim();
+  const configuredCallbackUrl = (process.env.MPESA_CALLBACK_URL || '').trim();
+  const mismatchWarnings: string[] = [];
+  if (darajaStatus.env === 'sandbox' && darajaStatus.shortCode && darajaStatus.shortCode !== '174379') {
+    mismatchWarnings.push(
+      `MPESA_ENV is currently "sandbox" while MPESA_SHORTCODE is "${darajaStatus.shortCode}". Safaricom sandbox rejects live store/till shortcodes — set MPESA_ENV=production with your Go-Live Consumer Key, Consumer Secret, and Passkey.`
+    );
+  }
+  if (!configuredCallbackUrl) {
+    mismatchWarnings.push(
+      'MPESA_CALLBACK_URL is not set. Set it to https://<your-public-deployed-domain>/api/payments/mpesa/callback after deploying.'
+    );
+  } else if (configuredCallbackUrl.includes('ais-dev-')) {
+    mismatchWarnings.push(
+      'MPESA_CALLBACK_URL currently points to an authenticated ais-dev preview URL (returns 302 login wall). Update it to a public unauthenticated HTTPS domain.'
+    );
+  }
 
   res.json({
     metrics: {
@@ -2816,8 +3939,30 @@ app.get('/api/admin/overview', requireAdmin, (_req, res) => {
       paidOrdersCount: revenueRow.count,
       totalUsers: usersCount,
     },
+    mpesaMetrics: {
+      totalDepositedKes: Number(mpesaMetricsRow.totalDepositedKes || 0),
+      walletDepositedKes: Number(mpesaMetricsRow.walletDepositedKes || 0),
+      completedCount: Number(mpesaMetricsRow.completedCount || 0),
+      pendingCount: Number(mpesaMetricsRow.pendingCount || 0),
+      failedOrCancelledCount: Number(mpesaMetricsRow.failedOrCancelledCount || 0),
+    },
+    mpesaConfigAudit: {
+      configured: darajaStatus.configured,
+      env: darajaStatus.env,
+      rawEnvSet: Boolean(rawEnv),
+      consumerKeySet: Boolean((process.env.MPESA_CONSUMER_KEY || '').trim()),
+      consumerSecretSet: Boolean((process.env.MPESA_CONSUMER_SECRET || '').trim()),
+      passkeySet: Boolean((process.env.MPESA_PASSKEY || '').trim()),
+      shortCode: darajaStatus.shortCode,
+      partyB: darajaStatus.partyB,
+      transactionType: darajaStatus.transactionType,
+      callbackUrl: configuredCallbackUrl || null,
+      callbackSecretSet: Boolean((process.env.MPESA_CALLBACK_SECRET || '').trim()),
+      mismatchWarnings,
+    },
     users,
     orders,
+    mpesaTransactions,
     payouts,
     securityLogs,
     emailLogs,
@@ -2896,8 +4041,9 @@ app.post('/api/admin/settings', requireAdmin, (req: AuthedRequest, res) => {
     'ea_bots_price_usd',
     'usd_kes_rate',
     'mpesa_till_number',
+    'mpesa_party_b',
+    'mpesa_transaction_type',
     'mpesa_merchant_name',
-    'megapay_api_url',
     'influencer_commission_pct',
     'usdt_trc20_address',
     'usdt_erc20_address',
@@ -2911,6 +4057,66 @@ app.post('/api/admin/settings', requireAdmin, (req: AuthedRequest, res) => {
   }
   logSecurityEvent('ADMIN_SETTINGS_UPDATE', 'info', getClientIp(req), req.currentUser!.email, 'Updated site settings');
   res.json({ settings: getSettingsMap() });
+});
+
+app.post('/api/admin/mpesa/test', requireAdmin, async (req: AuthedRequest, res) => {
+  try {
+    const settings = getSettingsMap();
+    const result = await testDarajaConnection(settings);
+    logSecurityEvent(
+      'ADMIN_DARAJA_TEST',
+      result.ok ? 'info' : 'warning',
+      getClientIp(req),
+      req.currentUser!.email,
+      result.message
+    );
+    res.status(result.ok ? 200 : 400).json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Daraja OAuth test failed.';
+    logSecurityEvent('ADMIN_DARAJA_TEST_ERROR', 'warning', getClientIp(req), req.currentUser!.email, msg);
+    res.status(502).json({ ok: false, message: msg });
+  }
+});
+
+app.post('/api/admin/mpesa/reset-stale', requireAdmin, (req: AuthedRequest, res) => {
+  clearDarajaTokenCache();
+  const info = db
+    .prepare(
+      `UPDATE orders
+       SET payment_status = 'pending',
+           mpesa_checkout_id = NULL,
+           mpesa_merchant_request_id = NULL,
+           mpesa_result_code = NULL,
+           mpesa_result_desc = NULL
+       WHERE payment_method = 'mpesa'
+         AND payment_status = 'processing'
+         AND (mpesa_receipt IS NULL OR mpesa_receipt = '')`
+    )
+    .run();
+
+  const txInfo = db
+    .prepare(
+      `UPDATE mpesa_transactions
+       SET status = 'cancelled',
+           result_desc = 'Cleared stale pending STK session by administrator.',
+           updated_at = datetime('now')
+       WHERE status = 'pending'
+         AND (mpesa_receipt_number IS NULL OR mpesa_receipt_number = '')`
+    )
+    .run();
+
+  logSecurityEvent(
+    'ADMIN_MPESA_RESET',
+    'info',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Cleared Daraja token cache, reset ${info.changes} pending STK order(s) and ${txInfo.changes} pending M-Pesa transaction(s).`
+  );
+  res.json({
+    ok: true,
+    resetCount: info.changes + txInfo.changes,
+    message: `Cleared Daraja OAuth cache, reset ${info.changes} incomplete STK order(s) and ${txInfo.changes} pending M-Pesa transaction(s).`,
+  });
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {

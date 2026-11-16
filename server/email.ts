@@ -3,7 +3,7 @@ import { db } from './db.ts';
 interface NotificationPayload {
   to: string;
   subject: string;
-  category: 'welcome' | 'order_receipt' | 'security_alert' | 'payout' | 'mt5_bridge';
+  category: 'welcome' | 'order_receipt' | 'wallet_deposit' | 'security_alert' | 'payout' | 'mt5_bridge';
   html: string;
   textPreview: string;
 }

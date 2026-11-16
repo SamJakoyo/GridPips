@@ -125,6 +125,7 @@ export async function syncUserStateToCloud(userId: number): Promise<void> {
         paper_history_json: parseJson(paper?.history_json, []),
         plan_json: parseJson(plan?.plan_json, null),
         watchlist_json: parseJson(wl?.symbols_json, ['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD']),
+        wallet_balance_kes: Number((u as { wallet_balance_kes?: number }).wallet_balance_kes ?? 0),
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_email' }
@@ -135,6 +136,78 @@ export async function syncUserStateToCloud(userId: number): Promise<void> {
     }
   } catch (err) {
     console.warn('Cloud user state sync failed:', err instanceof Error ? err.message : String(err));
+  }
+}
+
+export async function upsertCloudMpesaTransaction(txId: number): Promise<void> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) return;
+
+  try {
+    const row = db
+      .prepare(
+        `SELECT m.*, u.email as user_email
+         FROM mpesa_transactions m JOIN users u ON m.user_id = u.id
+         WHERE m.id = ?`
+      )
+      .get(txId) as
+      | {
+          tx_reference: string;
+          user_email: string;
+          purpose: string;
+          business_short_code: string;
+          party_b: string;
+          transaction_type: string;
+          phone_number: string;
+          amount_kes: number;
+          merchant_request_id: string | null;
+          checkout_request_id: string | null;
+          mpesa_receipt_number: string | null;
+          result_code: string | null;
+          result_desc: string | null;
+          status: string;
+          credited_to_wallet: number;
+          transaction_date: string | null;
+          callback_received_at: string | null;
+          source_ip: string | null;
+          created_at: string;
+          updated_at: string;
+        }
+      | undefined;
+    if (!row) return;
+
+    const { error } = await client.from('gridpips_mpesa_transactions').upsert(
+      {
+        tx_reference: row.tx_reference,
+        user_email: row.user_email.toLowerCase(),
+        purpose: row.purpose,
+        business_short_code: row.business_short_code,
+        party_b: row.party_b,
+        transaction_type: row.transaction_type,
+        phone_number: row.phone_number,
+        amount_kes: row.amount_kes,
+        merchant_request_id: row.merchant_request_id,
+        checkout_request_id: row.checkout_request_id,
+        mpesa_receipt_number: row.mpesa_receipt_number,
+        result_code: row.result_code,
+        result_desc: row.result_desc,
+        status: row.status,
+        credited_to_wallet: Boolean(row.credited_to_wallet),
+        transaction_date: row.transaction_date,
+        callback_received_at: row.callback_received_at
+          ? new Date(row.callback_received_at).toISOString()
+          : null,
+        source_ip: row.source_ip,
+        created_at: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+        updated_at: row.updated_at ? new Date(row.updated_at).toISOString() : new Date().toISOString(),
+      },
+      { onConflict: 'tx_reference' }
+    );
+    if (error && !isMissingTableError(error)) {
+      console.warn('Cloud M-Pesa transaction sync warning:', error.message);
+    }
+  } catch (err) {
+    console.warn('Cloud M-Pesa transaction sync failed:', err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -162,6 +235,9 @@ export async function upsertCloudOrder(orderId: number): Promise<void> {
           mpesa_phone: string | null;
           mpesa_receipt: string | null;
           mpesa_checkout_id: string | null;
+          mpesa_merchant_request_id?: string | null;
+          mpesa_result_code?: string | null;
+          mpesa_result_desc?: string | null;
           crypto_currency: string | null;
           crypto_network: string | null;
           crypto_address: string | null;
@@ -186,6 +262,9 @@ export async function upsertCloudOrder(orderId: number): Promise<void> {
         mpesa_phone: row.mpesa_phone,
         mpesa_receipt: row.mpesa_receipt,
         mpesa_checkout_id: row.mpesa_checkout_id,
+        mpesa_merchant_request_id: row.mpesa_merchant_request_id ?? null,
+        mpesa_result_code: row.mpesa_result_code ?? null,
+        mpesa_result_desc: row.mpesa_result_desc ?? null,
         crypto_currency: row.crypto_currency,
         crypto_network: row.crypto_network,
         crypto_address: row.crypto_address,
@@ -419,6 +498,13 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
           `INSERT OR IGNORE INTO watchlists (user_id, symbols_json, updated_at) VALUES (?, ?, datetime('now'))`
         ).run(userId, JSON.stringify(state.watchlist_json));
       }
+
+      if (typeof state.wallet_balance_kes === 'number' && state.wallet_balance_kes > 0) {
+        db.prepare('UPDATE users SET wallet_balance_kes = MAX(wallet_balance_kes, ?) WHERE id = ?').run(
+          Number(state.wallet_balance_kes),
+          userId
+        );
+      }
     }
 
     // Hydrate orders if missing locally
@@ -437,9 +523,10 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
           `INSERT OR IGNORE INTO orders (
             order_number, user_id, product_key, product_name, amount_usd, amount_kes,
             payment_method, payment_status, mpesa_phone, mpesa_receipt, mpesa_checkout_id,
+            mpesa_merchant_request_id, mpesa_result_code, mpesa_result_desc,
             crypto_currency, crypto_network, crypto_address, crypto_tx_hash, commission_usd,
             created_at, paid_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         );
         for (const o of cloudOrders) {
           insOrder.run(
@@ -454,6 +541,9 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
             o.mpesa_phone,
             o.mpesa_receipt,
             o.mpesa_checkout_id,
+            o.mpesa_merchant_request_id ?? null,
+            o.mpesa_result_code ?? null,
+            o.mpesa_result_desc ?? null,
             o.crypto_currency,
             o.crypto_network,
             o.crypto_address,

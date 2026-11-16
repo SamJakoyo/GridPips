@@ -30,6 +30,7 @@ export function initDatabase(): void {
       referred_by INTEGER,
       has_analyzer INTEGER NOT NULL DEFAULT 0,
       has_ea_bots INTEGER NOT NULL DEFAULT 0,
+      wallet_balance_kes REAL NOT NULL DEFAULT 0,
       mt5_login TEXT,
       mt5_server TEXT,
       mt5_bridge_token TEXT,
@@ -53,6 +54,9 @@ export function initDatabase(): void {
       mpesa_phone TEXT,
       mpesa_receipt TEXT,
       mpesa_checkout_id TEXT,
+      mpesa_merchant_request_id TEXT,
+      mpesa_result_code TEXT,
+      mpesa_result_desc TEXT,
       crypto_currency TEXT,
       crypto_network TEXT,
       crypto_address TEXT,
@@ -221,10 +225,38 @@ export function initDatabase(): void {
       executed_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS mpesa_transactions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tx_reference TEXT NOT NULL UNIQUE,
+      user_id INTEGER NOT NULL,
+      order_id INTEGER,
+      purpose TEXT NOT NULL DEFAULT 'wallet_deposit',
+      business_short_code TEXT NOT NULL,
+      party_b TEXT NOT NULL,
+      transaction_type TEXT NOT NULL DEFAULT 'CustomerBuyGoodsOnline',
+      phone_number TEXT NOT NULL,
+      amount_kes REAL NOT NULL,
+      merchant_request_id TEXT,
+      checkout_request_id TEXT UNIQUE,
+      mpesa_receipt_number TEXT UNIQUE,
+      result_code TEXT,
+      result_desc TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      credited_to_wallet INTEGER NOT NULL DEFAULT 0,
+      transaction_date TEXT,
+      callback_received_at TEXT,
+      source_ip TEXT,
+      raw_callback_json TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
   const userCols = (db.prepare('PRAGMA table_info(users)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!userCols.includes('supabase_uid')) db.exec('ALTER TABLE users ADD COLUMN supabase_uid TEXT');
+  if (!userCols.includes('wallet_balance_kes')) db.exec('ALTER TABLE users ADD COLUMN wallet_balance_kes REAL NOT NULL DEFAULT 0');
   if (!userCols.includes('mt5_balance')) db.exec('ALTER TABLE users ADD COLUMN mt5_balance REAL');
   if (!userCols.includes('mt5_equity')) db.exec('ALTER TABLE users ADD COLUMN mt5_equity REAL');
   if (!userCols.includes('mt5_symbol')) db.exec('ALTER TABLE users ADD COLUMN mt5_symbol TEXT');
@@ -242,6 +274,10 @@ export function initDatabase(): void {
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');
   if (!orderCols.includes('mpesa_receipt')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_receipt TEXT');
   if (!orderCols.includes('mpesa_checkout_id')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_checkout_id TEXT');
+  if (!orderCols.includes('mpesa_merchant_request_id'))
+    db.exec('ALTER TABLE orders ADD COLUMN mpesa_merchant_request_id TEXT');
+  if (!orderCols.includes('mpesa_result_code')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_result_code TEXT');
+  if (!orderCols.includes('mpesa_result_desc')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_result_desc TEXT');
 
   const defaultSettings: Record<string, string> = {
     exness_ib_url: 'https://one.exnessonelink.com/a/0p67hxlswg?source=app',
@@ -250,9 +286,10 @@ export function initDatabase(): void {
     analyzer_price_usd: '5.25',
     ea_bots_price_usd: '5.25',
     usd_kes_rate: '130',
-    mpesa_till_number: '5984120',
+    mpesa_till_number: '1921416',
+    mpesa_party_b: '1921416',
+    mpesa_transaction_type: 'CustomerBuyGoodsOnline',
     mpesa_merchant_name: 'GRIDPIPs Trading',
-    megapay_api_url: 'https://megapay.co.ke/api/v1/initiatestk',
     influencer_commission_pct: '20',
     usdt_trc20_address: 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1',
     usdt_erc20_address: '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C',
@@ -263,6 +300,8 @@ export function initDatabase(): void {
   for (const [key, value] of Object.entries(defaultSettings)) {
     insertSetting.run(key, value);
   }
+  // Migrate legacy placeholder till number (5984120) to user's Buy Goods Till 1921416
+  db.prepare("UPDATE site_settings SET value = '1921416' WHERE key IN ('mpesa_till_number', 'mpesa_party_b') AND value = '5984120'").run();
 
   // Seed default Admin account for site owner if not yet created
   const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();

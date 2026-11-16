@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Check, XCircle, RefreshCw } from 'lucide-react';
+import { ShieldAlert, Check, XCircle, RefreshCw, Search, Smartphone } from 'lucide-react';
 import { apiFetch } from '../lib/api';
-import type { EmailLogItem, Order, SecurityLogItem, User } from '../types';
+import type { EmailLogItem, MpesaTransaction, Order, SecurityLogItem } from '../types';
 
 interface AdminOverviewResponse {
   metrics: {
@@ -9,6 +9,27 @@ interface AdminOverviewResponse {
     totalRevenueKes: number;
     paidOrdersCount: number;
     totalUsers: number;
+  };
+  mpesaMetrics?: {
+    totalDepositedKes: number;
+    walletDepositedKes: number;
+    completedCount: number;
+    pendingCount: number;
+    failedOrCancelledCount: number;
+  };
+  mpesaConfigAudit?: {
+    configured: boolean;
+    env: 'sandbox' | 'production';
+    rawEnvSet: boolean;
+    consumerKeySet: boolean;
+    consumerSecretSet: boolean;
+    passkeySet: boolean;
+    shortCode: string;
+    partyB: string;
+    transactionType: string;
+    callbackUrl: string | null;
+    callbackSecretSet: boolean;
+    mismatchWarnings: string[];
   };
   users: Array<{
     id: number;
@@ -22,11 +43,13 @@ interface AdminOverviewResponse {
     has_ea_bots: number;
     mt5_connected: number;
     mt5_login: string | null;
+    wallet_balance_kes?: number;
     is_suspended: number;
     created_at: string;
     last_login_at: string | null;
   }>;
   orders: Order[];
+  mpesaTransactions?: MpesaTransaction[];
   payouts: Array<{
     id: number;
     user_name: string;
@@ -59,18 +82,26 @@ interface SupabaseHealthResponse {
     missingMetaApiEnvVars?: string[];
     metaApiConfigured?: boolean;
     metaApiProfileConfigured?: boolean;
+    missingMpesaDarajaEnvVars?: string[];
+    mpesaDarajaConfigured?: boolean;
+    mpesaDarajaEnv?: 'sandbox' | 'production';
+    mpesaTransactionType?: string;
   };
 }
 
 export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }> = ({
   onConfigSaved,
 }) => {
-  const [tab, setTab] = useState<'orders' | 'users' | 'security' | 'payouts' | 'emails' | 'settings'>('orders');
+  const [tab, setTab] = useState<'orders' | 'mpesa' | 'users' | 'security' | 'payouts' | 'emails' | 'settings'>('orders');
   const [data, setData] = useState<AdminOverviewResponse | null>(null);
   const [health, setHealth] = useState<SupabaseHealthResponse | null>(null);
+  const [mpesaSearch, setMpesaSearch] = useState('');
+  const [mpesaFilter, setMpesaFilter] = useState<'all' | 'completed' | 'pending' | 'cancelled' | 'failed'>('all');
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [darajaTesting, setDarajaTesting] = useState(false);
+  const [darajaTestResult, setDarajaTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   async function loadAdmin() {
     const [res, healthRes] = await Promise.all([
@@ -144,6 +175,43 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
     }
   }
 
+  async function handleTestDaraja() {
+    setDarajaTesting(true);
+    setDarajaTestResult(null);
+    try {
+      const res = await apiFetch<{ ok: boolean; message: string }>('/api/admin/mpesa/test', {
+        method: 'POST',
+      });
+      setDarajaTestResult(res);
+    } catch (err) {
+      setDarajaTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : 'Daraja verification failed.',
+      });
+    } finally {
+      setDarajaTesting(false);
+    }
+  }
+
+  async function handleResetStaleStk() {
+    setDarajaTesting(true);
+    setDarajaTestResult(null);
+    try {
+      const res = await apiFetch<{ ok: boolean; message: string }>('/api/admin/mpesa/reset-stale', {
+        method: 'POST',
+      });
+      setDarajaTestResult(res);
+      await loadAdmin();
+    } catch (err) {
+      setDarajaTestResult({
+        ok: false,
+        message: err instanceof Error ? err.message : 'Unable to reset STK state.',
+      });
+    } finally {
+      setDarajaTesting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Admin KPIs */}
@@ -183,6 +251,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           {(
             [
               ['orders', 'Revenue & Orders'],
+              ['mpesa', 'M-Pesa Deposits'],
               ['users', 'Users & Logins'],
               ['security', 'Security Center'],
               ['payouts', 'Influencer Payouts'],
@@ -214,14 +283,19 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       {/* Tab 1: Orders & Revenue */}
       {tab === 'orders' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 overflow-x-auto">
-          <h3 className="text-base font-bold text-slate-950 mb-4">All Customer Orders</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+            <h3 className="text-base font-bold text-slate-950">All Customer Orders &amp; Verification Queue</h3>
+            <span className="text-xs font-mono text-slate-500">
+              {data.orders.filter((o) => o.payment_status === 'processing').length} awaiting settlement check
+            </span>
+          </div>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-slate-200 text-xs text-slate-500">
                 <th className="py-2 pr-4">Order</th>
                 <th className="py-2 pr-4">Customer</th>
                 <th className="py-2 pr-4">Product</th>
-                <th className="py-2 pr-4">Gateway</th>
+                <th className="py-2 pr-4">Gateway / Reference</th>
                 <th className="py-2 pr-4 text-right">Amount</th>
                 <th className="py-2 pr-4">Status</th>
                 <th className="py-2 text-right">Controls</th>
@@ -236,15 +310,22 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     <div className="text-slate-500">{o.user_email}</div>
                   </td>
                   <td className="py-3 pr-4 text-xs text-slate-700">{o.product_name}</td>
-                  <td className="py-3 pr-4 text-xs font-mono uppercase text-slate-600">
-                    {o.payment_method}{' '}
-                    {o.mpesa_receipt
-                      ? `(${o.mpesa_receipt})`
-                      : o.crypto_tx_hash
-                      ? `(${o.crypto_tx_hash.slice(0, 10)})`
-                      : o.mpesa_phone
-                      ? `(+${o.mpesa_phone})`
-                      : ''}
+                  <td className="py-3 pr-4 text-xs font-mono text-slate-600">
+                    <div className="uppercase font-semibold">
+                      {o.payment_method}{' '}
+                      {o.mpesa_receipt
+                        ? `(${o.mpesa_receipt})`
+                        : o.crypto_tx_hash
+                        ? `(${o.crypto_tx_hash.slice(0, 12)}...)`
+                        : o.mpesa_phone
+                        ? `(+${o.mpesa_phone})`
+                        : ''}
+                    </div>
+                    {o.mpesa_checkout_id && (
+                      <div className="text-[11px] text-slate-400 truncate max-w-[180px]">
+                        {o.mpesa_checkout_id}
+                      </div>
+                    )}
                   </td>
                   <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold">
                     <div>${Number(o.amount_usd).toFixed(2)}</div>
@@ -254,7 +335,21 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       </div>
                     )}
                   </td>
-                  <td className="py-3 pr-4 text-xs font-semibold capitalize">{o.payment_status}</td>
+                  <td className="py-3 pr-4 text-xs font-semibold capitalize">
+                    <span
+                      className={
+                        o.payment_status === 'paid'
+                          ? 'text-emerald-700'
+                          : o.payment_status === 'processing'
+                          ? 'text-amber-700'
+                          : o.payment_status === 'failed' || o.payment_status === 'refunded'
+                          ? 'text-rose-700'
+                          : 'text-slate-600'
+                      }
+                    >
+                      {o.payment_status}
+                    </span>
+                  </td>
                   <td className="py-3 text-right space-x-2 whitespace-nowrap">
                     {o.payment_status !== 'paid' && (
                       <button
@@ -262,6 +357,14 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         className="px-2.5 py-1 bg-emerald-600 text-white text-xs font-semibold rounded cursor-pointer"
                       >
                         Approve &amp; Unlock
+                      </button>
+                    )}
+                    {o.payment_status === 'processing' && (
+                      <button
+                        onClick={() => updateOrderStatus(o.id, 'failed')}
+                        className="px-2.5 py-1 border border-rose-300 text-rose-700 text-xs font-semibold rounded cursor-pointer"
+                      >
+                        Reject
                       </button>
                     )}
                     {o.payment_status === 'paid' && (
@@ -280,7 +383,206 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
         </div>
       )}
 
-      {/* Tab 2: Users & Logins */}
+      {/* Tab 2: M-Pesa Daraja Deposits & Callback Monitor */}
+      {tab === 'mpesa' && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-slate-950 text-white rounded-xl p-4">
+              <div className="text-xs text-slate-400">Confirmed M-Pesa Volume</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-emerald-400 mt-1">
+                KES {Number(data.mpesaMetrics?.totalDepositedKes || 0).toLocaleString()}
+              </div>
+              <div className="text-[11px] font-mono tabular-nums text-slate-400 mt-0.5">
+                Wallet Top-ups: KES {Number(data.mpesaMetrics?.walletDepositedKes || 0).toLocaleString()}
+              </div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Completed STK Payments</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-emerald-700 mt-1">
+                {data.mpesaMetrics?.completedCount ?? 0}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Verified ResultCode 0</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Pending STK Prompts</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-amber-700 mt-1">
+                {data.mpesaMetrics?.pendingCount ?? 0}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">Awaiting customer PIN</div>
+            </div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">Cancelled / Failed</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-rose-700 mt-1">
+                {data.mpesaMetrics?.failedOrCancelledCount ?? 0}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">No balance credited</div>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-950">Safaricom Daraja STK Push &amp; Callback Ledger</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  All customer wallet deposits and license checkouts with CheckoutRequestID, MerchantRequestID, Receipt, and callback audit trail.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={mpesaSearch}
+                    onChange={(e) => setMpesaSearch(e.target.value)}
+                    placeholder="Search receipt, phone, ID..."
+                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-52"
+                  />
+                </div>
+                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                  {(['all', 'completed', 'pending', 'cancelled', 'failed'] as const).map((statusKey) => (
+                    <button
+                      key={statusKey}
+                      type="button"
+                      onClick={() => setMpesaFilter(statusKey)}
+                      className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer ${
+                        mpesaFilter === statusKey
+                          ? 'bg-white text-slate-950 shadow-xs'
+                          : 'text-slate-600 hover:text-slate-950'
+                      }`}
+                    >
+                      {statusKey}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {(() => {
+              const q = mpesaSearch.trim().toLowerCase();
+              const filteredTxs = (data.mpesaTransactions || []).filter((tx) => {
+                if (mpesaFilter !== 'all' && tx.status !== mpesaFilter) return false;
+                if (!q) return true;
+                return [
+                  tx.tx_reference,
+                  tx.user_name,
+                  tx.user_email,
+                  tx.phone_number,
+                  tx.mpesa_receipt_number,
+                  tx.checkout_request_id,
+                  tx.merchant_request_id,
+                  tx.party_b,
+                  tx.business_short_code,
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+                  .toLowerCase()
+                  .includes(q);
+              });
+
+              if (filteredTxs.length === 0) {
+                return (
+                  <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl space-y-2">
+                    <Smartphone className="w-6 h-6 text-slate-300 mx-auto" />
+                    <div className="text-sm font-semibold text-slate-700">No M-Pesa Daraja transactions recorded</div>
+                    <p className="text-xs text-slate-500">
+                      Customer STK Push deposits and checkouts will appear here automatically in real time.
+                    </p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2 pr-4">Tx Ref &amp; Date</th>
+                        <th className="py-2 pr-4">Customer &amp; Phone</th>
+                        <th className="py-2 pr-4">Routing (Shortcode / Till)</th>
+                        <th className="py-2 pr-4 text-right">Amount</th>
+                        <th className="py-2 pr-4">Receipt &amp; Daraja IDs</th>
+                        <th className="py-2">Status &amp; Callback</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredTxs.map((tx) => (
+                        <tr key={tx.id} className="align-top">
+                          <td className="py-3 pr-4">
+                            <div className="font-mono font-semibold text-slate-950">{tx.tx_reference}</div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {tx.purpose === 'wallet_deposit' ? 'Wallet Deposit' : 'Order Checkout'}
+                            </div>
+                            <div className="font-mono text-[11px] text-slate-400">{tx.created_at}</div>
+                          </td>
+                          <td className="py-3 pr-4">
+                            <div className="font-semibold text-slate-900">{tx.user_name || 'Customer'}</div>
+                            <div className="text-slate-500">{tx.user_email}</div>
+                            <div className="font-mono text-slate-700 mt-0.5">+{tx.phone_number}</div>
+                          </td>
+                          <td className="py-3 pr-4 font-mono">
+                            <div className="text-slate-900 font-semibold">
+                              SC {tx.business_short_code} → Till {tx.party_b}
+                            </div>
+                            <div className="text-[11px] text-slate-500">{tx.transaction_type}</div>
+                          </td>
+                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950">
+                            KES {Number(tx.amount_kes).toLocaleString()}
+                            {tx.purpose === 'wallet_deposit' && tx.credited_to_wallet === 1 && (
+                              <div className="text-[11px] font-sans font-normal text-emerald-700 mt-0.5">
+                                Wallet Credited
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 pr-4 font-mono max-w-[240px]">
+                            <div className="font-semibold text-emerald-700">
+                              {tx.mpesa_receipt_number || 'Awaiting receipt'}
+                            </div>
+                            {tx.checkout_request_id && (
+                              <div className="text-[11px] text-slate-500 truncate" title={tx.checkout_request_id}>
+                                CID: {tx.checkout_request_id}
+                              </div>
+                            )}
+                            {tx.merchant_request_id && (
+                              <div className="text-[11px] text-slate-400 truncate" title={tx.merchant_request_id}>
+                                MID: {tx.merchant_request_id}
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 max-w-[240px]">
+                            <div
+                              className={`font-semibold uppercase ${
+                                tx.status === 'completed'
+                                  ? 'text-emerald-700'
+                                  : tx.status === 'pending'
+                                  ? 'text-amber-700'
+                                  : 'text-rose-700'
+                              }`}
+                            >
+                              {tx.status}
+                              {tx.result_code ? ` (${tx.result_code})` : ''}
+                            </div>
+                            {tx.result_desc && (
+                              <div className="text-[11px] text-slate-600 mt-0.5">{tx.result_desc}</div>
+                            )}
+                            {tx.source_ip && (
+                              <div className="font-mono text-[11px] text-slate-400 mt-0.5">
+                                Callback IP: {tx.source_ip}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Tab 3: Users & Logins */}
       {tab === 'users' && (
         <div className="bg-white border border-slate-200 rounded-xl p-6 overflow-x-auto">
           <h3 className="text-base font-bold text-slate-950 mb-4">User Directory, Exness IDs &amp; Logins</h3>
@@ -475,6 +777,114 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       : `Run supabase/gridpips_cloud_tables.sql in Supabase SQL Editor (${(health.cloudSync?.missingTables || ['gridpips_user_state', 'gridpips_orders']).join(', ')}).`}
                   </p>
                 </div>
+
+                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3 md:col-span-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-semibold text-slate-900">5. Safaricom M-Pesa Daraja API (Server Env Audit)</span>
+                    <span
+                      className={`font-semibold ${
+                        health.envDiagnostics?.mpesaDarajaConfigured ? 'text-emerald-700' : 'text-amber-700'
+                      }`}
+                    >
+                      {health.envDiagnostics?.mpesaDarajaConfigured
+                        ? `Configured (${health.envDiagnostics.mpesaDarajaEnv?.toUpperCase() || 'SANDBOX'} · ${health.envDiagnostics.mpesaTransactionType || 'CustomerBuyGoodsOnline'})`
+                        : `Missing: ${(health.envDiagnostics?.missingMpesaDarajaEnvVars || ['MPESA_CONSUMER_KEY', 'MPESA_CONSUMER_SECRET', 'MPESA_PASSKEY', 'MPESA_SHORTCODE']).join(', ')}`}
+                    </span>
+                  </div>
+
+                  {data.mpesaConfigAudit && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-white border border-slate-200 rounded-lg p-3">
+                      <div>
+                        <div className="text-slate-400">MPESA_ENV</div>
+                        <div className={data.mpesaConfigAudit.env === 'production' ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
+                          {data.mpesaConfigAudit.env} {data.mpesaConfigAudit.rawEnvSet ? '' : '(default)'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_SHORTCODE</div>
+                        <div className="font-bold text-slate-900">{data.mpesaConfigAudit.shortCode || 'MISSING'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_PARTY_B</div>
+                        <div className="font-bold text-slate-900">{data.mpesaConfigAudit.partyB || 'MISSING'}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_TRANSACTION_TYPE</div>
+                        <div className="font-bold text-slate-900 truncate">{data.mpesaConfigAudit.transactionType}</div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_CONSUMER_KEY</div>
+                        <div className={data.mpesaConfigAudit.consumerKeySet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                          {data.mpesaConfigAudit.consumerKeySet ? 'SET (Server)' : 'MISSING'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_CONSUMER_SECRET</div>
+                        <div className={data.mpesaConfigAudit.consumerSecretSet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                          {data.mpesaConfigAudit.consumerSecretSet ? 'SET (Server)' : 'MISSING'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_PASSKEY</div>
+                        <div className={data.mpesaConfigAudit.passkeySet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                          {data.mpesaConfigAudit.passkeySet ? 'SET (Server)' : 'MISSING'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">MPESA_CALLBACK_URL</div>
+                        <div className={data.mpesaConfigAudit.callbackUrl ? 'font-bold text-emerald-700 truncate' : 'font-bold text-amber-700'}>
+                          {data.mpesaConfigAudit.callbackUrl ? 'SET' : 'NOT SET'}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {data.mpesaConfigAudit?.mismatchWarnings && data.mpesaConfigAudit.mismatchWarnings.length > 0 && (
+                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-900 space-y-1">
+                      {data.mpesaConfigAudit.mismatchWarnings.map((warn, idx) => (
+                        <div key={idx}>{warn}</div>
+                      ))}
+                    </div>
+                  )}
+
+                  <p className="text-slate-600">
+                    For security, Daraja Consumer Key, Consumer Secret, and Passkey must be entered in your hosting <strong>Environment Variables / Secrets</strong> panel (Google AI Studio Secrets &amp; Vercel Project Settings → Environment Variables) — never stored in browser code.
+                    {data.mpesaConfigAudit?.callbackUrl && (
+                      <span className="block mt-1 font-mono text-[11px] text-slate-800 break-all">
+                        Active MPESA_CALLBACK_URL: {data.mpesaConfigAudit.callbackUrl}
+                      </span>
+                    )}
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      disabled={darajaTesting}
+                      onClick={() => void handleTestDaraja()}
+                      className="px-3 py-1.5 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
+                    >
+                      {darajaTesting ? 'Testing Daraja...' : 'Verify Daraja OAuth Connection'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={darajaTesting}
+                      onClick={() => void handleResetStaleStk()}
+                      className="px-3 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
+                    >
+                      Restart STK State &amp; Clear Cache
+                    </button>
+                  </div>
+                  {darajaTestResult && (
+                    <div
+                      className={`p-2.5 rounded-md border text-xs ${
+                        darajaTestResult.ok
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                          : 'bg-rose-50 border-rose-200 text-rose-700'
+                      }`}
+                    >
+                      {darajaTestResult.message}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -663,7 +1073,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Till Number (MegaPay)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Till / Paybill Display Number</label>
               <input
                 value={settingsForm.mpesa_till_number || ''}
                 onChange={(e) =>
@@ -671,6 +1081,29 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 }
                 className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
               />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Daraja PartyB (Till / Paybill Shortcode)</label>
+              <input
+                value={settingsForm.mpesa_party_b || ''}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, mpesa_party_b: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Daraja Transaction Type</label>
+              <select
+                value={settingsForm.mpesa_transaction_type || 'CustomerBuyGoodsOnline'}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, mpesa_transaction_type: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
+              >
+                <option value="CustomerBuyGoodsOnline">CustomerBuyGoodsOnline (Till)</option>
+                <option value="CustomerPayBillOnline">CustomerPayBillOnline (Paybill)</option>
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Merchant Name</label>

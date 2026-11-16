@@ -85,7 +85,9 @@ const DEFAULT_CONFIG: PublicConfig = {
   usdKesRate: 130,
   analyzerPriceKes: 683,
   eaBotsPriceKes: 683,
-  mpesaTillNumber: '5984120',
+  mpesaTillNumber: '1921416',
+  mpesaPartyB: '1921416',
+  mpesaTransactionType: 'CustomerBuyGoodsOnline',
   mpesaMerchantName: 'GRIDPIPs Trading',
   commissionPct: 20,
   cryptoAddresses: {
@@ -680,10 +682,17 @@ export default function App() {
                 {activeTab === 'orders' && (
                   <OrdersDashboardView
                     orders={orders}
+                    user={user}
+                    config={config}
+                    onUserUpdated={(updated) => setUser(updated)}
                     onResumePayment={(ord) =>
                       setCheckoutState({ productKey: ord.product_key, existingOrder: ord })
                     }
                     onBuyNew={(productKey) => setCheckoutState({ productKey })}
+                    onRefresh={loadUserWorkspaceData}
+                    onLaunchProduct={(productKey) =>
+                      setActiveTab(productKey === 'ea_bots' ? 'eabots' : 'analyzer')
+                    }
                   />
                 )}
                 {activeTab === 'charts' && (
@@ -733,12 +742,19 @@ export default function App() {
         <CheckoutModal
           productKey={checkoutState.productKey}
           config={config}
+          user={user}
           existingOrder={checkoutState.existingOrder}
-          onClose={() => setCheckoutState(null)}
+          onClose={() => {
+            setCheckoutState(null);
+            void loadUserWorkspaceData();
+          }}
+          onOrderSubmitted={() => {
+            void loadUserWorkspaceData();
+          }}
           onUnlocked={(updatedUser) => {
             setUser(updatedUser);
             setCheckoutState(null);
-            loadUserWorkspaceData();
+            void loadUserWorkspaceData();
             setActiveTab(checkoutState.productKey === 'ea_bots' ? 'eabots' : 'analyzer');
           }}
         />

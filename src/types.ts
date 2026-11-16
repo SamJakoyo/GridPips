@@ -26,9 +26,37 @@ export interface User {
   mt5ConnectionMode?: 'metaapi';
   mt5ApiConfigured?: boolean;
   mt5ProvisioningProfileConfigured?: boolean;
+  walletBalanceKes?: number;
   isSuspended: boolean;
   createdAt: string;
   lastLoginAt?: string | null;
+}
+
+export interface MpesaTransaction {
+  id: number;
+  tx_reference: string;
+  user_id: number;
+  order_id?: number | null;
+  purpose: 'wallet_deposit' | 'order_payment' | string;
+  business_short_code: string;
+  party_b: string;
+  transaction_type: 'CustomerBuyGoodsOnline' | 'CustomerPayBillOnline' | string;
+  phone_number: string;
+  amount_kes: number;
+  merchant_request_id?: string | null;
+  checkout_request_id?: string | null;
+  mpesa_receipt_number?: string | null;
+  result_code?: string | null;
+  result_desc?: string | null;
+  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  credited_to_wallet: number;
+  transaction_date?: string | null;
+  callback_received_at?: string | null;
+  source_ip?: string | null;
+  created_at: string;
+  updated_at: string;
+  user_name?: string;
+  user_email?: string;
 }
 
 export interface PublicConfig {
@@ -41,7 +69,11 @@ export interface PublicConfig {
   analyzerPriceKes: number;
   eaBotsPriceKes: number;
   mpesaTillNumber: string;
+  mpesaPartyB?: string;
+  mpesaTransactionType?: 'CustomerBuyGoodsOnline' | 'CustomerPayBillOnline';
   mpesaMerchantName: string;
+  mpesaConfigured?: boolean;
+  mpesaEnv?: 'sandbox' | 'production';
   commissionPct: number;
   supabaseConfigured?: boolean;
   supabaseStatus?: 'connected' | 'missing_url' | 'missing_key' | 'not_configured';
@@ -67,6 +99,9 @@ export interface Order {
   mpesa_phone?: string | null;
   mpesa_receipt?: string | null;
   mpesa_checkout_id?: string | null;
+  mpesa_merchant_request_id?: string | null;
+  mpesa_result_code?: string | null;
+  mpesa_result_desc?: string | null;
   crypto_currency?: string | null;
   crypto_network?: string | null;
   crypto_address?: string | null;
