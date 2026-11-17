@@ -94,6 +94,7 @@ const COOKIE_NAME = 'gridpips_session';
 const LEGACY_COOKIE_NAME = 'pipgrid_session';
 
 app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 // Security HTTP headers (configured to allow AI Studio iframe preview, OAuth popups, TradingView, YouTube, and Supabase)
 app.use(
@@ -136,18 +137,189 @@ app.use(
   })
 );
 
-app.use(cookieParser());
-app.use(express.json({ limit: '25mb' }));
+// Layer-7 Application Firewall (WAF) — exploit scanner blocking, XSS/SQLi probe inspection, and adaptive IP strikes
+const WAF_STRIKE_WINDOW_MS = 10 * 60 * 1000;
+const WAF_BLOCK_DURATION_MS = 15 * 60 * 1000;
+const WAF_MAX_STRIKES = 5;
+const wafStrikes = new Map<string, { count: number; windowStart: number }>();
+const wafBlockedIps = new Map<string, number>();
 
-// Rate limiters to prevent brute-force & DDoS abuse
+const WAF_PROBE_PATH_RE =
+  /(?:^|\/)\.(?:env(?:\.|$)|git(?:\/|$)|htaccess|htpasswd|aws(?:\/|$)|ds_store)|(?:^|\/)(?:wp-admin|wp-login\.php|wp-content|wp-includes|xmlrpc\.php|phpmyadmin|pma|adminer)(?:\/|$)|\.(?:php|asp|aspx|jsp|cgi)$|(?:\.\.[/\\]|%2e%2e)|%00|\0/i;
+const WAF_INJECTION_RE =
+  /(?:<script\b|javascript:|onerror\s*=|onload\s*=|\bunion\s+(?:all\s+)?select\b|;\s*drop\s+table\b|\bbenchmark\s*\(|\bsleep\s*\(\s*\d)/i;
+
+function isLoopbackIp(ip: string): boolean {
+  const cleaned = ip.replace(/^::ffff:/i, '').trim();
+  return cleaned === '127.0.0.1' || cleaned === '::1' || cleaned === 'localhost';
+}
+
+function recordWafStrike(ip: string): boolean {
+  if (!ip || ip === 'unknown' || isLoopbackIp(ip) || isSafaricomCallbackIp(ip)) {
+    return false;
+  }
+  const now = Date.now();
+  const existing = wafStrikes.get(ip);
+  if (!existing || now - existing.windowStart > WAF_STRIKE_WINDOW_MS) {
+    wafStrikes.set(ip, { count: 1, windowStart: now });
+    return false;
+  }
+  existing.count += 1;
+  if (existing.count >= WAF_MAX_STRIKES) {
+    wafBlockedIps.set(ip, now + WAF_BLOCK_DURATION_MS);
+    wafStrikes.delete(ip);
+    return true;
+  }
+  return false;
+}
+
+function getActiveBlockedIpCount(): number {
+  const now = Date.now();
+  for (const [ip, expiresAt] of wafBlockedIps.entries()) {
+    if (expiresAt <= now) {
+      wafBlockedIps.delete(ip);
+    }
+  }
+  return wafBlockedIps.size;
+}
+
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const ip = getClientIp(req);
+
+  // Never interfere with Vercel crons or allowlisted Safaricom Daraja callbacks
+  if (req.path === '/api/ea/cron-tick' || isSafaricomCallbackIp(ip)) {
+    next();
+    return;
+  }
+
+  const blockedUntil = wafBlockedIps.get(ip);
+  if (blockedUntil) {
+    if (blockedUntil > Date.now()) {
+      res.status(403).json({ error: 'Access temporarily blocked by application firewall.' });
+      return;
+    }
+    wafBlockedIps.delete(ip);
+  }
+
+  const rawUrl = req.originalUrl || req.url || '';
+  if (rawUrl.length > 2048) {
+    logSecurityEvent('WAF_URI_TOO_LONG', 'warning', ip, null, `Blocked oversized URL (${rawUrl.length} chars)`);
+    res.status(414).json({ error: 'Request URI too long.' });
+    return;
+  }
+
+  let decodedUrl = rawUrl;
+  try {
+    decodedUrl = decodeURIComponent(rawUrl);
+  } catch {
+    // Keep rawUrl if malformed URI sequence; check below
+  }
+
+  if (WAF_PROBE_PATH_RE.test(req.path) || WAF_PROBE_PATH_RE.test(decodedUrl)) {
+    const autoBlocked = recordWafStrike(ip);
+    logSecurityEvent(
+      'WAF_EXPLOIT_PROBE_BLOCKED',
+      autoBlocked ? 'critical' : 'warning',
+      ip,
+      null,
+      `Blocked exploit/scanner path probe: ${req.method} ${req.path.slice(0, 120)}${autoBlocked ? ' (IP temp-banned 15m)' : ''}`
+    );
+    res.status(403).json({ error: 'Forbidden.' });
+    return;
+  }
+
+  if (WAF_INJECTION_RE.test(decodedUrl)) {
+    const autoBlocked = recordWafStrike(ip);
+    logSecurityEvent(
+      'WAF_INJECTION_BLOCKED',
+      autoBlocked ? 'critical' : 'warning',
+      ip,
+      null,
+      `Blocked XSS/SQLi probe on ${req.method} ${req.path.slice(0, 80)}${autoBlocked ? ' (IP temp-banned 15m)' : ''}`
+    );
+    res.status(403).json({ error: 'Request blocked by application firewall.' });
+    return;
+  }
+
+  next();
+});
+
+app.use(cookieParser());
+
+// Scoped JSON payload caps: 256KB default across auth/payment/admin routes, 3MB exclusively for journal screenshots
+const standardJsonParser = express.json({ limit: '256kb' });
+const journalJsonParser = express.json({ limit: '3mb' });
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path === '/api/workspace/journal') {
+    journalJsonParser(req, res, next);
+    return;
+  }
+  standardJsonParser(req, res, next);
+});
+app.use(express.urlencoded({ extended: false, limit: '64kb' }));
+
+// Rate limiters to prevent brute-force, STK Push spam, & DDoS abuse
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 25,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   handler: (req, res) => {
     logSecurityEvent('RATE_LIMIT_AUTH', 'warning', getClientIp(req), null, 'Too many auth attempts');
     res.status(429).json({ error: 'Too many authentication attempts. Please try again in 15 minutes.' });
+  },
+});
+
+const stkIpLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 12,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logSecurityEvent('RATE_LIMIT_STK_IP', 'warning', getClientIp(req), null, `STK Push IP rate limit exceeded on ${req.path}`);
+    res.status(429).json({ error: 'Too many M-Pesa payment requests from this network. Please wait a few minutes before retrying.' });
+  },
+});
+
+const stkUserLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 8,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `user:${(req as AuthedRequest).currentUser?.id ?? 0}`,
+  handler: (req, res) => {
+    const authedReq = req as AuthedRequest;
+    logSecurityEvent(
+      'RATE_LIMIT_STK_USER',
+      'warning',
+      getClientIp(req),
+      authedReq.currentUser?.email || null,
+      `STK Push user throttle exceeded on ${req.path}`
+    );
+    res.status(429).json({ error: 'Too many M-Pesa STK requests on your account. Wait 5 minutes before sending another prompt.' });
+  },
+});
+
+const callbackLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => isSafaricomCallbackIp(getClientIp(req)),
+  handler: (req, res) => {
+    logSecurityEvent('RATE_LIMIT_CALLBACK', 'warning', getClientIp(req), null, 'Excessive M-Pesa callback request rate');
+    res.status(429).json({ ResultCode: 1, ResultDesc: 'Too many requests' });
+  },
+});
+
+const adminLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logSecurityEvent('RATE_LIMIT_ADMIN', 'warning', getClientIp(req), null, `Admin route throttle exceeded on ${req.path}`);
+    res.status(429).json({ error: 'Admin rate limit exceeded. Slow down requests and retry shortly.' });
   },
 });
 
@@ -159,6 +331,7 @@ const apiLimiter = rateLimit({
 });
 
 app.use('/api', apiLimiter);
+app.use('/api/admin', adminLimiter);
 
 interface DbUser {
   id: number;
@@ -1831,12 +2004,19 @@ const settleMpesaTxAndCreditWallet = db.transaction(
 );
 
 function resolveDarajaCallbackUrl(req: Request): string {
+  const appendCallbackTokenIfNeeded = (urlStr: string): string => {
+    const secret = cleanMpesaEnvVar('MPESA_CALLBACK_SECRET');
+    if (!secret || /[?&]token=/i.test(urlStr)) return urlStr;
+    const sep = urlStr.includes('?') ? '&' : '?';
+    return `${urlStr}${sep}token=${encodeURIComponent(secret)}`;
+  };
+
   const configured = cleanMpesaEnvVar('MPESA_CALLBACK_URL');
   if (configured) {
-    if (/^https?:\/\/gridpips\.com(\/|$)/i.test(configured)) {
-      return configured.replace(/^https?:\/\/gridpips\.com/i, 'https://www.gridpips.com');
-    }
-    return configured;
+    const normalized = /^https?:\/\/gridpips\.com(\/|$)/i.test(configured)
+      ? configured.replace(/^https?:\/\/gridpips\.com/i, 'https://www.gridpips.com')
+      : configured;
+    return appendCallbackTokenIfNeeded(normalized);
   }
   const host = (req.get('host') || '').toLowerCase();
   if (
@@ -1847,15 +2027,15 @@ function resolveDarajaCallbackUrl(req: Request): string {
     !host.includes('ais-pre-') &&
     host !== 'gridpips.com'
   ) {
-    return `https://${host}/api/payments/mpesa/callback`;
+    return appendCallbackTokenIfNeeded(`https://${host}/api/payments/mpesa/callback`);
   }
   const fallbackOrigin = (process.env.APP_URL || 'https://www.gridpips.com')
     .replace(/\/+$/, '')
     .replace(/^https?:\/\/gridpips\.com$/i, 'https://www.gridpips.com');
-  return `${fallbackOrigin}/api/payments/mpesa/callback`;
+  return appendCallbackTokenIfNeeded(`${fallbackOrigin}/api/payments/mpesa/callback`);
 }
 
-app.post('/api/orders/:id/mpesa/stk', requireAuth, async (req: AuthedRequest, res) => {
+app.post('/api/orders/:id/mpesa/stk', requireAuth, stkIpLimiter, stkUserLimiter, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
   const phone = normalizeKenyanPhone(sanitizeText(req.body?.phone, 25));
   if (!phone) {
@@ -2179,7 +2359,7 @@ app.get('/api/orders/:id/mpesa/status', requireAuth, async (req: AuthedRequest, 
   });
 });
 
-app.post('/api/orders/:id/mpesa/confirm', requireAuth, async (req: AuthedRequest, res) => {
+app.post('/api/orders/:id/mpesa/confirm', requireAuth, stkIpLimiter, stkUserLimiter, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
   const rawReceipt = sanitizeText(req.body?.mpesaReceipt, 24).toUpperCase().replace(/\s+/g, '');
 
@@ -2321,7 +2501,7 @@ app.get('/api/wallet/summary', requireAuth, async (req: AuthedRequest, res) => {
   });
 });
 
-app.post('/api/wallet/mpesa/deposit', requireAuth, async (req: AuthedRequest, res) => {
+app.post('/api/wallet/mpesa/deposit', requireAuth, stkIpLimiter, stkUserLimiter, async (req: AuthedRequest, res) => {
   const phone = normalizeKenyanPhone(sanitizeText(req.body?.phone, 25));
   const rawAmount = Number(req.body?.amountKes);
   const amountKes = Math.round(rawAmount);
@@ -2882,8 +3062,8 @@ async function handleDarajaCallback(req: Request, res: Response) {
   }
 }
 
-app.post('/api/payments/mpesa/callback', handleDarajaCallback);
-app.post('/api/mpesa/callback', handleDarajaCallback);
+app.post('/api/payments/mpesa/callback', callbackLimiter, handleDarajaCallback);
+app.post('/api/mpesa/callback', callbackLimiter, handleDarajaCallback);
 
 app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
@@ -4165,6 +4345,15 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
       ? Math.round((Number(mpesaMetricsRow.completedCount || 0) / totalMpesaAttempts) * 1000) / 10
       : 0;
 
+  const wafBlocksRow = db
+    .prepare(
+      `SELECT COUNT(*) as count
+       FROM security_logs
+       WHERE (event_type LIKE 'WAF_%' OR event_type LIKE 'RATE_LIMIT_%')
+         AND created_at >= datetime('now', '-1 day')`
+    )
+    .get() as { count: number };
+
   res.json({
     metrics: {
       totalRevenueUsd: Number(revenueRow.usd || 0),
@@ -4206,9 +4395,23 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
       shortCode: darajaStatus.shortCode,
       partyB: darajaStatus.partyB,
       transactionType: darajaStatus.transactionType,
-      callbackUrl: configuredCallbackUrl || null,
+      callbackUrl: configuredCallbackUrl
+        ? configuredCallbackUrl.replace(/([?&]token=)[^&]+/i, '$1***')
+        : null,
       callbackSecretSet: Boolean(cleanMpesaEnvVar('MPESA_CALLBACK_SECRET')),
       mismatchWarnings,
+    },
+    firewallStatus: {
+      wafEnabled: true,
+      jsonLimitDefault: '256kb',
+      jsonLimitJournal: '3mb',
+      stkRateLimit: '8 / 5m user · 12 / 5m IP',
+      adminRateLimit: '60 / 1m IP',
+      authRateLimit: '20 / 15m IP',
+      callbackSecretConfigured: Boolean(cleanMpesaEnvVar('MPESA_CALLBACK_SECRET')),
+      sessionSecretStrong: hasStrongSessionSecret(),
+      wafBlocks24h: Number(wafBlocksRow.count || 0),
+      activeTempBlockedIps: getActiveBlockedIpCount(),
     },
     users,
     orders,
@@ -4571,10 +4774,12 @@ app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => 
   }
 
   // 2. Public M-Pesa Callback Endpoint
-  const cbUrl = `${targetOrigin}/api/payments/mpesa/callback`;
+  const cbBaseUrl = `${targetOrigin}/api/payments/mpesa/callback`;
+  const cbSecret = cleanMpesaEnvVar('MPESA_CALLBACK_SECRET');
+  const cbTestUrl = cbSecret ? `${cbBaseUrl}?token=${encodeURIComponent(cbSecret)}` : cbBaseUrl;
   const tCb = Date.now();
   try {
-    const cbResp = await fetch(cbUrl, {
+    const cbResp = await fetch(cbTestUrl, {
       method: 'POST',
       redirect: 'manual',
       headers: { 'Content-Type': 'application/json' },
@@ -4592,12 +4797,16 @@ app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => 
       category: 'Payments',
       status: !accepted ? 'fail' : apexWarn ? 'warn' : 'pass',
       latencyMs,
-      summary: accepted ? 'HTTP 200 · ResultCode 0' : `HTTP ${cbResp.status}`,
+      summary: accepted
+        ? cbSecret
+          ? 'HTTP 200 · Token Gated'
+          : 'HTTP 200 · ResultCode 0'
+        : `HTTP ${cbResp.status}`,
       detail: !accepted
-        ? `Callback POST to ${cbUrl} did not return ResultCode 0.`
+        ? `Callback POST to ${cbBaseUrl} returned HTTP ${cbResp.status} (did not return ResultCode 0).`
         : apexWarn
-        ? `Endpoint works on ${cbUrl}, but MPESA_CALLBACK_URL currently uses apex gridpips.com (308 redirect).`
-        : `${cbUrl} accepts Safaricom POST callbacks directly with zero redirects.`,
+        ? `Endpoint works on ${cbBaseUrl}, but MPESA_CALLBACK_URL currently uses apex gridpips.com (308 redirect).`
+        : `${cbBaseUrl} accepts Safaricom POST callbacks directly with zero redirects${cbSecret ? ' and enforces MPESA_CALLBACK_SECRET' : ''}.`,
     });
   } catch (err) {
     checks.push({
@@ -4749,6 +4958,7 @@ app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => 
 
   // 8. Session Secret & Security Posture
   const strongSecret = hasStrongSessionSecret();
+  const callbackSecretConfigured = Boolean(cleanMpesaEnvVar('MPESA_CALLBACK_SECRET'));
   const criticalCount = (
     db
       .prepare("SELECT COUNT(*) as cnt FROM security_logs WHERE severity = 'critical' AND created_at >= datetime('now', '-1 day')")
@@ -4766,6 +4976,28 @@ app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => 
     detail: strongSecret
       ? `32+ char SESSION_SECRET active. ${criticalCount} critical security events recorded in the last 24h.`
       : 'Add a random 32+ character SESSION_SECRET environment variable in Vercel Project Settings for persistent signed login sessions.',
+  });
+
+  // 9. Application Firewall, Payload Caps & STK Throttling
+  const wafBlocksCount = (
+    db
+      .prepare(
+        "SELECT COUNT(*) as cnt FROM security_logs WHERE (event_type LIKE 'WAF_%' OR event_type LIKE 'RATE_LIMIT_%') AND created_at >= datetime('now', '-1 day')"
+      )
+      .get() as { cnt: number }
+  ).cnt;
+  checks.push({
+    id: 'waf-firewall',
+    name: 'Application Firewall (WAF) & Payload Guard',
+    category: 'Security',
+    status: callbackSecretConfigured ? 'pass' : 'warn',
+    latencyMs: 0,
+    summary: callbackSecretConfigured
+      ? `WAF Active · Callback Secret Set · ${wafBlocksCount} blocks (24h)`
+      : `WAF Active · MPESA_CALLBACK_SECRET Not Set`,
+    detail: callbackSecretConfigured
+      ? `L7 scanner/XSS/SQLi filter, 256KB JSON cap (3MB journal), STK 8/5m & Admin 60/1m throttles, and ?token= callback secret active.`
+      : `L7 scanner/XSS/SQLi filter, 256KB JSON cap (3MB journal), and STK 8/5m + Admin 60/1m throttles active. Add MPESA_CALLBACK_SECRET + ?token= in Vercel for strict 403 callback gating.`,
   });
 
   const passed = checks.filter((c) => c.status === 'pass').length;
@@ -4794,8 +5026,17 @@ app.post('/api/admin/checkup', requireAdmin, async (req: AuthedRequest, res) => 
 });
 
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('Unhandled Express API error:', err);
   if (res.headersSent) return;
+  const errObj = err as { type?: string; status?: number; message?: string } | null;
+  if (errObj?.type === 'entity.too.large' || errObj?.status === 413) {
+    res.status(413).json({ error: 'Request payload too large.' });
+    return;
+  }
+  if (errObj?.type === 'entity.parse.failed' || errObj?.status === 400) {
+    res.status(400).json({ error: 'Invalid JSON request payload.' });
+    return;
+  }
+  console.error('Unhandled Express API error:', err);
   const message = err instanceof Error ? err.message : 'Internal server error.';
   res.status(500).json({ error: message });
 });

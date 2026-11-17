@@ -108,6 +108,18 @@ interface AdminOverviewResponse {
     callbackSecretSet: boolean;
     mismatchWarnings: string[];
   };
+  firewallStatus?: {
+    wafEnabled: boolean;
+    jsonLimitDefault: string;
+    jsonLimitJournal: string;
+    stkRateLimit: string;
+    adminRateLimit: string;
+    authRateLimit: string;
+    callbackSecretConfigured: boolean;
+    sessionSecretStrong: boolean;
+    wafBlocks24h: number;
+    activeTempBlockedIps: number;
+  };
   users: Array<{
     id: number;
     name: string;
@@ -1366,6 +1378,61 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     )}
                   </div>
                 </div>
+
+                {data.firewallStatus && (
+                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-2.5 md:col-span-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-900">
+                        6. Application Firewall (WAF), Payload Caps &amp; STK Throttling
+                      </span>
+                      <span
+                        className={`font-semibold ${
+                          data.firewallStatus.callbackSecretConfigured && data.firewallStatus.sessionSecretStrong
+                            ? 'text-emerald-700'
+                            : 'text-amber-700'
+                        }`}
+                      >
+                        {data.firewallStatus.callbackSecretConfigured
+                          ? 'Active · Strict Callback Token Enforced'
+                          : 'Active · Add MPESA_CALLBACK_SECRET on Vercel'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-white border border-slate-200 rounded-lg p-3">
+                      <div>
+                        <div className="text-slate-400">L7 WAF FILTER</div>
+                        <div className="font-bold text-emerald-700">
+                          {data.firewallStatus.wafEnabled ? 'ENABLED' : 'OFF'}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">JSON BODY CAPS</div>
+                        <div className="font-bold text-slate-900">
+                          {data.firewallStatus.jsonLimitDefault} · {data.firewallStatus.jsonLimitJournal} journal
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">STK / ADMIN LIMITS</div>
+                        <div className="font-bold text-slate-900 truncate">
+                          {data.firewallStatus.stkRateLimit}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-slate-400">24H BLOCKS / BANS</div>
+                        <div className="font-bold text-slate-900 tabular-nums">
+                          {data.firewallStatus.wafBlocks24h} blocks · {data.firewallStatus.activeTempBlockedIps} temp bans
+                        </div>
+                      </div>
+                    </div>
+                    <p className="text-slate-600">
+                      Blocks automated <span className="font-mono">.env/.git/wp-admin/.php</span> scanners, path traversal, and XSS/SQLi query probes with automatic 15-minute IP cooldowns, enforces 256KB JSON limits on auth/payment routes, and throttles M-Pesa STK Push ({data.firewallStatus.stkRateLimit}) &amp; Admin ({data.firewallStatus.adminRateLimit}).
+                      {!data.firewallStatus.callbackSecretConfigured && (
+                        <span className="block mt-1 text-amber-800">
+                          Action required on Vercel: add <span className="font-mono font-semibold">MPESA_CALLBACK_SECRET</span> (32+ chars) and append <span className="font-mono font-semibold">?token=&lt;secret&gt;</span> to <span className="font-mono font-semibold">MPESA_CALLBACK_URL</span> so unauthorized callback POSTs receive HTTP 403 immediately.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
