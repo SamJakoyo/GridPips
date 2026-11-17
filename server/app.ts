@@ -82,6 +82,15 @@ import {
   queryDarajaStkStatus,
   testDarajaConnection,
 } from './daraja.ts';
+import {
+  DEFAULT_CRYPTO_ADDRESSES,
+  getExplorerTxUrl,
+  getLiveBtcUsdPrice,
+  validateCryptoTxHashFormat,
+  verifyOnChainCryptoPayment,
+  type CryptoCurrency,
+  type CryptoNetwork,
+} from './cryptoVerify.ts';
 
 try {
   initDatabase();
@@ -685,11 +694,38 @@ app.get('/api/config/public', (_req, res) => {
     supabaseUrl: sb.url,
     supabaseAnonKey: sb.anonKey,
     cryptoAddresses: {
-      USDT_TRC20: s.usdt_trc20_address,
-      USDT_ERC20: s.usdt_erc20_address,
-      BTC: s.btc_address,
+      USDT_TRC20: s.usdt_trc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_TRC20,
+      USDT_ERC20: s.usdt_erc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_ERC20,
+      BTC: s.btc_address || DEFAULT_CRYPTO_ADDRESSES.BTC,
     },
   });
+});
+
+app.get('/api/crypto/quote', async (req, res) => {
+  try {
+    const s = getSettingsMap();
+    const rawAmount = Number(req.query.amountUsd || s.analyzer_price_usd || 5.25);
+    const amountUsd = Number.isFinite(rawAmount) && rawAmount > 0 ? Math.min(rawAmount, 100000) : 5.25;
+    const btcUsd = await getLiveBtcUsdPrice();
+    const btcAmount = Number((amountUsd / btcUsd).toFixed(8));
+    res.json({
+      amountUsd,
+      btcUsd: Number(btcUsd.toFixed(2)),
+      btcAmount,
+      btcAmountFormatted: btcAmount.toFixed(8),
+      usdtAmount: Number(amountUsd.toFixed(2)),
+      cryptoAddresses: {
+        USDT_TRC20: s.usdt_trc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_TRC20,
+        USDT_ERC20: s.usdt_erc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_ERC20,
+        BTC: s.btc_address || DEFAULT_CRYPTO_ADDRESSES.BTC,
+      },
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Unable to fetch live crypto quote.',
+    });
+  }
 });
 
 // ---------------- Auth (Exness IB Gate + Rate Limiting + Supabase Single Source of Truth) ----------------
@@ -3065,13 +3101,46 @@ async function handleDarajaCallback(req: Request, res: Response) {
 app.post('/api/payments/mpesa/callback', callbackLimiter, handleDarajaCallback);
 app.post('/api/mpesa/callback', callbackLimiter, handleDarajaCallback);
 
+function resolveCryptoNetworkAndAddress(
+  rawCurrency: unknown,
+  rawNetwork: unknown,
+  settings: Record<string, string>
+): { currency: CryptoCurrency; network: CryptoNetwork; address: string } {
+  const cur = String(rawCurrency || '').toUpperCase() === 'BTC' ? 'BTC' : 'USDT';
+  if (cur === 'BTC') {
+    return {
+      currency: 'BTC',
+      network: 'BTC',
+      address: settings.btc_address || DEFAULT_CRYPTO_ADDRESSES.BTC,
+    };
+  }
+  const net = String(rawNetwork || '').toUpperCase() === 'ERC20' ? 'ERC20' : 'TRC20';
+  return {
+    currency: 'USDT',
+    network: net,
+    address:
+      net === 'ERC20'
+        ? settings.usdt_erc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_ERC20
+        : settings.usdt_trc20_address || DEFAULT_CRYPTO_ADDRESSES.USDT_TRC20,
+  };
+}
+
 app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest, res) => {
   const orderId = Number(req.params.id);
-  const txHash = sanitizeText(req.body?.txHash, 120).replace(/\s+/g, '');
+  const rawTxHash = sanitizeText(req.body?.txHash, 130).replace(/\s+/g, '');
   const order = db
     .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
     .get(orderId, req.currentUser!.id) as
-    | { id: number; order_number: string; payment_status: string; amount_usd: number }
+    | {
+        id: number;
+        order_number: string;
+        product_name: string;
+        payment_status: string;
+        amount_usd: number;
+        crypto_currency: string | null;
+        crypto_network: string | null;
+        crypto_address: string | null;
+      }
     | undefined;
 
   if (!order) {
@@ -3083,16 +3152,95 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
     res.json({ order, user: serializeUser(user), status: 'paid' });
     return;
   }
-  if (!/^[a-zA-Z0-9]{20,110}$/.test(txHash)) {
-    res.status(400).json({ error: 'Paste a valid blockchain transaction hash (20+ alphanumeric characters).' });
+
+  const settings = getSettingsMap();
+  const resolved = resolveCryptoNetworkAndAddress(
+    req.body?.cryptoCurrency ?? order.crypto_currency,
+    req.body?.cryptoNetwork ?? order.crypto_network,
+    settings
+  );
+
+  const hashCheck = validateCryptoTxHashFormat(resolved.currency, resolved.network, rawTxHash);
+  if (!hashCheck.ok) {
+    res.status(400).json({ error: hashCheck.error });
+    return;
+  }
+  const txHash = hashCheck.normalizedHash;
+
+  const duplicateLocal = db
+    .prepare('SELECT id FROM orders WHERE LOWER(crypto_tx_hash) = LOWER(?) AND id != ?')
+    .get(txHash, order.id) as { id: number } | undefined;
+
+  let duplicateCloud = false;
+  const sbAdmin = getServerSupabaseAdminClient();
+  if (!duplicateLocal && sbAdmin) {
+    const { data: sbDup } = await sbAdmin
+      .from('gridpips_orders')
+      .select('order_number')
+      .ilike('crypto_tx_hash', txHash)
+      .neq('order_number', order.order_number)
+      .limit(1)
+      .maybeSingle();
+    duplicateCloud = Boolean(sbDup);
+  }
+
+  if (duplicateLocal || duplicateCloud) {
+    res.status(409).json({ error: 'This transaction hash has already been submitted on another order.' });
     return;
   }
 
-  const duplicate = db
-    .prepare('SELECT id FROM orders WHERE crypto_tx_hash = ? AND id != ?')
-    .get(txHash, order.id) as { id: number } | undefined;
-  if (duplicate) {
-    res.status(409).json({ error: 'This transaction hash has already been submitted on another order.' });
+  // Admin test/manual shortcut remains allowed, otherwise perform live on-chain blockchain verification
+  if (req.currentUser!.role === 'admin') {
+    db.prepare(
+      `UPDATE orders
+       SET payment_method = 'crypto',
+           crypto_currency = ?,
+           crypto_network = ?,
+           crypto_address = ?,
+           crypto_tx_hash = ?,
+           mpesa_result_desc = ?
+       WHERE id = ?`
+    ).run(
+      resolved.currency,
+      resolved.network,
+      resolved.address,
+      txHash,
+      'Verified by admin checkout.',
+      order.id
+    );
+    await fulfillOrder(order.id);
+    const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({
+      order: updated,
+      user: serializeUser(user),
+      status: 'paid',
+      explorerUrl: getExplorerTxUrl(resolved.currency, resolved.network, txHash),
+      message: 'On-chain transaction verified and access unlocked.',
+    });
+    return;
+  }
+
+  const verification = await verifyOnChainCryptoPayment({
+    currency: resolved.currency,
+    network: resolved.network,
+    txHash,
+    expectedAddress: resolved.address,
+    expectedAmountUsd: Number(order.amount_usd || 5.25),
+  });
+
+  if (verification.outcome === 'rejected') {
+    logSecurityEvent(
+      'CRYPTO_TX_REJECTED',
+      'warning',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} (${resolved.currency} ${resolved.network}) rejected TX ${txHash}: ${verification.message}`
+    );
+    res.status(400).json({
+      error: verification.message,
+      explorerUrl: verification.explorerUrl,
+    });
     return;
   }
 
@@ -3100,13 +3248,42 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
     `UPDATE orders
      SET payment_method = 'crypto',
          payment_status = 'processing',
+         crypto_currency = ?,
+         crypto_network = ?,
+         crypto_address = ?,
          crypto_tx_hash = ?,
          mpesa_result_desc = ?
      WHERE id = ?`
-  ).run(txHash, 'On-chain TXID submitted — awaiting confirmation.', order.id);
+  ).run(
+    resolved.currency,
+    resolved.network,
+    resolved.address,
+    txHash,
+    verification.message,
+    order.id
+  );
 
-  if (req.currentUser!.role === 'admin') {
+  if (verification.outcome === 'confirmed') {
     await fulfillOrder(order.id);
+    logSecurityEvent(
+      'CRYPTO_TX_VERIFIED_ONCHAIN',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} auto-unlocked via ${resolved.currency} (${resolved.network}) TX ${txHash}`
+    );
+    void sendAutomatedEmail({
+      to: req.currentUser!.email,
+      subject: `GRIDPIPs License Activated (${order.order_number})`,
+      category: 'order_receipt',
+      textPreview: `Your ${resolved.currency} (${resolved.network}) payment for ${order.product_name} has been confirmed on-chain (${txHash}).`,
+      html: `<h2>Crypto Payment Confirmed</h2>
+        <p>Order: <strong>${order.order_number}</strong></p>
+        <p>Product: <strong>${order.product_name}</strong></p>
+        <p>Method: <strong>${resolved.currency} (${resolved.network})</strong></p>
+        <p>TX Hash: <strong>${txHash}</strong></p>
+        <p>Amount Settled: <strong>$${Number(order.amount_usd).toFixed(2)} USD</strong></p>`,
+    });
   } else {
     void upsertCloudOrder(order.id);
     logSecurityEvent(
@@ -3114,7 +3291,7 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
       'info',
       getClientIp(req),
       req.currentUser!.email,
-      `Order ${order.order_number} · TX ${txHash} ($${order.amount_usd})`
+      `Order ${order.order_number} · ${resolved.currency} (${resolved.network}) TX ${txHash} ($${order.amount_usd})`
     );
   }
 
@@ -3126,10 +3303,123 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
     order: updated,
     user: serializeUser(user),
     status: updated.payment_status,
-    message:
-      updated.payment_status === 'paid'
-        ? 'On-chain transaction verified and access unlocked.'
-        : 'Transaction hash recorded and queued for on-chain confirmation.',
+    outcome: verification.outcome,
+    explorerUrl: verification.explorerUrl,
+    receivedUsd: verification.receivedUsd,
+    receivedAmount: verification.receivedAmount,
+    message: verification.message,
+  });
+});
+
+app.get('/api/orders/:id/crypto/status', requireAuth, async (req: AuthedRequest, res) => {
+  const orderId = Number(req.params.id);
+  const order = db
+    .prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?')
+    .get(orderId, req.currentUser!.id) as
+    | {
+        id: number;
+        order_number: string;
+        product_name: string;
+        payment_status: string;
+        amount_usd: number;
+        crypto_currency: string | null;
+        crypto_network: string | null;
+        crypto_address: string | null;
+        crypto_tx_hash: string | null;
+        mpesa_result_desc: string | null;
+      }
+    | undefined;
+
+  if (!order) {
+    res.status(404).json({ error: 'Order not found.' });
+    return;
+  }
+
+  if (order.payment_status === 'paid') {
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+    res.json({
+      status: 'paid',
+      order,
+      user: serializeUser(user),
+      explorerUrl:
+        order.crypto_tx_hash
+          ? getExplorerTxUrl(
+              order.crypto_currency === 'BTC' ? 'BTC' : 'USDT',
+              order.crypto_network === 'ERC20'
+                ? 'ERC20'
+                : order.crypto_currency === 'BTC'
+                ? 'BTC'
+                : 'TRC20',
+              order.crypto_tx_hash
+            )
+          : null,
+      message: 'Payment confirmed and license unlocked.',
+    });
+    return;
+  }
+
+  if (!order.crypto_tx_hash) {
+    res.json({
+      status: order.payment_status,
+      order,
+      message: 'No transaction hash submitted yet.',
+    });
+    return;
+  }
+
+  const settings = getSettingsMap();
+  const resolved = resolveCryptoNetworkAndAddress(order.crypto_currency, order.crypto_network, settings);
+  const expectedAddr = order.crypto_address || resolved.address;
+
+  const verification = await verifyOnChainCryptoPayment({
+    currency: resolved.currency,
+    network: resolved.network,
+    txHash: order.crypto_tx_hash,
+    expectedAddress: expectedAddr,
+    expectedAmountUsd: Number(order.amount_usd || 5.25),
+  });
+
+  if (verification.outcome === 'confirmed') {
+    db.prepare('UPDATE orders SET mpesa_result_desc = ? WHERE id = ?').run(verification.message, order.id);
+    await fulfillOrder(order.id);
+    logSecurityEvent(
+      'CRYPTO_TX_VERIFIED_ONCHAIN',
+      'info',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Order ${order.order_number} auto-unlocked on poll (${resolved.currency} ${resolved.network}) TX ${order.crypto_tx_hash}`
+    );
+    void sendAutomatedEmail({
+      to: req.currentUser!.email,
+      subject: `GRIDPIPs License Activated (${order.order_number})`,
+      category: 'order_receipt',
+      textPreview: `Your ${resolved.currency} (${resolved.network}) payment for ${order.product_name} has been confirmed on-chain (${order.crypto_tx_hash}).`,
+      html: `<h2>Crypto Payment Confirmed</h2>
+        <p>Order: <strong>${order.order_number}</strong></p>
+        <p>Product: <strong>${order.product_name}</strong></p>
+        <p>Method: <strong>${resolved.currency} (${resolved.network})</strong></p>
+        <p>TX Hash: <strong>${order.crypto_tx_hash}</strong></p>
+        <p>Amount Settled: <strong>$${Number(order.amount_usd).toFixed(2)} USD</strong></p>`,
+    });
+  } else {
+    db.prepare('UPDATE orders SET mpesa_result_desc = ? WHERE id = ?').run(verification.message, order.id);
+    void upsertCloudOrder(order.id);
+  }
+
+  const updated = db.prepare('SELECT * FROM orders WHERE id = ?').get(order.id) as {
+    payment_status: string;
+  };
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser;
+
+  res.json({
+    status: updated.payment_status,
+    outcome: verification.outcome,
+    order: updated,
+    user: serializeUser(user),
+    explorerUrl: verification.explorerUrl,
+    receivedUsd: verification.receivedUsd,
+    receivedAmount: verification.receivedAmount,
+    message: verification.message,
   });
 });
 

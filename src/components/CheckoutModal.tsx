@@ -13,7 +13,10 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
+  QrCode,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { apiFetch } from '../lib/api';
 import type { Order, PublicConfig, User } from '../types';
 
@@ -81,6 +84,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       : 'TRC20'
   );
   const [txHash, setTxHash] = useState(existingOrder?.crypto_tx_hash || '');
+  const [btcQuote, setBtcQuote] = useState<{ btcUsd: number; btcAmountFormatted: string } | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [cryptoExplorerUrl, setCryptoExplorerUrl] = useState<string>('');
 
   const [loading, setLoading] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
@@ -193,8 +199,56 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     return () => clearPollingTimers();
   }, [stkPhase, order?.id, order?.mpesa_checkout_id]);
 
+  useEffect(() => {
+    if (paymentMethod !== 'crypto') return;
+    let active = true;
+    apiFetch<{ btcUsd: number; btcAmountFormatted: string }>(
+      `/api/crypto/quote?amountUsd=${encodeURIComponent(String(priceUsd))}`
+    )
+      .then((res) => {
+        if (active) setBtcQuote({ btcUsd: res.btcUsd, btcAmountFormatted: res.btcAmountFormatted });
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [paymentMethod, priceUsd]);
+
+  useEffect(() => {
+    if (paymentMethod !== 'crypto' || !activeAddress) {
+      setQrDataUrl('');
+      return;
+    }
+    const qrPayload =
+      cryptoCurrency === 'BTC' && btcQuote?.btcAmountFormatted
+        ? `bitcoin:${activeAddress}?amount=${btcQuote.btcAmountFormatted}`
+        : activeAddress;
+    let active = true;
+    QRCode.toDataURL(qrPayload, {
+      width: 176,
+      margin: 1,
+      color: { dark: '#0f172a', light: '#ffffff' },
+    })
+      .then((url) => {
+        if (active) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (active) setQrDataUrl('');
+      });
+    return () => {
+      active = false;
+    };
+  }, [paymentMethod, activeAddress, cryptoCurrency, btcQuote?.btcAmountFormatted]);
+
   async function ensureOrder(method: 'mpesa' | 'crypto'): Promise<Order> {
-    if (order && order.payment_status !== 'paid' && order.payment_method === method) {
+    const effectiveNetwork = method === 'crypto' ? (cryptoCurrency === 'BTC' ? 'BTC' : cryptoNetwork) : undefined;
+    if (
+      order &&
+      order.payment_status !== 'paid' &&
+      order.payment_method === method &&
+      (method === 'mpesa' ||
+        (order.crypto_currency === cryptoCurrency && order.crypto_network === effectiveNetwork))
+    ) {
       return order;
     }
     const res = await apiFetch<{ order: Order }>('/api/orders/create', {
@@ -203,12 +257,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         productKey,
         paymentMethod: method,
         cryptoCurrency: method === 'crypto' ? cryptoCurrency : undefined,
-        cryptoNetwork:
-          method === 'crypto'
-            ? cryptoCurrency === 'BTC'
-              ? 'BTC'
-              : cryptoNetwork
-            : undefined,
+        cryptoNetwork: effectiveNetwork,
       }),
     });
     setOrder(res.order);
@@ -310,22 +359,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setLoading(true);
     try {
       const activeOrder = await ensureOrder('crypto');
+      const effectiveNetwork = cryptoCurrency === 'BTC' ? 'BTC' : cryptoNetwork;
       const res = await apiFetch<{
         order: Order;
         user: User;
         status: string;
+        explorerUrl?: string;
         message?: string;
       }>(`/api/orders/${activeOrder.id}/crypto/submit`, {
         method: 'POST',
-        body: JSON.stringify({ txHash }),
+        body: JSON.stringify({
+          txHash,
+          cryptoCurrency,
+          cryptoNetwork: effectiveNetwork,
+        }),
       });
       setOrder(res.order);
+      if (res.explorerUrl) setCryptoExplorerUrl(res.explorerUrl);
       onOrderSubmitted?.(res.order);
 
       if (res.status === 'paid' || res.order.payment_status === 'paid') {
         setStkPhase('paid');
         setConfirmedUser(res.user);
-        setStkStatusMessage(res.message || 'Transaction confirmed and access unlocked.');
+        setStkStatusMessage(res.message || 'Transaction confirmed on-chain and access unlocked.');
       } else {
         setStkPhase('submitted');
         setStkStatusMessage(
@@ -336,6 +392,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setError(err instanceof Error ? err.message : 'Crypto TX submission failed.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCheckCryptoStatus() {
+    if (!order?.id) return;
+    setCheckingStatus(true);
+    setError('');
+    try {
+      const res = await apiFetch<{
+        status: string;
+        order: Order;
+        user?: User;
+        explorerUrl?: string | null;
+        message?: string;
+      }>(`/api/orders/${order.id}/crypto/status`);
+      setOrder(res.order);
+      if (res.explorerUrl) setCryptoExplorerUrl(res.explorerUrl);
+      onOrderSubmitted?.(res.order);
+      if (res.status === 'paid' || res.order.payment_status === 'paid') {
+        setStkPhase('paid');
+        if (res.user) setConfirmedUser(res.user);
+        setStkStatusMessage(res.message || 'On-chain transaction confirmed and access unlocked.');
+      } else if (res.message) {
+        setStkStatusMessage(res.message);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to check blockchain status right now.');
+    } finally {
+      setCheckingStatus(false);
     }
   }
 
@@ -454,6 +539,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   <span className="text-slate-500">Order Reference</span>
                   <span className="font-mono font-semibold text-slate-950">{order.order_number}</span>
                 </div>
+                {order.payment_method === 'crypto' && order.crypto_network && (
+                  <div className="px-3.5 py-2.5 flex items-center justify-between">
+                    <span className="text-slate-500">Asset &amp; Network</span>
+                    <span className="font-mono font-semibold text-slate-900">
+                      {order.crypto_currency || 'USDT'} ({order.crypto_network})
+                    </span>
+                  </div>
+                )}
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
                   <span className="text-slate-500">Submitted Reference</span>
                   <span className="font-mono font-semibold text-slate-900 truncate max-w-[200px]">
@@ -462,9 +555,36 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 </div>
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
                   <span className="text-slate-500">Status</span>
-                  <span className="font-semibold text-amber-700">Awaiting Settlement Review</span>
+                  <span className="font-semibold text-amber-700">
+                    {order.payment_method === 'crypto' ? 'Awaiting Block Confirmation' : 'Awaiting Settlement Review'}
+                  </span>
                 </div>
               </div>
+
+              {order.payment_method === 'crypto' && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={checkingStatus}
+                    onClick={() => void handleCheckCryptoStatus()}
+                    className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus ? 'animate-spin' : ''}`} />
+                    <span>{checkingStatus ? 'Verifying On-Chain...' : 'Check On-Chain Confirmation'}</span>
+                  </button>
+                  {cryptoExplorerUrl && (
+                    <a
+                      href={cryptoExplorerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="py-2.5 px-3 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
+                    >
+                      <span>Explorer</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              )}
 
               <button
                 type="button"
@@ -773,26 +893,72 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-lg space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-700">
-                        Send exactly ${priceUsd.toFixed(2)} in {cryptoCurrency} ({cryptoNetwork})
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => copyValue('crypto', activeAddress)}
-                        className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
-                      >
-                        {copiedKey === 'crypto' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                        ) : (
-                          <Copy className="w-3.5 h-3.5" />
-                        )}
-                        <span>{copiedKey === 'crypto' ? 'Copied' : 'Copy address'}</span>
-                      </button>
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-1">
+                        <div className="text-xs font-semibold text-slate-900">
+                          {cryptoCurrency === 'BTC' && btcQuote
+                            ? `Send ${btcQuote.btcAmountFormatted} BTC (≈ $${priceUsd.toFixed(2)} USD)`
+                            : `Send exactly ${priceUsd.toFixed(2)} USDT (${cryptoNetwork})`}
+                        </div>
+                        <div className="text-[11px] text-amber-800 font-medium">
+                          {cryptoCurrency === 'BTC'
+                            ? `Bitcoin Mainnet only (1 BTC ≈ $${btcQuote ? btcQuote.btcUsd.toLocaleString() : '—'})`
+                            : cryptoNetwork === 'ERC20'
+                            ? 'Send ONLY USDT on Ethereum (ERC20) — other tokens/chains will be lost'
+                            : 'Send ONLY USDT on TRON (TRC20) — other tokens/chains will be lost'}
+                        </div>
+                      </div>
+                      {cryptoCurrency === 'BTC' && btcQuote && (
+                        <button
+                          type="button"
+                          onClick={() => copyValue('btcAmount', btcQuote.btcAmountFormatted)}
+                          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                        >
+                          {copiedKey === 'btcAmount' ? (
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                          <span>{copiedKey === 'btcAmount' ? 'Copied BTC' : 'Copy BTC'}</span>
+                        </button>
+                      )}
                     </div>
-                    <div className="font-mono text-xs text-slate-800 break-all bg-white p-2.5 rounded border border-slate-200">
-                      {activeAddress}
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3.5 bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="shrink-0 w-28 h-28 rounded-md border border-slate-200 bg-white flex items-center justify-center p-1">
+                        {qrDataUrl ? (
+                          <img
+                            src={qrDataUrl}
+                            alt={`${cryptoCurrency} ${cryptoNetwork} deposit QR code`}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <QrCode className="w-8 h-8 text-slate-300" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 w-full space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                            {cryptoCurrency === 'BTC' ? 'BTC Deposit Address' : `USDT ${cryptoNetwork} Address`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => copyValue('crypto', activeAddress)}
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer"
+                          >
+                            {copiedKey === 'crypto' ? (
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                            <span>{copiedKey === 'crypto' ? 'Copied' : 'Copy address'}</span>
+                          </button>
+                        </div>
+                        <div className="font-mono text-xs text-slate-900 break-all bg-slate-50 p-2 rounded border border-slate-200 select-all">
+                          {activeAddress}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -805,7 +971,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       required
                       value={txHash}
                       onChange={(e) => setTxHash(e.target.value)}
-                      placeholder="Paste full on-chain TX hash"
+                      placeholder={
+                        cryptoCurrency === 'BTC'
+                          ? 'Paste 64-character Bitcoin TXID'
+                          : cryptoNetwork === 'ERC20'
+                          ? 'Paste 0x... Ethereum transaction hash'
+                          : 'Paste 64-character TRON TRC20 TXID'
+                      }
                       className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-blue-600"
                     />
                   </div>
@@ -815,7 +987,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     disabled={loading || txHash.trim().length < 20}
                     className="w-full py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
                   >
-                    {loading ? 'Submitting Transaction...' : 'Submit TX Hash for Verification'}
+                    {loading ? 'Verifying On-Chain...' : 'Verify TX Hash & Unlock'}
                   </button>
                 </form>
               )}

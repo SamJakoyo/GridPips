@@ -291,9 +291,9 @@ export function initDatabase(): void {
     mpesa_transaction_type: 'CustomerBuyGoodsOnline',
     mpesa_merchant_name: 'GRIDPIPs Trading',
     influencer_commission_pct: '20',
-    usdt_trc20_address: 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1',
-    usdt_erc20_address: '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C',
-    btc_address: 'bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w',
+    usdt_trc20_address: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',
+    usdt_erc20_address: '0x7ac8dd858f3154d83114d7134a85924fdbb22234',
+    btc_address: '13JdKdY8s8iVf5PAwy7popMHCqKvZsSrjD',
   };
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)');
@@ -302,6 +302,10 @@ export function initDatabase(): void {
   }
   // Migrate legacy placeholder till number (5984120) to user's Buy Goods Till 1921416
   db.prepare("UPDATE site_settings SET value = '1921416' WHERE key IN ('mpesa_till_number', 'mpesa_party_b') AND value = '5984120'").run();
+  // Migrate legacy placeholder crypto addresses to configured real deposit addresses
+  db.prepare("UPDATE site_settings SET value = 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ' WHERE key = 'usdt_trc20_address' AND (value = 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1' OR value = '')").run();
+  db.prepare("UPDATE site_settings SET value = '0x7ac8dd858f3154d83114d7134a85924fdbb22234' WHERE key = 'usdt_erc20_address' AND (value = '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C' OR value = '')").run();
+  db.prepare("UPDATE site_settings SET value = '13JdKdY8s8iVf5PAwy7popMHCqKvZsSrjD' WHERE key = 'btc_address' AND (value = 'bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w' OR value = '')").run();
 
   // Seed default Admin account for site owner if not yet created
   const adminEmail = (process.env.ADMIN_EMAIL || 'samjakoyo26@gmail.com').toLowerCase();

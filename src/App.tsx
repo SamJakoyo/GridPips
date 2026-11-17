@@ -91,9 +91,9 @@ const DEFAULT_CONFIG: PublicConfig = {
   mpesaMerchantName: 'GRIDPIPs Trading',
   commissionPct: 20,
   cryptoAddresses: {
-    USDT_TRC20: 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1',
-    USDT_ERC20: '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C',
-    BTC: 'bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w',
+    USDT_TRC20: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',
+    USDT_ERC20: '0x7ac8dd858f3154d83114d7134a85924fdbb22234',
+    BTC: '13JdKdY8s8iVf5PAwy7popMHCqKvZsSrjD',
   },
 };
 
