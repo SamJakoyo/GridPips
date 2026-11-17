@@ -970,3 +970,84 @@ export async function syncAllCloudMpesaTransactionsToLocal(): Promise<void> {
     console.warn('Cloud M-Pesa admin sync warning:', err instanceof Error ? err.message : String(err));
   }
 }
+
+const SITE_SETTINGS_CLOUD_EMAIL = '__site_settings__@system.gridpips';
+const LEGACY_PLACEHOLDER_SETTINGS: Record<string, string[]> = {
+  mpesa_till_number: ['5984120'],
+  mpesa_party_b: ['5984120'],
+  usdt_trc20_address: ['TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1'],
+  usdt_erc20_address: ['0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C'],
+  btc_address: ['bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w'],
+};
+
+let lastSiteSettingsHydratedAt = 0;
+
+export async function saveCloudSiteSettings(settings: Record<string, string>): Promise<boolean> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) return false;
+
+  try {
+    const { error } = await client.from('gridpips_user_state').upsert(
+      {
+        user_email: SITE_SETTINGS_CLOUD_EMAIL,
+        plan_json: settings,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_email' }
+    );
+    if (error && !isMissingTableError(error)) {
+      console.warn('Cloud site settings save warning:', error.message);
+      return false;
+    }
+    if (!error) {
+      lastSiteSettingsHydratedAt = Date.now();
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn('Cloud site settings save failed:', err instanceof Error ? err.message : String(err));
+    return false;
+  }
+}
+
+export async function hydrateSiteSettingsFromCloud(force = false): Promise<void> {
+  if (!force && Date.now() - lastSiteSettingsHydratedAt < 15_000) {
+    return;
+  }
+  const client = getServerSupabaseAdminClient();
+  if (!client) return;
+
+  try {
+    const { data, error } = await client
+      .from('gridpips_user_state')
+      .select('plan_json')
+      .eq('user_email', SITE_SETTINGS_CLOUD_EMAIL)
+      .maybeSingle();
+
+    if (error || !data || !data.plan_json || typeof data.plan_json !== 'object' || Array.isArray(data.plan_json)) {
+      lastSiteSettingsHydratedAt = Date.now();
+      return;
+    }
+
+    const cloudSettings = data.plan_json as Record<string, unknown>;
+    const upsertStmt = db.prepare(
+      'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    );
+
+    const tx = db.transaction(() => {
+      for (const [key, rawVal] of Object.entries(cloudSettings)) {
+        if (typeof rawVal !== 'string') continue;
+        const val = rawVal.trim();
+        if (!val) continue;
+        const legacyBlocked = LEGACY_PLACEHOLDER_SETTINGS[key];
+        if (legacyBlocked && legacyBlocked.includes(val)) continue;
+        upsertStmt.run(key, val);
+      }
+    });
+    tx();
+    lastSiteSettingsHydratedAt = Date.now();
+  } catch (err) {
+    console.warn('Cloud site settings hydration warning:', err instanceof Error ? err.message : String(err));
+  }
+}
+

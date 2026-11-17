@@ -192,6 +192,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [settingsError, setSettingsError] = useState('');
   const [darajaTesting, setDarajaTesting] = useState(false);
   const [darajaTestResult, setDarajaTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [domainInput, setDomainInput] = useState('www.gridpips.com');
@@ -285,14 +286,29 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
     e.preventDefault();
     setSavingSettings(true);
     setFeedback('');
+    setSettingsError('');
     try {
-      await apiFetch('/api/admin/settings', {
-        method: 'POST',
-        body: JSON.stringify(settingsForm),
-      });
+      const saved = await apiFetch<{ settings: Record<string, string>; cloudPersisted?: boolean }>(
+        '/api/admin/settings',
+        {
+          method: 'POST',
+          body: JSON.stringify(settingsForm),
+        }
+      );
+      if (saved.settings) {
+        setSettingsForm(saved.settings);
+      }
       await onConfigSaved();
       await loadAdmin();
-      setFeedback('Platform settings updated live across the site.');
+      setFeedback(
+        saved.cloudPersisted
+          ? 'Platform settings saved to Cloud DB and updated live across the site.'
+          : 'Platform settings saved and updated live across this server.'
+      );
+    } catch (err) {
+      setSettingsError(
+        err instanceof Error ? err.message : 'Failed to save platform settings. Please try again.'
+      );
     } finally {
       setSavingSettings(false);
     }
@@ -1703,6 +1719,12 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             </div>
           </div>
 
+          {settingsError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+              {settingsError}
+            </div>
+          )}
+
           {feedback && (
             <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg">
               {feedback}
@@ -1712,7 +1734,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           <button
             type="submit"
             disabled={savingSettings}
-            className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer"
+            className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60"
           >
             {savingSettings ? 'Saving...' : 'Save Global Settings'}
           </button>

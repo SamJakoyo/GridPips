@@ -62,9 +62,11 @@ import {
   checkCloudSyncTablesHealth,
   deleteCloudJournalTrade,
   hydrateMpesaCheckoutFromCloud,
+  hydrateSiteSettingsFromCloud,
   hydrateUserFromCloud,
   insertCloudJournalTrade,
   insertCloudMt5Command,
+  saveCloudSiteSettings,
   syncAllCloudMpesaTransactionsToLocal,
   syncUserStateToCloud,
   upsertCloudMpesaTransaction,
@@ -666,7 +668,8 @@ app.get('/sitemap.xml', (req, res) => {
   );
 });
 
-app.get('/api/config/public', (_req, res) => {
+app.get('/api/config/public', async (_req, res) => {
+  await hydrateSiteSettingsFromCloud().catch(() => {});
   const s = getSettingsMap();
   const analyzerPriceUsd = Number(s.analyzer_price_usd || 5.25);
   const eaBotsPriceUsd = Number(s.ea_bots_price_usd || 5.25);
@@ -703,6 +706,7 @@ app.get('/api/config/public', (_req, res) => {
 
 app.get('/api/crypto/quote', async (req, res) => {
   try {
+    await hydrateSiteSettingsFromCloud().catch(() => {});
     const s = getSettingsMap();
     const rawAmount = Number(req.query.amountUsd || s.analyzer_price_usd || 5.25);
     const amountUsd = Number.isFinite(rawAmount) && rawAmount > 0 ? Math.min(rawAmount, 100000) : 5.25;
@@ -1776,7 +1780,8 @@ app.get('/api/orders/my', requireAuth, (req: AuthedRequest, res) => {
   res.json({ orders });
 });
 
-app.post('/api/orders/create', requireAuth, (req: AuthedRequest, res) => {
+app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
+  await hydrateSiteSettingsFromCloud().catch(() => {});
   const user = req.currentUser!;
   const productKey = req.body?.productKey === 'ea_bots' ? 'ea_bots' : 'analyzer';
   const paymentMethod = req.body?.paymentMethod === 'mpesa' ? 'mpesa' : 'crypto';
@@ -3153,6 +3158,7 @@ app.post('/api/orders/:id/crypto/submit', requireAuth, async (req: AuthedRequest
     return;
   }
 
+  await hydrateSiteSettingsFromCloud().catch(() => {});
   const settings = getSettingsMap();
   const resolved = resolveCryptoNetworkAndAddress(
     req.body?.cryptoCurrency ?? order.crypto_currency,
@@ -4413,7 +4419,10 @@ app.post('/api/referrals/payout', requireAuth, async (req: AuthedRequest, res) =
 
 // ---------------- Admin Command Center ----------------
 app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
-  await syncAllCloudMpesaTransactionsToLocal().catch(() => {});
+  await Promise.all([
+    hydrateSiteSettingsFromCloud(true).catch(() => {}),
+    syncAllCloudMpesaTransactionsToLocal().catch(() => {}),
+  ]);
   const revenueRow = db
     .prepare("SELECT COALESCE(SUM(amount_usd), 0) as usd, COALESCE(SUM(amount_kes), 0) as kes, COUNT(*) as count FROM orders WHERE payment_status = 'paid'")
     .get() as { usd: number; kes: number; count: number };
@@ -4775,7 +4784,7 @@ app.post('/api/admin/payouts/:id/status', requireAdmin, (req: AuthedRequest, res
   res.json({ ok: true });
 });
 
-app.post('/api/admin/settings', requireAdmin, (req: AuthedRequest, res) => {
+app.post('/api/admin/settings', requireAdmin, async (req: AuthedRequest, res) => {
   const allowedKeys = [
     'exness_ib_url',
     'telegram_url',
@@ -4792,14 +4801,44 @@ app.post('/api/admin/settings', requireAdmin, (req: AuthedRequest, res) => {
     'usdt_erc20_address',
     'btc_address',
   ];
-  const stmt = db.prepare('INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value');
-  for (const key of allowedKeys) {
-    if (req.body?.[key] !== undefined) {
-      stmt.run(key, sanitizeText(String(req.body[key]), 240));
+  const numericKeys = new Set([
+    'analyzer_price_usd',
+    'ea_bots_price_usd',
+    'usd_kes_rate',
+    'influencer_commission_pct',
+  ]);
+  for (const key of numericKeys) {
+    if (req.body?.[key] !== undefined && String(req.body[key]).trim() !== '') {
+      const parsed = Number(req.body[key]);
+      if (!Number.isFinite(parsed) || parsed < 0) {
+        res.status(400).json({ error: `Invalid numeric value for ${key}.` });
+        return;
+      }
     }
   }
-  logSecurityEvent('ADMIN_SETTINGS_UPDATE', 'info', getClientIp(req), req.currentUser!.email, 'Updated site settings');
-  res.json({ settings: getSettingsMap() });
+
+  const stmt = db.prepare(
+    'INSERT INTO site_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  );
+  const tx = db.transaction(() => {
+    for (const key of allowedKeys) {
+      if (req.body?.[key] !== undefined) {
+        stmt.run(key, sanitizeText(String(req.body[key]), 400));
+      }
+    }
+  });
+  tx();
+
+  const updatedSettings = getSettingsMap();
+  const cloudPersisted = await saveCloudSiteSettings(updatedSettings);
+  logSecurityEvent(
+    'ADMIN_SETTINGS_UPDATE',
+    'info',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Updated site settings${cloudPersisted ? ' (synced to Cloud Postgres)' : ' (local SQLite only)'}`
+  );
+  res.json({ settings: updatedSettings, cloudPersisted });
 });
 
 app.post('/api/admin/mpesa/test', requireAdmin, async (req: AuthedRequest, res) => {
