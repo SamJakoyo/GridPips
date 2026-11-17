@@ -88,7 +88,7 @@ const DEFAULT_CONFIG: PublicConfig = {
   mpesaTillNumber: '1921416',
   mpesaPartyB: '1921416',
   mpesaTransactionType: 'CustomerBuyGoodsOnline',
-  mpesaMerchantName: 'GRIDPIPs Trading',
+  mpesaMerchantName: 'AURVIK ENTERPRISES',
   commissionPct: 20,
   cryptoAddresses: {
     USDT_TRC20: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',

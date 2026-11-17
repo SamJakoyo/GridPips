@@ -688,7 +688,7 @@ app.get('/api/config/public', async (_req, res) => {
     mpesaTillNumber: s.mpesa_till_number || daraja.partyB || daraja.shortCode || '1921416',
     mpesaPartyB: s.mpesa_party_b || daraja.partyB || s.mpesa_till_number || '1921416',
     mpesaTransactionType: daraja.transactionType,
-    mpesaMerchantName: s.mpesa_merchant_name || 'GRIDPIPs Trading',
+    mpesaMerchantName: s.mpesa_merchant_name || 'AURVIK ENTERPRISES',
     mpesaConfigured: daraja.configured,
     mpesaEnv: daraja.env,
     commissionPct: Number(s.influencer_commission_pct || 20),

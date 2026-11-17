@@ -738,7 +738,7 @@ export const OrdersDashboardView: React.FC<{
               <div>
                 <div className="text-xs font-semibold text-emerald-700">Official Payment Receipt</div>
                 <h3 className="text-lg font-bold text-slate-950 mt-0.5">
-                  {config?.mpesaMerchantName || 'GRIDPIPs Trading'}
+                  {config?.mpesaMerchantName || 'AURVIK ENTERPRISES'}
                 </h3>
                 <div className="text-xs font-mono text-slate-500 mt-0.5">
                   {receiptOrder.order_number}

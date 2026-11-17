@@ -289,7 +289,7 @@ export function initDatabase(): void {
     mpesa_till_number: '1921416',
     mpesa_party_b: '1921416',
     mpesa_transaction_type: 'CustomerBuyGoodsOnline',
-    mpesa_merchant_name: 'GRIDPIPs Trading',
+    mpesa_merchant_name: 'AURVIK ENTERPRISES',
     influencer_commission_pct: '20',
     usdt_trc20_address: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',
     usdt_erc20_address: '0x7ac8dd858f3154d83114d7134a85924fdbb22234',
@@ -302,6 +302,7 @@ export function initDatabase(): void {
   }
   // Migrate legacy placeholder till number (5984120) to user's Buy Goods Till 1921416
   db.prepare("UPDATE site_settings SET value = '1921416' WHERE key IN ('mpesa_till_number', 'mpesa_party_b') AND value = '5984120'").run();
+  db.prepare("UPDATE site_settings SET value = 'AURVIK ENTERPRISES' WHERE key = 'mpesa_merchant_name' AND (value = 'GRIDPIPs Trading' OR value = '')").run();
   // Migrate legacy placeholder crypto addresses to configured real deposit addresses
   db.prepare("UPDATE site_settings SET value = 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ' WHERE key = 'usdt_trc20_address' AND (value = 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1' OR value = '')").run();
   db.prepare("UPDATE site_settings SET value = '0x7ac8dd858f3154d83114d7134a85924fdbb22234' WHERE key = 'usdt_erc20_address' AND (value = '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C' OR value = '')").run();

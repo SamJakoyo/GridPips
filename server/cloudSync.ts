@@ -975,6 +975,7 @@ const SITE_SETTINGS_CLOUD_EMAIL = '__site_settings__@system.gridpips';
 const LEGACY_PLACEHOLDER_SETTINGS: Record<string, string[]> = {
   mpesa_till_number: ['5984120'],
   mpesa_party_b: ['5984120'],
+  mpesa_merchant_name: ['GRIDPIPs Trading'],
   usdt_trc20_address: ['TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1'],
   usdt_erc20_address: ['0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C'],
   btc_address: ['bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w'],
