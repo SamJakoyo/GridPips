@@ -57,6 +57,7 @@ import {
 import { AdminDashboardView } from './components/AdminDashboardView';
 import { AccountProfileView } from './components/AccountProfileView';
 import { BrandLogo } from './components/BrandLogo';
+import { LANDING_IMAGES } from './assets/landingImages';
 
 type WorkspaceTab =
   | 'overview'
@@ -908,6 +909,17 @@ const WorkspaceOverview: React.FC<{
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
         className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-[radial-gradient(ellipse_at_top_left,_rgba(245,158,11,0.14),_#FFFFFF_52%,_#FAF7F0_100%)] p-6 sm:p-7"
       >
+        {/* Soft editorial candlestick visual backdrop on right side */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-3/5 overflow-hidden">
+          <img
+            src={LANDING_IMAGES.gridPipsBanner}
+            alt=""
+            referrerPolicy="no-referrer"
+            className="w-full h-full object-cover object-center opacity-20 mix-blend-multiply"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#FAF7F0] via-[#FAF7F0]/70 to-transparent" />
+        </div>
+
         {/* Subtle ambient gold drift */}
         <div
           aria-hidden="true"
@@ -1133,33 +1145,49 @@ const WorkspaceOverview: React.FC<{
         </div>
       </motion.div>
 
-      {/* 4-Column KPI Row */}
+      {/* 4-Column KPI Row with Unique Visual Headers */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.08 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
+          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-slate-500">ICT Strategy Analyzer</span>
-            {user.hasAnalyzer && (
-              <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
-                <Check className="w-3 h-3 text-emerald-600" />
-              </span>
-            )}
+          <div className="relative h-28 overflow-hidden bg-slate-900">
+            <img
+              src={LANDING_IMAGES.analystIct3d}
+              alt="ICT market strategist reviewing liquidity pools and fair value gaps"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
+              ICT Liquidity Engine
+            </span>
           </div>
-          <div className="text-lg font-bold text-slate-950 mt-1.5">
-            {user.hasAnalyzer ? 'Unlocked and ready' : `$${config.analyzerPriceUsd.toFixed(2)} required`}
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-500">ICT Strategy Analyzer</span>
+                {user.hasAnalyzer && (
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </span>
+                )}
+              </div>
+              <div className="text-lg font-bold text-slate-950 mt-1.5">
+                {user.hasAnalyzer ? 'Unlocked and ready' : `$${config.analyzerPriceUsd.toFixed(2)} required`}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
+              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
+            >
+              {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-          >
-            {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
-          </button>
         </motion.div>
 
         <motion.div
@@ -1167,27 +1195,43 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.14 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
+          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
         >
-          <div className="text-xs text-slate-500">MQL5 EA Bots and MT5</div>
-          <div className="text-lg font-bold text-slate-950 mt-1.5">
-            {user.hasEaBots
-              ? user.mt5Connected
-                ? `MT5 ${user.mt5Login}`
-                : 'Ready to connect'
-              : `$${config.eaBotsPriceUsd.toFixed(2)} required`}
+          <div className="relative h-28 overflow-hidden bg-slate-900">
+            <img
+              src={LANDING_IMAGES.automatorCode3d}
+              alt="Quant developer coding MQL5 Expert Advisors beside live charts"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
+              MQL5 &amp; MT5 Bridge
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
-            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-          >
-            {user.hasEaBots
-              ? user.mt5Connected
-                ? 'Manage MT5 Auto-Trading →'
-                : 'Connect Client MT5 Account →'
-              : 'Buy EA Bots Pack →'}
-          </button>
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-slate-500">MQL5 EA Bots and MT5</div>
+              <div className="text-lg font-bold text-slate-950 mt-1.5">
+                {user.hasEaBots
+                  ? user.mt5Connected
+                    ? `MT5 ${user.mt5Login}`
+                    : 'Ready to connect'
+                  : `$${config.eaBotsPriceUsd.toFixed(2)} required`}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
+              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
+            >
+              {user.hasEaBots
+                ? user.mt5Connected
+                  ? 'Manage MT5 Auto-Trading →'
+                  : 'Connect Client MT5 Account →'
+                : 'Buy EA Bots Pack →'}
+            </button>
+          </div>
         </motion.div>
 
         <motion.div
@@ -1195,23 +1239,39 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.2 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
+          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
         >
-          <div className="text-xs text-slate-500">Journal performance</div>
-          <div
-            className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
-              totalPnl >= 0 ? 'text-amber-600' : 'text-rose-600'
-            }`}
-          >
-            {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
+          <div className="relative h-28 overflow-hidden bg-slate-900">
+            <img
+              src={LANDING_IMAGES.heroTrader3d}
+              alt="Forex trader auditing execution metrics at dual-screen desk"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
+              Execution Review
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('journal')}
-            className="text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2.5 cursor-pointer"
-          >
-            {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
-          </button>
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-slate-500">Journal performance</div>
+              <div
+                className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
+                  totalPnl >= 0 ? 'text-amber-600' : 'text-rose-600'
+                }`}
+              >
+                {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('journal')}
+              className="text-left text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2.5 cursor-pointer"
+            >
+              {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
+            </button>
+          </div>
         </motion.div>
 
         <motion.div
@@ -1219,19 +1279,35 @@ const WorkspaceOverview: React.FC<{
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.28, delay: 0.26 }}
           whileHover={{ y: -2 }}
-          className="rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors p-5"
+          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
         >
-          <div className="text-xs text-slate-500">Orders and referrals</div>
-          <div className="text-lg font-bold font-mono tabular-nums text-slate-950 mt-1.5">
-            {orders.length} order{orders.length === 1 ? '' : 's'}
+          <div className="relative h-28 overflow-hidden bg-slate-900">
+            <img
+              src={LANDING_IMAGES.automatorEa3d}
+              alt="Institutional multi-monitor desk managing orders and Exness partner commissions"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
+            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
+              Partner &amp; Billing
+            </span>
           </div>
-          <button
-            type="button"
-            onClick={() => onNavigate('referrals')}
-            className="text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-          >
-            Earn {config.commissionPct}% commissions →
-          </button>
+          <div className="p-5 flex-1 flex flex-col justify-between">
+            <div>
+              <div className="text-xs text-slate-500">Orders and referrals</div>
+              <div className="text-lg font-bold font-mono tabular-nums text-slate-950 mt-1.5">
+                {orders.length} order{orders.length === 1 ? '' : 's'}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate('referrals')}
+              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
+            >
+              Earn {config.commissionPct}% commissions →
+            </button>
+          </div>
         </motion.div>
       </div>
 
@@ -1350,30 +1426,41 @@ const WorkspaceOverview: React.FC<{
         </motion.div>
 
         <div className="lg:col-span-4 space-y-5">
-          {/* Warm Amber Gold Telegram Card */}
+          {/* Warm Amber Gold Telegram Card with Mentorship Visual */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.34, delay: 0.28 }}
             whileHover={{ y: -2 }}
-            className="rounded-2xl bg-[#E5A93C] text-[#090806] p-6"
+            className="group rounded-2xl bg-[#E5A93C] text-[#090806] overflow-hidden"
           >
-            <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
-            <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
-            <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
-              Trade alongside fellow ICT and SMC traders, review live killzone setups, and get fast EA setup help.
-            </p>
-            <motion.a
-              whileHover={{ scale: 1.01 }}
-              whileTap={{ scale: 0.985 }}
-              href={config.telegramUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 bg-[#0B0A08] text-white text-xs font-semibold rounded-lg hover:bg-[#1A1813] inline-flex items-center justify-center gap-2 transition-colors"
-            >
-              <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
-              Open t.me/JakoyoFx
-            </motion.a>
+            <div className="relative h-32 overflow-hidden bg-slate-900">
+              <img
+                src={LANDING_IMAGES.mentorCommunity3d}
+                alt="Trading mentor reviewing ICT smart money setups for JakoyoFX community"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#E5A93C]/20 to-[#E5A93C]" />
+            </div>
+            <div className="p-6 pt-3">
+              <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
+              <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
+              <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
+                Trade alongside fellow ICT and SMC traders, review live killzone setups, and get fast EA setup help.
+              </p>
+              <motion.a
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.985 }}
+                href={config.telegramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 bg-[#0B0A08] text-white text-xs font-semibold rounded-lg hover:bg-[#1A1813] inline-flex items-center justify-center gap-2 transition-colors"
+              >
+                <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
+                Open t.me/JakoyoFx
+              </motion.a>
+            </div>
           </motion.div>
 
           {/* Killzones (NY time) Card */}

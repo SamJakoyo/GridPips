@@ -41,14 +41,14 @@ const HERO_FRAMES = [
     caption: 'Execution Desk · ICT Killzone Mapping',
   },
   {
-    src: LANDING_IMAGES.analystIct3d,
-    alt: '3D strategist inspecting smart money liquidity pools and fair value gaps',
-    caption: 'Liquidity Analysis · BSL & FVG Structure',
+    src: LANDING_IMAGES.automatorCode3d,
+    alt: 'Quantitative developer coding MQL5 Expert Advisors beside live candlestick price charts',
+    caption: 'MQL5 Automation · Code & MetaTrader 5 Bridge',
   },
   {
-    src: LANDING_IMAGES.automatorEa3d,
-    alt: '3D Black institutional forex trader executing trades across multi-monitor candlestick and order depth screens',
-    caption: 'MQL5 Automation · MetaTrader 5 Bridge',
+    src: LANDING_IMAGES.gridPipsBanner,
+    alt: 'Institutional candlestick liquidity curve across cream and slate editorial canvas',
+    caption: 'Liquidity Flow · XAUUSD, Forex & Indices',
   },
 ];
 
