@@ -115,6 +115,7 @@ export interface Order {
 
 export interface Candle {
   index: number;
+  timestampSec?: number;
   time: string;
   open: number;
   high: number;
@@ -205,8 +206,10 @@ export interface IctAnalysisResult {
   po3Phase: string;
   activeKillzone: string;
   structureShift: string;
+  mssIndex?: number | null;
   displacementDetected?: boolean;
   liquiditySweep?: string;
+  sweepIndex?: number | null;
   drawOnLiquidity?: {
     label: string;
     price: number;

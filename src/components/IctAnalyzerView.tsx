@@ -19,6 +19,7 @@ import {
   type AnalyzerTimeframe,
 } from '../lib/tradingTimeframes';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
+import { TradingViewMappedChart } from './TradingViewMappedChart';
 import type { IctAnalysisResult, PdArrayItem, PublicConfig, User } from '../types';
 
 interface IctAnalyzerViewProps {
@@ -64,7 +65,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const [analysis, setAnalysis] = useState<IctAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [chartViewMode, setChartViewMode] = useState<'split' | 'live' | 'ict'>('split');
+  const [chartViewMode, setChartViewMode] = useState<'ict' | 'split' | 'live'>('ict');
   const [autoSync, setAutoSync] = useState(true);
   const [pdFilter, setPdFilter] = useState<'active' | 'all'>('active');
 
@@ -319,9 +320,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
             {(
               [
-                ['split', 'Live + ICT Split'],
-                ['live', 'Live Chart'],
-                ['ict', 'ICT Map'],
+                ['ict', 'Mapped TV Chart'],
+                ['split', 'Mapped + TV Widget'],
+                ['live', 'TV Widget'],
               ] as const
             ).map(([mode, label]) => (
               <button
@@ -529,17 +530,24 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Synchronized Live TradingView Chart & ICT Liquidity/PD Array Map */}
+            {/* Synchronized TradingView Chart with Live ICT Mappings */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
+              {(chartViewMode === 'ict' || chartViewMode === 'split') && (
+                <TradingViewMappedChart
+                  analysis={analysis}
+                  heightClass={chartViewMode === 'ict' ? 'h-[480px]' : 'h-[420px]'}
+                />
+              )}
+
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div>
                       <h3 className="text-sm font-bold text-white">
-                        {symbol} ({activeTimeframe}) — Connected Live Chart
+                        {symbol} ({activeTimeframe}) — TradingView External Widget
                       </h3>
                       <p className="text-xs text-slate-400">
-                        TradingView live feed synchronized with the {activeTimeframe} ICT Premium/Discount scan below
+                        Use &quot;Copy Pine&quot; on the Mapped TV Chart above to paste the exact ICT Premium/Discount &amp; PD Array overlay into TradingView.com
                       </p>
                     </div>
                     <a
@@ -561,39 +569,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                         : 'aspect-[16/9] min-h-[380px] max-h-[65vh]'
                     }
                   />
-                </div>
-              )}
-
-              {(chartViewMode === 'split' || chartViewMode === 'ict') && (
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-5 text-white">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-                    <div>
-                      <h3 className="text-base font-bold text-white">
-                        {analysis.symbol} ({analysis.timeframe}) — Premium / Discount &amp; PD Array Map
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {analysis.structureShift} · Power of 3: {analysis.po3Phase} · {analysis.liquiditySweep || 'Monitoring Liquidity'}
-                      </p>
-                    </div>
-                    <div className="text-right font-mono tabular-nums">
-                      <div className="text-sm font-bold text-white">{analysis.currentPrice}</div>
-                      <div className="text-xs text-slate-400">
-                        EQ 50%: {pd?.equilibrium ?? '-'} · OTE 0.705: {analysis.oteLevels.fib705}
-                      </div>
-                    </div>
-                  </div>
-
-                  <IctSvgChart analysis={analysis} />
-
-                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
-                    <span>Red tint above EQ: Premium Zone</span>
-                    <span>Green tint below EQ: Discount Zone</span>
-                    <span>White dashed: 50% Equilibrium</span>
-                    <span>Green/Red boxes: Bullish/Bearish PD Arrays</span>
-                    <span>Violet/Amber boxes: Breaker &amp; Liquidity Void</span>
-                    <span>Cyan dashed: BSL / SSL Liquidity</span>
-                    <span>Amber dashed: OTE 0.705</span>
-                  </div>
                 </div>
               )}
             </div>
@@ -963,227 +938,6 @@ const PdArrayColumn: React.FC<{
           })}
         </div>
       )}
-    </div>
-  );
-};
-
-const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) => {
-  const width = 760;
-  const height = 360;
-  const padX = 16;
-  const padY = 22;
-
-  const prices = analysis.candles.flatMap((c) => [c.high, c.low]);
-  const maxP = Math.max(...prices, analysis.bslLevel);
-  const minP = Math.min(...prices, analysis.sslLevel);
-  const range = maxP - minP || 1;
-
-  const toY = (p: number) => padY + ((maxP - p) / range) * (height - padY * 2);
-  const stepX = (width - padX * 2) / analysis.candles.length;
-
-  const equilibrium = analysis.premiumDiscount?.equilibrium ?? (maxP + minP) / 2;
-  const yEq = toY(equilibrium);
-  const yTop = padY;
-  const yBot = height - padY;
-
-  const yOteTop = toY(Math.max(analysis.oteLevels.fib618, analysis.oteLevels.fib786));
-  const yOteBot = toY(Math.min(analysis.oteLevels.fib618, analysis.oteLevels.fib786));
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto min-w-[540px]">
-        {/* Premium Zone Shading (above 50% Equilibrium) */}
-        <rect
-          x={padX}
-          y={yTop}
-          width={width - padX * 2}
-          height={Math.max(0, yEq - yTop)}
-          fill="rgba(244, 63, 94, 0.06)"
-        />
-        <text
-          x={width - padX - 4}
-          y={yTop + 12}
-          textAnchor="end"
-          fill="rgba(253, 164, 175, 0.7)"
-          fontSize={9}
-          fontFamily="JetBrains Mono, monospace"
-        >
-          PREMIUM ZONE (&gt;50%)
-        </text>
-
-        {/* Discount Zone Shading (below 50% Equilibrium) */}
-        <rect
-          x={padX}
-          y={yEq}
-          width={width - padX * 2}
-          height={Math.max(0, yBot - yEq)}
-          fill="rgba(16, 185, 129, 0.06)"
-        />
-        <text
-          x={width - padX - 4}
-          y={yBot - 6}
-          textAnchor="end"
-          fill="rgba(134, 239, 172, 0.7)"
-          fontSize={9}
-          fontFamily="JetBrains Mono, monospace"
-        >
-          DISCOUNT ZONE (&lt;50%)
-        </text>
-
-        {/* OTE 0.618 - 0.786 Band */}
-        <rect
-          x={padX}
-          y={Math.min(yOteTop, yOteBot)}
-          width={width - padX * 2}
-          height={Math.max(2, Math.abs(yOteBot - yOteTop))}
-          fill="rgba(245, 158, 11, 0.07)"
-        />
-
-        {/* Subtle Grid */}
-        {[0.2, 0.4, 0.6, 0.8].map((r) => (
-          <line
-            key={r}
-            x1={padX}
-            y1={padY + r * (height - padY * 2)}
-            x2={width - padX}
-            y2={padY + r * (height - padY * 2)}
-            stroke="#1e293b"
-            strokeWidth={1}
-          />
-        ))}
-
-        {/* PD Array Zones (FVGs, OBs, Breakers, Rejections, Liquidity Voids) */}
-        {analysis.zones.map((z, idx) => {
-          const yZTop = toY(z.top);
-          const yZBot = toY(z.bottom);
-          const xStart = padX + z.startIndex * stepX;
-          const isBreakerOrVoid = z.type.includes('Breaker') || z.type === 'Liquidity Void';
-          const isBull = z.type.startsWith('Bullish');
-
-          const fillColor = isBreakerOrVoid
-            ? 'rgba(168, 85, 247, 0.14)'
-            : isBull
-            ? 'rgba(22, 163, 74, 0.16)'
-            : 'rgba(225, 29, 72, 0.16)';
-          const strokeColor = isBreakerOrVoid
-            ? 'rgba(192, 132, 252, 0.45)'
-            : isBull
-            ? 'rgba(34, 197, 94, 0.45)'
-            : 'rgba(244, 63, 94, 0.45)';
-          const labelColor = isBreakerOrVoid ? '#d8b4fe' : isBull ? '#86efac' : '#fda4af';
-
-          return (
-            <g key={idx}>
-              <rect
-                x={xStart}
-                y={Math.min(yZTop, yZBot)}
-                width={width - padX - xStart}
-                height={Math.max(4, Math.abs(yZBot - yZTop))}
-                fill={fillColor}
-                stroke={strokeColor}
-                strokeWidth={0.8}
-              />
-              <text
-                x={width - padX - 4}
-                y={Math.min(yZTop, yZBot) + 11}
-                textAnchor="end"
-                fill={labelColor}
-                fontSize={9}
-                fontFamily="JetBrains Mono, monospace"
-              >
-                {z.type} {z.pdZone ? `(${z.pdZone})` : ''}
-              </text>
-            </g>
-          );
-        })}
-
-        {/* 50% Equilibrium Line */}
-        <line
-          x1={padX}
-          y1={yEq}
-          x2={width - padX}
-          y2={yEq}
-          stroke="#e2e8f0"
-          strokeDasharray="5 4"
-          strokeWidth={1.1}
-        />
-        <text
-          x={padX + 4}
-          y={yEq - 4}
-          fill="#f8fafc"
-          fontSize={9}
-          fontFamily="JetBrains Mono, monospace"
-        >
-          EQ 50% ({equilibrium})
-        </text>
-
-        {/* BSL / SSL & Equal Highs/Lows */}
-        <line
-          x1={padX}
-          y1={toY(analysis.bslLevel)}
-          x2={width - padX}
-          y2={toY(analysis.bslLevel)}
-          stroke="#38bdf8"
-          strokeDasharray="4 4"
-          strokeWidth={1}
-        />
-        <text x={padX + 4} y={toY(analysis.bslLevel) - 4} fill="#38bdf8" fontSize={9} fontFamily="JetBrains Mono, monospace">
-          BSL {analysis.bslLevel}
-        </text>
-
-        <line
-          x1={padX}
-          y1={toY(analysis.sslLevel)}
-          x2={width - padX}
-          y2={toY(analysis.sslLevel)}
-          stroke="#38bdf8"
-          strokeDasharray="4 4"
-          strokeWidth={1}
-        />
-        <text x={padX + 4} y={toY(analysis.sslLevel) + 11} fill="#38bdf8" fontSize={9} fontFamily="JetBrains Mono, monospace">
-          SSL {analysis.sslLevel}
-        </text>
-
-        {/* OTE 0.705 */}
-        <line
-          x1={padX}
-          y1={toY(analysis.oteLevels.fib705)}
-          x2={width - padX}
-          y2={toY(analysis.oteLevels.fib705)}
-          stroke="#f59e0b"
-          strokeDasharray="3 3"
-          strokeWidth={1}
-        />
-        <text x={padX + 4} y={toY(analysis.oteLevels.fib705) - 4} fill="#fbbf24" fontSize={9} fontFamily="JetBrains Mono, monospace">
-          OTE 0.705 ({analysis.oteLevels.fib705})
-        </text>
-
-        {/* Live OHLC Candles */}
-        {analysis.candles.map((c) => {
-          const cx = padX + c.index * stepX + stepX / 2;
-          const isUp = c.close >= c.open;
-          const color = isUp ? '#22c55e' : '#f43f5e';
-          const yOpen = toY(c.open);
-          const yClose = toY(c.close);
-          const yHigh = toY(c.high);
-          const yLow = toY(c.low);
-          const bodyTop = Math.min(yOpen, yClose);
-          const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
-          return (
-            <g key={c.index}>
-              <line x1={cx} y1={yHigh} x2={cx} y2={yLow} stroke={color} strokeWidth={1.2} />
-              <rect
-                x={cx - stepX * 0.3}
-                y={bodyTop}
-                width={Math.max(3, stepX * 0.6)}
-                height={bodyHeight}
-                fill={color}
-                rx={1}
-              />
-            </g>
-          );
-        })}
-      </svg>
     </div>
   );
 };

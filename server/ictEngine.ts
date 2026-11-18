@@ -2,6 +2,7 @@ import { fetchTradingViewChartData, type TvInterval } from './tradingViewFeed.ts
 
 export interface Candle {
   index: number;
+  timestampSec: number;
   time: string;
   open: number;
   high: number;
@@ -92,8 +93,10 @@ export interface IctAnalysisResult {
   po3Phase: 'Accumulation' | 'Manipulation (Judas Swing)' | 'Distribution';
   activeKillzone: string;
   structureShift: string;
+  mssIndex?: number | null;
   displacementDetected: boolean;
   liquiditySweep: string;
+  sweepIndex?: number | null;
   drawOnLiquidity: {
     label: string;
     price: number;
@@ -232,6 +235,7 @@ export async function runIctMarketAnalysis(
 
   const candles: Candle[] = tvData.bars.map((b, idx) => ({
     index: idx,
+    timestampSec: b.timestampSec,
     time: formatCandleTime(b.timestampSec, timeframe),
     open: b.open,
     high: b.high,
@@ -351,7 +355,8 @@ export async function runIctMarketAnalysis(
   // Liquidity Sweep check (Turtle Soup / Stop Run)
   let liquiditySweep = 'No recent external stop run detected';
   let recentSweepBias: 'Bullish' | 'Bearish' | null = null;
-  for (let i = candles.length - 1; i >= Math.max(3, candles.length - 10); i--) {
+  let sweepIndex: number | null = null;
+  for (let i = candles.length - 1; i >= Math.max(3, candles.length - 14); i--) {
     const c = candles[i];
     const prevSwingsH = swingHighs.filter((s) => s.index < i - 1);
     const prevSwingsL = swingLows.filter((s) => s.index < i - 1);
@@ -361,11 +366,13 @@ export async function runIctMarketAnalysis(
     if (prevLow && c.low < prevLow.price && c.close > prevLow.price) {
       liquiditySweep = `SSL Stop Hunt below ${prevLow.price.toFixed(digits)} reclaimed at ${c.time}`;
       recentSweepBias = 'Bullish';
+      sweepIndex = i;
       break;
     }
     if (prevHigh && c.high > prevHigh.price && c.close < prevHigh.price) {
       liquiditySweep = `BSL Stop Hunt above ${prevHigh.price.toFixed(digits)} rejected at ${c.time}`;
       recentSweepBias = 'Bearish';
+      sweepIndex = i;
       break;
     }
   }
@@ -1118,8 +1125,10 @@ export async function runIctMarketAnalysis(
     po3Phase,
     activeKillzone: kz.label,
     structureShift,
+    mssIndex: mssBullishCandle?.index ?? mssBearishCandle?.index ?? null,
     displacementDetected,
     liquiditySweep,
+    sweepIndex,
     drawOnLiquidity,
     bslLevel,
     sslLevel,

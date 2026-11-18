@@ -187,7 +187,7 @@ async function fetchSeriesAttempt(
   tvSymbol: string,
   interval: TvInterval,
   digits: number,
-  barCount = 60
+  barCount = 100
 ): Promise<TradingViewSeriesPayload> {
   return new Promise((resolve, reject) => {
     const ws = openTvWebSocket();
@@ -214,7 +214,7 @@ async function fetchSeriesAttempt(
         return;
       }
 
-      const bars = latestBars.slice(-48);
+      const bars = latestBars.slice(-80);
       const lastBar = bars[bars.length - 1];
       const livePrice =
         typeof quoteSnapshot.lp === 'number' && Number.isFinite(quoteSnapshot.lp)
@@ -349,10 +349,10 @@ export async function fetchTradingViewChartData(
     try {
       let payload: TradingViewSeriesPayload;
       try {
-        payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 60);
+        payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 100);
       } catch {
         // Retry once if TradingView dropped the initial WS handshake
-        payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 60);
+        payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 100);
       }
       const ttl = interval === '1' ? 6000 : interval === '5' || interval === '15' ? 12000 : 20000;
       seriesCache.set(key, { payload, expiresAt: Date.now() + ttl });
