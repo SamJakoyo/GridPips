@@ -331,6 +331,170 @@ async function fetchSeriesAttempt(
   });
 }
 
+const staleSeriesCache = new Map<string, TradingViewSeriesPayload>();
+
+async function fetchFallbackSeriesPayload(
+  symbol: string,
+  tvSymbol: string,
+  interval: TvInterval,
+  digits: number
+): Promise<TradingViewSeriesPayload | null> {
+  // 1. Binance public Klines fallback for Crypto pairs (BTCUSD / ETHUSD)
+  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') {
+    const binanceSym = symbol === 'BTCUSD' ? 'BTCUSDT' : 'ETHUSDT';
+    const binanceIntMap: Record<TvInterval, string> = {
+      '1': '1m',
+      '5': '5m',
+      '15': '15m',
+      '30': '30m',
+      '60': '1h',
+      '240': '4h',
+      D: '1d',
+      W: '1w',
+    };
+    const bInt = binanceIntMap[interval] || '15m';
+    try {
+      const res = await fetch(
+        `https://api.binance.com/api/v3/klines?symbol=${binanceSym}&interval=${bInt}&limit=80`,
+        { signal: AbortSignal.timeout(5000) }
+      );
+      if (res.ok) {
+        const rows = (await res.json()) as Array<[number, string, string, string, string, string]>;
+        if (Array.isArray(rows) && rows.length >= 15) {
+          const bars: TradingViewBar[] = rows.map((r) => ({
+            timestampSec: Math.floor(Number(r[0]) / 1000),
+            open: Number(Number(r[1]).toFixed(digits)),
+            high: Number(Number(r[2]).toFixed(digits)),
+            low: Number(Number(r[3]).toFixed(digits)),
+            close: Number(Number(r[4]).toFixed(digits)),
+            volume: Number(r[5]) || 0,
+          }));
+          const last = bars[bars.length - 1];
+          const first = bars[0];
+          const chgPct = first.open > 0 ? Number((((last.close - first.open) / first.open) * 100).toFixed(2)) : null;
+          return {
+            symbol,
+            tvSymbol,
+            interval,
+            digits,
+            currentPrice: last.close,
+            bid: null,
+            ask: null,
+            chgPct,
+            bars,
+            fetchedAt: new Date().toISOString(),
+          };
+        }
+      }
+    } catch {
+      // fall through to Yahoo
+    }
+  }
+
+  // 2. Yahoo Finance public chart endpoint fallback for FX, Gold, Indices, & Crypto
+  const yahooSymMap: Record<string, string> = {
+    EURUSD: 'EURUSD=X',
+    GBPUSD: 'GBPUSD=X',
+    USDJPY: 'JPY=X',
+    XAUUSD: 'GC=F',
+    XAGUSD: 'SI=F',
+    NAS100: 'NQ=F',
+    US30: 'YM=F',
+    SPX500: 'ES=F',
+    BTCUSD: 'BTC-USD',
+    ETHUSD: 'ETH-USD',
+  };
+  const ySym = yahooSymMap[symbol] || (symbol.length === 6 ? `${symbol}=X` : symbol);
+  const yahooIntMap: Record<TvInterval, { interval: string; range: string }> = {
+    '1': { interval: '1m', range: '1d' },
+    '5': { interval: '5m', range: '5d' },
+    '15': { interval: '15m', range: '5d' },
+    '30': { interval: '30m', range: '1mo' },
+    '60': { interval: '60m', range: '1mo' },
+    '240': { interval: '60m', range: '3mo' },
+    D: { interval: '1d', range: '6mo' },
+    W: { interval: '1wk', range: '2y' },
+  };
+  const yCfg = yahooIntMap[interval] || { interval: '15m', range: '5d' };
+
+  try {
+    const res = await fetch(
+      `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySym)}?interval=${yCfg.interval}&range=${yCfg.range}`,
+      {
+        headers: { 'User-Agent': USER_AGENT },
+        signal: AbortSignal.timeout(5500),
+      }
+    );
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      chart?: {
+        result?: Array<{
+          timestamp?: number[];
+          indicators?: {
+            quote?: Array<{
+              open?: Array<number | null>;
+              high?: Array<number | null>;
+              low?: Array<number | null>;
+              close?: Array<number | null>;
+              volume?: Array<number | null>;
+            }>;
+          };
+        }>;
+      };
+    };
+    const result = json.chart?.result?.[0];
+    const tsList = result?.timestamp || [];
+    const q = result?.indicators?.quote?.[0];
+    if (!q || tsList.length < 15) return null;
+
+    const rawBars: TradingViewBar[] = [];
+    for (let i = 0; i < tsList.length; i++) {
+      const o = q.open?.[i];
+      const h = q.high?.[i];
+      const l = q.low?.[i];
+      const c = q.close?.[i];
+      if (
+        typeof o === 'number' &&
+        typeof h === 'number' &&
+        typeof l === 'number' &&
+        typeof c === 'number' &&
+        Number.isFinite(o) &&
+        Number.isFinite(h) &&
+        Number.isFinite(l) &&
+        Number.isFinite(c)
+      ) {
+        rawBars.push({
+          timestampSec: tsList[i],
+          open: Number(o.toFixed(digits)),
+          high: Number(h.toFixed(digits)),
+          low: Number(l.toFixed(digits)),
+          close: Number(c.toFixed(digits)),
+          volume: typeof q.volume?.[i] === 'number' ? Number(q.volume[i]) : 0,
+        });
+      }
+    }
+    const bars = rawBars.slice(-80);
+    if (bars.length < 15) return null;
+    const last = bars[bars.length - 1];
+    const first = bars[0];
+    const chgPct = first.open > 0 ? Number((((last.close - first.open) / first.open) * 100).toFixed(2)) : null;
+    return {
+      symbol,
+      tvSymbol,
+      interval,
+      digits,
+      currentPrice: last.close,
+      bid: null,
+      ask: null,
+      chgPct,
+      bars,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTradingViewChartData(
   rawSymbol: string,
   interval: TvInterval
@@ -347,15 +511,29 @@ export async function fetchTradingViewChartData(
 
   const job = (async () => {
     try {
-      let payload: TradingViewSeriesPayload;
+      let payload: TradingViewSeriesPayload | null = null;
       try {
         payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 100);
       } catch {
-        // Retry once if TradingView dropped the initial WS handshake
-        payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 100);
+        try {
+          // Retry once if TradingView dropped the initial WS handshake
+          payload = await fetchSeriesAttempt(resolved.symbol, resolved.tvSymbol, interval, resolved.digits, 100);
+        } catch {
+          payload = await fetchFallbackSeriesPayload(resolved.symbol, resolved.tvSymbol, interval, resolved.digits);
+        }
       }
+
+      if (!payload) {
+        const stale = staleSeriesCache.get(key);
+        if (stale) {
+          return stale;
+        }
+        throw new Error(`Unable to fetch live OHLC data for ${resolved.tvSymbol}.`);
+      }
+
       const ttl = interval === '1' ? 6000 : interval === '5' || interval === '15' ? 12000 : 20000;
       seriesCache.set(key, { payload, expiresAt: Date.now() + ttl });
+      staleSeriesCache.set(key, payload);
       return payload;
     } finally {
       seriesInFlight.delete(key);

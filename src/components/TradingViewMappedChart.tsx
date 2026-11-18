@@ -451,7 +451,24 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
     primitiveRef.current = primitive;
     markersPluginRef.current = markersPlugin;
 
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined'
+        ? new ResizeObserver((entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+            const w = Math.floor(entry.contentRect.width);
+            const h = Math.floor(entry.contentRect.height);
+            if (w > 0 && h > 0) {
+              chart.resize(w, h);
+            }
+          })
+        : null;
+    if (resizeObserver) {
+      resizeObserver.observe(el);
+    }
+
     return () => {
+      resizeObserver?.disconnect();
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;

@@ -382,13 +382,54 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
-          {error}
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex flex-wrap items-center justify-between gap-2">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={runScan}
+            className="px-3 py-1 bg-rose-700 text-white font-semibold rounded-md hover:bg-rose-800 cursor-pointer"
+          >
+            Retry Scan
+          </button>
         </div>
       )}
       {cloudNotice && (
         <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg">
           {cloudNotice}
+        </div>
+      )}
+
+      {!analysis && (
+        <div className="space-y-5">
+          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 className="text-sm font-bold text-white">
+                  {symbol} ({activeTimeframe}) — Fresh TradingView Chart
+                </h3>
+                <p className="text-xs text-slate-400">
+                  {loading
+                    ? `Scanning ${symbol} (${activeTimeframe}) Premium/Discount & PD Array Matrix...`
+                    : `Live interactive TradingView chart for ${symbol} (${activeTimeframe})`}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={runScan}
+                disabled={loading}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Scanning...' : 'Load ICT Map'}
+              </button>
+            </div>
+            <LiveTradingViewChart
+              symbol={symbol}
+              timeframe={activeTimeframe}
+              theme="dark"
+              heightClass="h-[460px]"
+            />
+          </div>
         </div>
       )}
 
@@ -557,11 +598,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     symbol={symbol}
                     timeframe={activeTimeframe}
                     theme="dark"
-                    heightClass={
-                      chartViewMode === 'live'
-                        ? 'aspect-[16/9] min-h-[460px] max-h-[78vh]'
-                        : 'aspect-[16/9] min-h-[380px] max-h-[65vh]'
-                    }
+                    heightClass={chartViewMode === 'live' ? 'h-[560px]' : 'h-[430px]'}
                   />
                 </div>
               )}

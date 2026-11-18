@@ -168,7 +168,7 @@ export const TradingViewChartsView: React.FC<{
         <LiveTradingViewChart
           symbol={symbol}
           timeframe={activeTimeframe}
-          heightClass="aspect-[16/9] min-h-[440px] max-h-[78vh]"
+          heightClass="h-[440px] sm:h-[540px]"
         />
       </div>
     </div>
