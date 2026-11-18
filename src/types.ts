@@ -122,14 +122,74 @@ export interface Candle {
   close: number;
 }
 
+export type IctZoneType =
+  | 'Bullish FVG'
+  | 'Bearish FVG'
+  | 'Bullish OB'
+  | 'Bearish OB'
+  | 'Bullish Breaker'
+  | 'Bearish Breaker'
+  | 'Bullish Mitigation'
+  | 'Bearish Mitigation'
+  | 'Bullish Rejection'
+  | 'Bearish Rejection'
+  | 'Liquidity Void';
+
 export interface IctZone {
-  type: 'Bullish FVG' | 'Bearish FVG' | 'Bullish OB' | 'Bearish OB';
+  type: IctZoneType;
   top: number;
   bottom: number;
   ceMid: number;
   startIndex: number;
   endIndex: number;
   mitigated: boolean;
+  pdZone?: 'Premium' | 'Discount' | 'Equilibrium';
+}
+
+export type PdArrayCategory =
+  | 'Old High / BSL'
+  | 'Old Low / SSL'
+  | 'Equal Highs (EQH)'
+  | 'Equal Lows (EQL)'
+  | 'Rejection Block'
+  | 'Order Block (OB)'
+  | 'Fair Value Gap (FVG)'
+  | 'Liquidity Void'
+  | 'Breaker Block'
+  | 'Mitigation Block';
+
+export interface PdArrayItem {
+  id: string;
+  name: string;
+  category: PdArrayCategory;
+  direction: 'Bullish' | 'Bearish' | 'Neutral';
+  zone: 'Premium' | 'Discount' | 'Equilibrium';
+  priority: number;
+  top: number;
+  bottom: number;
+  midpoint: number;
+  status: 'Unmitigated' | 'In Zone' | 'Mitigated' | 'Target Liquidity';
+  distancePct: number;
+  description: string;
+  startIndex: number;
+}
+
+export interface PremiumDiscountProfile {
+  rangeHigh: number;
+  rangeLow: number;
+  equilibrium: number;
+  premiumStart: number;
+  discountEnd: number;
+  currentPositionPct: number;
+  currentZone: 'Premium' | 'Discount' | 'Equilibrium';
+  quadrant:
+    | 'Deep Premium (75-100%)'
+    | 'Upper Premium (50-75%)'
+    | 'Equilibrium (50%)'
+    | 'Upper Discount (25-50%)'
+    | 'Deep Discount (0-25%)';
+  alignedWithBias: boolean;
+  guidance: string;
 }
 
 export interface IctAnalysisResult {
@@ -145,17 +205,30 @@ export interface IctAnalysisResult {
   po3Phase: string;
   activeKillzone: string;
   structureShift: string;
+  displacementDetected?: boolean;
+  liquiditySweep?: string;
+  drawOnLiquidity?: {
+    label: string;
+    price: number;
+    side: 'BSL (Premium)' | 'SSL (Discount)';
+  };
   bslLevel: number;
   sslLevel: number;
+  equalHighsLevel?: number | null;
+  equalLowsLevel?: number | null;
+  premiumDiscount?: PremiumDiscountProfile;
+  pdArrays?: PdArrayItem[];
   oteLevels: {
     fib618: number;
     fib705: number;
     fib786: number;
+    zone?: 'Premium' | 'Discount';
   };
   zones: IctZone[];
   setup: {
     direction: 'Long (Buy)' | 'Short (Sell)';
     entryZone: string;
+    entryArrayName?: string;
     stopLoss: number;
     tp1: number;
     tp2: number;

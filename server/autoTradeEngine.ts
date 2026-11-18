@@ -197,7 +197,7 @@ export async function runCloudAutoTradePass(options?: {
 
     for (const tf of timeframesToScan) {
       try {
-        const res = await runIctMarketAnalysis(sym, tf, 'UCtjxa77Nqamhvc8AtV85NkA');
+        const res = await runIctMarketAnalysis(sym, tf, 'UCtjxa77NqamhVC8atV85Rog');
         analysesCache.set(`${sym}:${tf}`, res);
       } catch {
         // skip symbol if feed temporarily unreachable

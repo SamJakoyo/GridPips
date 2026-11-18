@@ -63,6 +63,21 @@ const LESSONS: LessonModule[] = [
     youtubeSearchQuery: 'ICT Silver Bullet Strategy',
   },
   {
+    id: 'ict-4',
+    track: 'ICT Core',
+    title: 'Premium vs. Discount Dealing Ranges & The ICT PD Array Matrix',
+    duration: 'Core Matrix',
+    summary:
+      'Anchor every institutional trade using the 50% Equilibrium midpoint of a Dealing Range and execute only from aligned Premium or Discount Price Delivery (PD) Arrays.',
+    keyPoints: [
+      'Split any confirmed Swing Low to Swing High Dealing Range at 50% Equilibrium: above 50% is Premium (Sell Zone), below 50% is Discount (Buy Zone).',
+      'Rank the PD Array Matrix hierarchy: Old High/Low (BSL/SSL), Rejection Block, Order Block, Fair Value Gap (50% CE), Liquidity Void, Breaker Block, and Mitigation Block.',
+      'Never chase longs inside Premium or shorts inside Discount—wait for price to retrace across Equilibrium into OTE (0.618–0.786) + an unmitigated PD Array.',
+      'Target opposing External Range Liquidity (BSL / Equal Highs for Discount longs; SSL / Equal Lows for Premium shorts).',
+    ],
+    youtubeSearchQuery: 'ICT Premium and Discount PD Arrays',
+  },
+  {
     id: 'smc-1',
     track: 'SMC Strategy',
     title: 'SMC Market Structure: Break of Structure (BOS) vs Change of Character (CHoCH)',

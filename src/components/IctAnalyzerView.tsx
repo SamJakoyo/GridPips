@@ -9,6 +9,7 @@ import {
   BookMarked,
   CandlestickChart,
   Zap,
+  AlertTriangle,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import {
@@ -18,7 +19,7 @@ import {
   type AnalyzerTimeframe,
 } from '../lib/tradingTimeframes';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
-import type { IctAnalysisResult, PublicConfig, User } from '../types';
+import type { IctAnalysisResult, PdArrayItem, PublicConfig, User } from '../types';
 
 interface IctAnalyzerViewProps {
   user: User;
@@ -65,6 +66,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const [error, setError] = useState('');
   const [chartViewMode, setChartViewMode] = useState<'split' | 'live' | 'ict'>('split');
   const [autoSync, setAutoSync] = useState(true);
+  const [pdFilter, setPdFilter] = useState<'active' | 'all'>('active');
 
   const [savedSetups, setSavedSetups] = useState<SavedSetupItem[]>([]);
   const [playbooks, setPlaybooks] = useState<PlaybookItem[]>([]);
@@ -136,7 +138,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           entryZone: analysis.setup.entryZone,
           stopLoss: analysis.setup.stopLoss,
           tp1: analysis.setup.tp1,
-          notes: `${analysis.structureShift} · ${analysis.activeKillzone}`,
+          notes: `${analysis.structureShift} · ${analysis.premiumDiscount?.currentZone || ''} · ${analysis.activeKillzone}`,
         }),
       });
       setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to your account.`);
@@ -229,21 +231,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           Unlock the ICT Strategy Market Analyzer
         </h2>
         <p className="text-sm text-slate-600 leading-relaxed">
-          Built around Inner Circle Trader (ICT) liquidity concepts from channel{' '}
-          <span className="font-mono text-slate-800">{config.ictYoutubeChannelId}</span>. Scan live candles from 1M scalps up to 1W swing setups for Fair Value Gaps, Order Blocks, Market Structure Shifts, Optimal Trade Entry (0.618–0.786), and active London/NY Killzones — synced side-by-side with your live TradingView chart.
+          Built around Inner Circle Trader (ICT) Premium &amp; Discount methodology from channel{' '}
+          <span className="font-mono text-slate-800">{config.ictYoutubeChannelId}</span>. Scan live candles from 1M scalps up to 1W swing setups for Dealing Range 50% Equilibrium, Full PD Array Matrix (Order Blocks, FVGs, Breaker/Mitigation/Rejection Blocks, Liquidity Voids), Market Structure Shifts, Optimal Trade Entry (0.618–0.786), and active Killzones.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Live TradingView chart synced from 1M to 1W
+            · Premium vs. Discount Dealing Range &amp; 50% Equilibrium
           </div>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Automated BSL / SSL Liquidity Pool mapping
+            · Full ICT PD Array Matrix (OB, FVG, Breaker, Rejection, Void)
           </div>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · FVG 50% Consequent Encroachment entries
+            · Automated BSL / SSL &amp; Equal Highs/Lows mapping
           </div>
           <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Exact Entry, Stop Loss &amp; Take Profit targets
+            · Exact Discount-Long / Premium-Short Entry, SL &amp; TP targets
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -269,6 +271,17 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const symbolOptions = TRADING_SYMBOLS.includes(symbol as (typeof TRADING_SYMBOLS)[number])
     ? [...TRADING_SYMBOLS]
     : [symbol, ...TRADING_SYMBOLS];
+
+  const pd = analysis?.premiumDiscount;
+  const allPdArrays = analysis?.pdArrays || [];
+  const filteredPdArrays =
+    pdFilter === 'active'
+      ? allPdArrays.filter((item) => item.status !== 'Mitigated')
+      : allPdArrays;
+  const premiumArrays = filteredPdArrays.filter(
+    (item) => item.zone === 'Premium' || item.zone === 'Equilibrium'
+  );
+  const discountArrays = filteredPdArrays.filter((item) => item.zone === 'Discount');
 
   return (
     <div className="space-y-6">
@@ -383,7 +396,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           {/* Summary Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Bias &amp; Direction ({analysis.timeframe})</div>
+              <div className="text-xs text-slate-500">Bias &amp; Execution ({analysis.timeframe})</div>
               <div
                 className={`text-lg font-bold mt-1 ${
                   analysis.dailyBias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'
@@ -391,27 +404,132 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               >
                 {analysis.dailyBias} · {analysis.setup.direction}
               </div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">{analysis.structureShift}</div>
             </div>
+
             <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Active Killzone</div>
-              <div className="text-sm font-semibold text-slate-950 mt-1">{analysis.activeKillzone}</div>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Liquidity Draw (BSL / SSL)</div>
-              <div className="text-sm font-mono tabular-nums font-semibold text-slate-950 mt-1">
-                {analysis.bslLevel} / {analysis.sslLevel}
+              <div className="text-xs text-slate-500">Dealing Range Position</div>
+              <div
+                className={`text-lg font-bold font-mono tabular-nums mt-1 ${
+                  pd?.currentZone === 'Premium'
+                    ? 'text-rose-700'
+                    : pd?.currentZone === 'Discount'
+                    ? 'text-emerald-700'
+                    : 'text-amber-700'
+                }`}
+              >
+                {pd ? `${pd.currentZone} (${pd.currentPositionPct}%)` : 'Equilibrium'}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
+                {pd?.quadrant || '50% Equilibrium'}
               </div>
             </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-4">
+              <div className="text-xs text-slate-500">50% Equilibrium &amp; Draw</div>
+              <div className="text-sm font-mono tabular-nums font-bold text-slate-950 mt-1">
+                EQ {pd ? pd.equilibrium : '-'} · DOL {analysis.drawOnLiquidity?.price ?? analysis.bslLevel}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
+                {analysis.drawOnLiquidity
+                  ? `${analysis.drawOnLiquidity.side}: ${analysis.drawOnLiquidity.label}`
+                  : `BSL ${analysis.bslLevel} / SSL ${analysis.sslLevel}`}
+              </div>
+            </div>
+
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <div className="text-xs text-slate-500">Projected Risk : Reward</div>
               <div className="text-lg font-bold font-mono tabular-nums text-blue-600 mt-1">
                 1 : {analysis.setup.rrRatio}
               </div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">{analysis.activeKillzone}</div>
             </div>
           </div>
 
+          {/* Premium vs. Discount Dealing Range Gauge */}
+          {pd && (
+            <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-950">
+                    ICT Premium vs. Discount Dealing Range (50% Equilibrium)
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Institutional delivery buys Bullish PD Arrays below 50% Equilibrium (Discount) and sells Bearish PD Arrays above 50% Equilibrium (Premium).
+                  </p>
+                </div>
+                <div
+                  className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                    pd.alignedWithBias ? 'text-emerald-700' : 'text-amber-700'
+                  }`}
+                >
+                  {pd.alignedWithBias ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  )}
+                  <span>
+                    {pd.alignedWithBias
+                      ? `Aligned (${analysis.dailyBias} in ${pd.currentZone})`
+                      : `Extended (${analysis.dailyBias} Bias while in ${pd.currentZone})`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Dealing Range Horizontal Bar */}
+              <div className="space-y-1.5 pt-1">
+                <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-600">
+                  <span>0% Discount Low · {pd.rangeLow}</span>
+                  <span className="font-bold text-slate-950">50% Equilibrium · {pd.equilibrium}</span>
+                  <span>100% Premium High · {pd.rangeHigh}</span>
+                </div>
+
+                <div className="relative h-6 w-full rounded-md overflow-hidden border border-slate-200 flex">
+                  <div
+                    className="w-1/2 h-full bg-emerald-50 border-r border-dashed border-slate-400 flex items-center pl-3 text-xs font-semibold text-emerald-800"
+                    title="Discount Zone (0% - 50%)"
+                  >
+                    Discount Zone (Buy PD Arrays)
+                  </div>
+                  <div
+                    className="w-1/2 h-full bg-rose-50 flex items-center justify-end pr-3 text-xs font-semibold text-rose-800"
+                    title="Premium Zone (50% - 100%)"
+                  >
+                    Premium Zone (Sell PD Arrays)
+                  </div>
+
+                  {/* OTE Sweet Spot Band (0.618 - 0.786 inside Discount for Longs, or inside Premium for Shorts) */}
+                  <div
+                    className="absolute top-0 bottom-0 bg-amber-400/25 border-x border-amber-500/60 pointer-events-none"
+                    style={
+                      analysis.dailyBias === 'Bullish'
+                        ? { left: '21.4%', width: '16.8%' }
+                        : { left: '61.8%', width: '16.8%' }
+                    }
+                    title={`OTE Sweet Spot (0.618 - 0.786 ${analysis.oteLevels.zone || ''})`}
+                  />
+
+                  {/* Current Price Marker */}
+                  <div
+                    className="absolute top-0 bottom-0 w-0.5 bg-slate-950 z-10 pointer-events-none"
+                    style={{ left: `${Math.min(99, Math.max(1, pd.currentPositionPct))}%` }}
+                  />
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                  <span>{pd.guidance}</span>
+                  <span className="font-mono tabular-nums text-slate-500">
+                    OTE 0.618–0.786 ({analysis.oteLevels.zone || (analysis.dailyBias === 'Bullish' ? 'Discount' : 'Premium')}):{' '}
+                    {Math.min(analysis.oteLevels.fib618, analysis.oteLevels.fib786)} –{' '}
+                    {Math.max(analysis.oteLevels.fib618, analysis.oteLevels.fib786)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Synchronized Live TradingView Chart & ICT Liquidity/FVG Overlay */}
+            {/* Synchronized Live TradingView Chart & ICT Liquidity/PD Array Map */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
@@ -421,7 +539,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                         {symbol} ({activeTimeframe}) — Connected Live Chart
                       </h3>
                       <p className="text-xs text-slate-400">
-                        TradingView live feed synchronized with the {activeTimeframe} ICT liquidity scan below
+                        TradingView live feed synchronized with the {activeTimeframe} ICT Premium/Discount scan below
                       </p>
                     </div>
                     <a
@@ -430,7 +548,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                       rel="noopener noreferrer"
                       className="text-xs font-medium text-blue-400 hover:underline inline-flex items-center gap-1"
                     >
-                      ICT Ref
+                      ICT Channel ({config.ictYoutubeChannelId})
                       <ArrowUpRight className="w-3.5 h-3.5" />
                     </a>
                   </div>
@@ -451,25 +569,30 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
                     <div>
                       <h3 className="text-base font-bold text-white">
-                        {analysis.symbol} ({analysis.timeframe}) — ICT Liquidity &amp; FVG Map
+                        {analysis.symbol} ({analysis.timeframe}) — Premium / Discount &amp; PD Array Map
                       </h3>
                       <p className="text-xs text-slate-400">
-                        {analysis.structureShift} · Power of 3: {analysis.po3Phase} · Live TradingView ({analysis.tvSymbol || analysis.symbol})
+                        {analysis.structureShift} · Power of 3: {analysis.po3Phase} · {analysis.liquiditySweep || 'Monitoring Liquidity'}
                       </p>
                     </div>
                     <div className="text-right font-mono tabular-nums">
                       <div className="text-sm font-bold text-white">{analysis.currentPrice}</div>
-                      <div className="text-xs text-slate-400">OTE 0.705: {analysis.oteLevels.fib705}</div>
+                      <div className="text-xs text-slate-400">
+                        EQ 50%: {pd?.equilibrium ?? '-'} · OTE 0.705: {analysis.oteLevels.fib705}
+                      </div>
                     </div>
                   </div>
 
                   <IctSvgChart analysis={analysis} />
 
                   <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">
-                    <span>Green box: Bullish FVG / OB</span>
-                    <span>Red box: Bearish FVG / OB</span>
-                    <span>Dashed Cyan: BSL / SSL Liquidity</span>
-                    <span>Dashed Amber: OTE 0.705 Entry</span>
+                    <span>Red tint above EQ: Premium Zone</span>
+                    <span>Green tint below EQ: Discount Zone</span>
+                    <span>White dashed: 50% Equilibrium</span>
+                    <span>Green/Red boxes: Bullish/Bearish PD Arrays</span>
+                    <span>Violet/Amber boxes: Breaker &amp; Liquidity Void</span>
+                    <span>Cyan dashed: BSL / SSL Liquidity</span>
+                    <span>Amber dashed: OTE 0.705</span>
                   </div>
                 </div>
               )}
@@ -481,7 +604,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <h3 className="text-base font-bold text-slate-950">Execution Parameters</h3>
                   <a
-                    href={analysis.tradingViewUrl || `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(analysis.tvSymbol || analysis.symbol)}`}
+                    href={
+                      analysis.tradingViewUrl ||
+                      `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(analysis.tvSymbol || analysis.symbol)}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs font-mono font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
@@ -490,9 +616,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
-                <div className="space-y-3 text-sm">
+                <div className="space-y-2.5 text-sm">
                   <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Live Price (TradingView)</span>
+                    <span className="text-slate-500">Live Price</span>
                     <span className="font-mono tabular-nums font-bold text-slate-950">
                       {analysis.currentPrice}
                       {typeof analysis.changePct === 'number' && (
@@ -516,10 +642,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </div>
                   )}
                   <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Timeframe</span>
-                    <span className="font-mono font-semibold text-slate-950">{analysis.timeframe}</span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-500">Setup Bias</span>
                     <span
                       className={`font-semibold ${
@@ -529,10 +651,22 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                       {analysis.setup.direction}
                     </span>
                   </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
+                    <span className="text-slate-500 shrink-0">Anchor PD Array</span>
+                    <span className="font-semibold text-slate-950 text-right truncate">
+                      {analysis.setup.entryArrayName || `${analysis.oteLevels.zone || ''} PD Array`}
+                    </span>
+                  </div>
                   <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Entry FVG / OTE</span>
+                    <span className="text-slate-500">Entry Zone</span>
                     <span className="font-mono tabular-nums font-semibold text-slate-950">
                       {analysis.setup.entryZone}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">50% Equilibrium</span>
+                    <span className="font-mono tabular-nums font-semibold text-slate-700">
+                      {pd ? pd.equilibrium : '-'}
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-100">
@@ -542,7 +676,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">TP1 (2R Target)</span>
+                    <span className="text-slate-500">TP1 (2R / Equilibrium)</span>
                     <span className="font-mono tabular-nums font-semibold text-emerald-700">
                       {analysis.setup.tp1}
                     </span>
@@ -551,6 +685,12 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     <span className="text-slate-500">TP2 (Liquidity Draw)</span>
                     <span className="font-mono tabular-nums font-semibold text-emerald-700">
                       {analysis.setup.tp2}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
+                    <span className="text-slate-500 shrink-0">Power of 3 / Sweep</span>
+                    <span className="text-xs font-medium text-slate-700 text-right">
+                      {analysis.po3Phase}
                     </span>
                   </div>
                   {analysis.lastUpdated && (
@@ -595,6 +735,55 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   ))}
                 </ul>
               </div>
+            </div>
+          </div>
+
+          {/* ICT PD Array Matrix (Premium vs Discount Hierarchy) */}
+          <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-950">
+                  ICT PD Array Matrix — Premium vs. Discount Hierarchy
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Derived directly from live {analysis.symbol} ({analysis.timeframe}) OHLC price delivery: Old High/Low (BSL/SSL), Equal Highs/Lows, Rejection Blocks, Order Blocks, FVGs (50% CE), Liquidity Voids, Breaker Blocks &amp; Mitigation Blocks.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setPdFilter('active')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    pdFilter === 'active' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                  }`}
+                >
+                  Unmitigated &amp; Active
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPdFilter('all')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
+                    pdFilter === 'all' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                  }`}
+                >
+                  All Arrays ({allPdArrays.length})
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-1">
+              <PdArrayColumn
+                title="Premium PD Arrays (Above 50% Equilibrium)"
+                subtitle="Institutional resistance & short execution POIs / Buy-Side targets"
+                tone="premium"
+                items={premiumArrays}
+              />
+              <PdArrayColumn
+                title="Discount PD Arrays (Below 50% Equilibrium)"
+                subtitle="Institutional support & long execution POIs / Sell-Side targets"
+                tone="discount"
+                items={discountArrays}
+              />
             </div>
           </div>
         </>
@@ -651,7 +840,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <form onSubmit={handleCreatePlaybook} className="space-y-2.5">
             <input
               type="text"
-              placeholder={`Playbook title (e.g. ${symbol} ${activeTimeframe} Silver Bullet)`}
+              placeholder={`Playbook title (e.g. ${symbol} ${activeTimeframe} Discount OTE + FVG)`}
               value={playbookTitle}
               onChange={(e) => setPlaybookTitle(e.target.value)}
               className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
@@ -659,14 +848,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             <div className="flex gap-2">
               <input
                 type="text"
-                placeholder="Entry trigger, invalidation, & Killzone rules..."
+                placeholder="PD Array trigger, Equilibrium filter, & Killzone rules..."
                 value={playbookRules}
                 onChange={(e) => setPlaybookRules(e.target.value)}
                 className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer"
+                className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap shrink-0"
               >
                 Save Playbook
               </button>
@@ -704,11 +893,85 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   );
 };
 
+const PdArrayColumn: React.FC<{
+  title: string;
+  subtitle: string;
+  tone: 'premium' | 'discount';
+  items: PdArrayItem[];
+}> = ({ title, subtitle, tone, items }) => {
+  return (
+    <div className="border border-slate-200 rounded-lg overflow-hidden">
+      <div
+        className={`px-4 py-3 border-b border-slate-200 ${
+          tone === 'premium' ? 'bg-rose-50/60' : 'bg-emerald-50/60'
+        }`}
+      >
+        <div
+          className={`text-sm font-bold ${
+            tone === 'premium' ? 'text-rose-800' : 'text-emerald-800'
+          }`}
+        >
+          {title}
+        </div>
+        <div className="text-xs text-slate-600">{subtitle}</div>
+      </div>
+
+      {items.length === 0 ? (
+        <div className="px-4 py-6 text-xs text-slate-500">
+          No active {tone === 'premium' ? 'Premium' : 'Discount'} PD arrays detected in this filter view.
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {items.map((item) => {
+            const statusColor =
+              item.status === 'In Zone'
+                ? 'text-blue-700 font-bold'
+                : item.status === 'Target Liquidity'
+                ? 'text-amber-700 font-semibold'
+                : item.status === 'Mitigated'
+                ? 'text-slate-400'
+                : 'text-emerald-700 font-semibold';
+            const bandLabel =
+              item.top === item.bottom
+                ? `${item.midpoint}`
+                : `${item.bottom} – ${item.top} (Mid ${item.midpoint})`;
+            return (
+              <div key={item.id} className="px-4 py-3 hover:bg-slate-50/70 transition-colors">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-slate-950 truncate">
+                      <span className="font-mono text-slate-500 mr-1.5">P{item.priority}</span>
+                      {item.name}
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-xs font-mono tabular-nums font-semibold text-slate-900">
+                      {bandLabel}
+                    </div>
+                    <div className="text-xs font-mono tabular-nums mt-0.5 flex items-center justify-end gap-1.5">
+                      <span className="text-slate-400">
+                        {item.distancePct >= 0 ? `+${item.distancePct}%` : `${item.distancePct}%`}
+                      </span>
+                      <span aria-hidden="true" className="text-slate-300">·</span>
+                      <span className={statusColor}>{item.status}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) => {
   const width = 760;
-  const height = 340;
+  const height = 360;
   const padX = 16;
-  const padY = 20;
+  const padY = 22;
 
   const prices = analysis.candles.flatMap((c) => [c.high, c.low]);
   const maxP = Math.max(...prices, analysis.bslLevel);
@@ -718,9 +981,65 @@ const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) =>
   const toY = (p: number) => padY + ((maxP - p) / range) * (height - padY * 2);
   const stepX = (width - padX * 2) / analysis.candles.length;
 
+  const equilibrium = analysis.premiumDiscount?.equilibrium ?? (maxP + minP) / 2;
+  const yEq = toY(equilibrium);
+  const yTop = padY;
+  const yBot = height - padY;
+
+  const yOteTop = toY(Math.max(analysis.oteLevels.fib618, analysis.oteLevels.fib786));
+  const yOteBot = toY(Math.min(analysis.oteLevels.fib618, analysis.oteLevels.fib786));
+
   return (
     <div className="w-full overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto min-w-[540px]">
+        {/* Premium Zone Shading (above 50% Equilibrium) */}
+        <rect
+          x={padX}
+          y={yTop}
+          width={width - padX * 2}
+          height={Math.max(0, yEq - yTop)}
+          fill="rgba(244, 63, 94, 0.06)"
+        />
+        <text
+          x={width - padX - 4}
+          y={yTop + 12}
+          textAnchor="end"
+          fill="rgba(253, 164, 175, 0.7)"
+          fontSize={9}
+          fontFamily="JetBrains Mono, monospace"
+        >
+          PREMIUM ZONE (&gt;50%)
+        </text>
+
+        {/* Discount Zone Shading (below 50% Equilibrium) */}
+        <rect
+          x={padX}
+          y={yEq}
+          width={width - padX * 2}
+          height={Math.max(0, yBot - yEq)}
+          fill="rgba(16, 185, 129, 0.06)"
+        />
+        <text
+          x={width - padX - 4}
+          y={yBot - 6}
+          textAnchor="end"
+          fill="rgba(134, 239, 172, 0.7)"
+          fontSize={9}
+          fontFamily="JetBrains Mono, monospace"
+        >
+          DISCOUNT ZONE (&lt;50%)
+        </text>
+
+        {/* OTE 0.618 - 0.786 Band */}
+        <rect
+          x={padX}
+          y={Math.min(yOteTop, yOteBot)}
+          width={width - padX * 2}
+          height={Math.max(2, Math.abs(yOteBot - yOteTop))}
+          fill="rgba(245, 158, 11, 0.07)"
+        />
+
+        {/* Subtle Grid */}
         {[0.2, 0.4, 0.6, 0.8].map((r) => (
           <line
             key={r}
@@ -733,36 +1052,72 @@ const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) =>
           />
         ))}
 
+        {/* PD Array Zones (FVGs, OBs, Breakers, Rejections, Liquidity Voids) */}
         {analysis.zones.map((z, idx) => {
-          const yTop = toY(z.top);
-          const yBot = toY(z.bottom);
+          const yZTop = toY(z.top);
+          const yZBot = toY(z.bottom);
           const xStart = padX + z.startIndex * stepX;
+          const isBreakerOrVoid = z.type.includes('Breaker') || z.type === 'Liquidity Void';
           const isBull = z.type.startsWith('Bullish');
+
+          const fillColor = isBreakerOrVoid
+            ? 'rgba(168, 85, 247, 0.14)'
+            : isBull
+            ? 'rgba(22, 163, 74, 0.16)'
+            : 'rgba(225, 29, 72, 0.16)';
+          const strokeColor = isBreakerOrVoid
+            ? 'rgba(192, 132, 252, 0.45)'
+            : isBull
+            ? 'rgba(34, 197, 94, 0.45)'
+            : 'rgba(244, 63, 94, 0.45)';
+          const labelColor = isBreakerOrVoid ? '#d8b4fe' : isBull ? '#86efac' : '#fda4af';
+
           return (
             <g key={idx}>
               <rect
                 x={xStart}
-                y={Math.min(yTop, yBot)}
+                y={Math.min(yZTop, yZBot)}
                 width={width - padX - xStart}
-                height={Math.max(4, Math.abs(yBot - yTop))}
-                fill={isBull ? 'rgba(22, 163, 74, 0.16)' : 'rgba(225, 29, 72, 0.16)'}
-                stroke={isBull ? 'rgba(34, 197, 94, 0.45)' : 'rgba(244, 63, 94, 0.45)'}
+                height={Math.max(4, Math.abs(yZBot - yZTop))}
+                fill={fillColor}
+                stroke={strokeColor}
                 strokeWidth={0.8}
               />
               <text
                 x={width - padX - 4}
-                y={Math.min(yTop, yBot) + 11}
+                y={Math.min(yZTop, yZBot) + 11}
                 textAnchor="end"
-                fill={isBull ? '#86efac' : '#fda4af'}
+                fill={labelColor}
                 fontSize={9}
                 fontFamily="JetBrains Mono, monospace"
               >
-                {z.type}
+                {z.type} {z.pdZone ? `(${z.pdZone})` : ''}
               </text>
             </g>
           );
         })}
 
+        {/* 50% Equilibrium Line */}
+        <line
+          x1={padX}
+          y1={yEq}
+          x2={width - padX}
+          y2={yEq}
+          stroke="#e2e8f0"
+          strokeDasharray="5 4"
+          strokeWidth={1.1}
+        />
+        <text
+          x={padX + 4}
+          y={yEq - 4}
+          fill="#f8fafc"
+          fontSize={9}
+          fontFamily="JetBrains Mono, monospace"
+        >
+          EQ 50% ({equilibrium})
+        </text>
+
+        {/* BSL / SSL & Equal Highs/Lows */}
         <line
           x1={padX}
           y1={toY(analysis.bslLevel)}
@@ -789,6 +1144,7 @@ const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) =>
           SSL {analysis.sslLevel}
         </text>
 
+        {/* OTE 0.705 */}
         <line
           x1={padX}
           y1={toY(analysis.oteLevels.fib705)}
@@ -802,6 +1158,7 @@ const IctSvgChart: React.FC<{ analysis: IctAnalysisResult }> = ({ analysis }) =>
           OTE 0.705 ({analysis.oteLevels.fib705})
         </text>
 
+        {/* Live OHLC Candles */}
         {analysis.candles.map((c) => {
           const cx = padX + c.index * stepX + stepX / 2;
           const isUp = c.close >= c.open;
