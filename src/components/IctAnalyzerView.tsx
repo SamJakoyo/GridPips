@@ -65,7 +65,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const [analysis, setAnalysis] = useState<IctAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [chartViewMode, setChartViewMode] = useState<'ict' | 'split' | 'live'>('ict');
+  const [chartViewMode, setChartViewMode] = useState<'split' | 'ict' | 'live'>('split');
   const [autoSync, setAutoSync] = useState(true);
   const [pdFilter, setPdFilter] = useState<'active' | 'all'>('active');
 
@@ -320,9 +320,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
             {(
               [
-                ['ict', 'Mapped TV Chart'],
-                ['split', 'Mapped + TV Widget'],
-                ['live', 'TV Widget'],
+                ['split', 'Dual Charts'],
+                ['ict', 'ICT Mapped'],
+                ['live', 'TradingView Only'],
               ] as const
             ).map(([mode, label]) => (
               <button
@@ -530,24 +530,17 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Synchronized TradingView Chart with Live ICT Mappings */}
+            {/* Dual TradingView Charts: Fresh TradingView Chart + ICT Mapped Chart */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
-              {(chartViewMode === 'ict' || chartViewMode === 'split') && (
-                <TradingViewMappedChart
-                  analysis={analysis}
-                  heightClass={chartViewMode === 'ict' ? 'h-[480px]' : 'h-[420px]'}
-                />
-              )}
-
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
                 <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div>
                       <h3 className="text-sm font-bold text-white">
-                        {symbol} ({activeTimeframe}) — TradingView External Widget
+                        {symbol} ({activeTimeframe}) — Fresh TradingView Chart
                       </h3>
                       <p className="text-xs text-slate-400">
-                        Use &quot;Copy Pine&quot; on the Mapped TV Chart above to paste the exact ICT Premium/Discount &amp; PD Array overlay into TradingView.com
+                        Live interactive TradingView chart with drawing tools &amp; indicators synchronized to {symbol} {activeTimeframe}
                       </p>
                     </div>
                     <a
@@ -563,6 +556,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   <LiveTradingViewChart
                     symbol={symbol}
                     timeframe={activeTimeframe}
+                    theme="dark"
                     heightClass={
                       chartViewMode === 'live'
                         ? 'aspect-[16/9] min-h-[460px] max-h-[78vh]'
@@ -570,6 +564,13 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     }
                   />
                 </div>
+              )}
+
+              {(chartViewMode === 'split' || chartViewMode === 'ict') && (
+                <TradingViewMappedChart
+                  analysis={analysis}
+                  heightClass={chartViewMode === 'ict' ? 'h-[480px]' : 'h-[420px]'}
+                />
               )}
             </div>
 
