@@ -1,7 +1,8 @@
 import crypto from 'node:crypto';
 
-const DEFAULT_PROVISIONING_URL = 'https://mt-provisioning-api-v1.agiliumtrade.ai';
+const DEFAULT_PROVISIONING_URL = 'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai';
 const FALLBACK_CLIENT_REGION = 'london';
+const VALID_CLIENT_FALLBACK_REGIONS = ['london', 'new-york'] as const;
 
 export function getMt5ApiToken(): string {
   return (
@@ -30,6 +31,11 @@ export function isMetaApiProfileConfigured(): boolean {
 }
 
 function getProvisioningUrl(): string {
+  const custom = (process.env.METAAPI_PROVISIONING_URL || '').trim().replace(/\/+$/, '');
+  // Guard against the invalid/non-existent single-agiliumtrade provisioning host
+  if (custom && /^https:\/\/[a-z0-9.-]+$/i.test(custom) && !/^https:\/\/mt-provisioning-api-v1\.agiliumtrade\.ai$/i.test(custom)) {
+    return custom;
+  }
   return DEFAULT_PROVISIONING_URL;
 }
 
@@ -41,7 +47,55 @@ function getClientApiBaseUrl(region?: string | null): string {
   return `https://mt-client-api-v1.${cleanRegion}.agiliumtrade.ai`;
 }
 
-async function metaApiFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
+function describeFetchError(url: string, err: unknown): { message: string; code: string; retryable: boolean } {
+  let host = url;
+  try {
+    host = new URL(url).host;
+  } catch {
+    // keep raw url
+  }
+  const errObj = err as {
+    name?: string;
+    message?: string;
+    code?: string;
+    cause?: { code?: string; message?: string; errno?: number };
+  } | null;
+
+  const causeCode = String(errObj?.cause?.code || errObj?.code || '').trim();
+  const causeMsg = String(errObj?.cause?.message || '').trim();
+  const baseMsg = String(errObj?.message || 'Network request failed').trim();
+
+  if (errObj?.name === 'TimeoutError' || errObj?.name === 'AbortError' || causeCode === 'UND_ERR_CONNECT_TIMEOUT' || causeCode === 'ETIMEDOUT') {
+    return {
+      code: causeCode || 'ETIMEDOUT',
+      retryable: true,
+      message: `MetaApi Cloud timed out while contacting ${host}. Please try again in a few seconds.`,
+    };
+  }
+
+  const retryableCodes = new Set(['ECONNRESET', 'EAI_AGAIN', 'EPIPE', 'UND_ERR_SOCKET', 'UND_ERR_CONNECT_TIMEOUT']);
+  const retryable = retryableCodes.has(causeCode);
+  const detail = [causeCode, causeMsg && causeMsg !== baseMsg ? causeMsg : ''].filter(Boolean).join(' — ');
+
+  return {
+    code: causeCode || 'NETWORK_ERROR',
+    retryable,
+    message: `Unable to reach MetaApi Cloud (${host}${detail ? `: ${detail}` : ''}). Please retry or verify server connectivity.`,
+  };
+}
+
+class MetaApiHttpError extends Error {
+  status: number;
+  detail: string;
+  constructor(status: number, detail: string) {
+    super(`MetaApi Error (${status}): ${detail}`);
+    this.name = 'MetaApiHttpError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function metaApiFetch<T>(url: string, init: RequestInit = {}, maxAttempts = 2): Promise<T> {
   const token = getMt5ApiToken();
   if (!token) {
     throw new Error('METAAPI_TOKEN is not configured on the backend server.');
@@ -49,31 +103,91 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}): Promise<T> 
 
   const headers = new Headers(init.headers);
   headers.set('auth-token', token);
+  if (!headers.has('Accept')) {
+    headers.set('Accept', 'application/json');
+  }
   if (init.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const resp = await fetch(url, {
-    ...init,
-    headers,
-    signal: AbortSignal.timeout(20000),
-  });
+  let lastErr: Error | null = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    let resp: Response;
+    try {
+      resp = await fetch(url, {
+        ...init,
+        headers,
+        signal: AbortSignal.timeout(25000),
+      });
+    } catch (err) {
+      const info = describeFetchError(url, err);
+      lastErr = new Error(info.message);
+      if (info.retryable && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 600 * attempt));
+        continue;
+      }
+      throw lastErr;
+    }
 
-  const text = await resp.text();
-  let parsed: unknown = null;
-  try {
-    parsed = text ? JSON.parse(text) : null;
-  } catch {
-    parsed = null;
+    const text = await resp.text();
+    let parsed: unknown = null;
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch {
+      parsed = null;
+    }
+
+    if (!resp.ok) {
+      const errObj = parsed as { message?: string; error?: string; details?: unknown } | null;
+      const detail = errObj?.message || errObj?.error || text || `HTTP ${resp.status}`;
+      const httpErr = new MetaApiHttpError(resp.status, detail);
+      if (resp.status >= 502 && resp.status <= 504 && attempt < maxAttempts) {
+        lastErr = httpErr;
+        await new Promise((r) => setTimeout(r, 700 * attempt));
+        continue;
+      }
+      throw httpErr;
+    }
+
+    return parsed as T;
   }
 
-  if (!resp.ok) {
-    const errObj = parsed as { message?: string; error?: string; details?: unknown } | null;
-    const detail = errObj?.message || errObj?.error || text || `HTTP ${resp.status}`;
-    throw new Error(`MetaApi Error (${resp.status}): ${detail}`);
+  throw lastErr || new Error('MetaApi Cloud request failed.');
+}
+
+async function metaApiClientFetch<T>(
+  region: string | null | undefined,
+  path: string,
+  init: RequestInit = {}
+): Promise<{ data: T; region: string }> {
+  const primaryRegion =
+    (region || getOptionalMetaApiRegion() || FALLBACK_CLIENT_REGION)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, '') || FALLBACK_CLIENT_REGION;
+
+  const candidates = [
+    primaryRegion,
+    ...VALID_CLIENT_FALLBACK_REGIONS.filter((r) => r !== primaryRegion),
+  ];
+
+  let lastError: unknown = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidateRegion = candidates[i];
+    const url = `${getClientApiBaseUrl(candidateRegion)}${path}`;
+    try {
+      const data = await metaApiFetch<T>(url, init);
+      return { data, region: candidateRegion };
+    } catch (err) {
+      lastError = err;
+      // Only fall over to another regional host if the regional hostname failed DNS/connectivity
+      const isDnsFailure = err instanceof Error && /ENOTFOUND|Unable to reach MetaApi Cloud/i.test(err.message);
+      if (!isDnsFailure) {
+        throw err;
+      }
+    }
   }
 
-  return parsed as T;
+  throw lastError instanceof Error ? lastError : new Error('Unable to reach MetaApi client API.');
 }
 
 interface MetaApiAccountListItem {
@@ -116,10 +230,16 @@ export async function fetchKnownExnessServersFromMetaApi(): Promise<string[]> {
   await Promise.all(
     queries.map(async (q) => {
       try {
-        const res = await metaApiFetch<Record<string, string[]>>(
-          `${baseUrl}/users/current/known-mt-servers/5/${encodeURIComponent(q)}`
+        const res = await metaApiFetch<Record<string, string[]> | string[]>(
+          `${baseUrl}/known-mt-servers/5/search?query=${encodeURIComponent(q)}`,
+          {},
+          1
         );
-        if (res && typeof res === 'object') {
+        if (Array.isArray(res)) {
+          for (const srv of res) {
+            if (typeof srv === 'string' && srv.trim()) discovered.add(srv.trim());
+          }
+        } else if (res && typeof res === 'object') {
           for (const serverList of Object.values(res)) {
             if (Array.isArray(serverList)) {
               for (const srv of serverList) {
@@ -137,7 +257,9 @@ export async function fetchKnownExnessServersFromMetaApi(): Promise<string[]> {
   );
 
   const servers = Array.from(discovered).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-  cachedMetaApiExnessServers = { fetchedAt: now, servers };
+  if (servers.length > 0) {
+    cachedMetaApiExnessServers = { fetchedAt: now, servers };
+  }
   return servers;
 }
 
@@ -174,35 +296,73 @@ export async function provisionAndDeployMt5Account(params: {
   let state = matched?.state || 'CREATED';
   let connectionStatus = matched?.connectionStatus || 'DISCONNECTED';
 
+  if (accountId && matched) {
+    // Refresh password/name on existing MetaApi account so reconnecting with a new password works seamlessly
+    await metaApiFetch<unknown>(
+      `${baseUrl}/users/current/accounts/${encodeURIComponent(accountId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          name: params.name,
+          password: params.password,
+          server: params.server,
+        }),
+      },
+      1
+    ).catch(() => {});
+  }
+
   if (!accountId) {
-    const createPayload: Record<string, unknown> = {
-      login: params.login,
-      password: params.password,
-      name: params.name,
-      server: params.server,
-      platform: 'mt5',
-      magic: 20260525,
-      type: 'cloud',
-      reliability: 'regular',
+    const buildCreatePayload = (includeProfile: boolean): Record<string, unknown> => {
+      const payload: Record<string, unknown> = {
+        login: params.login,
+        password: params.password,
+        name: params.name,
+        server: params.server,
+        platform: 'mt5',
+        magic: 20260525,
+        type: 'cloud-g2',
+      };
+      if (includeProfile && profileId) {
+        payload.provisioningProfileId = profileId;
+      }
+      if (optionalRegion) {
+        payload.region = optionalRegion;
+      }
+      return payload;
     };
 
-    if (profileId) {
-      createPayload.provisioningProfileId = profileId;
-    }
-    if (optionalRegion) {
-      createPayload.region = optionalRegion;
+    const submitCreate = (payload: Record<string, unknown>) =>
+      metaApiFetch<{ id: string; state?: string }>(
+        `${baseUrl}/users/current/accounts`,
+        {
+          method: 'POST',
+          headers: {
+            'transaction-id': crypto.randomBytes(16).toString('hex'),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+    let created: { id: string; state?: string };
+    try {
+      created = await submitCreate(buildCreatePayload(Boolean(profileId)));
+    } catch (err) {
+      // If a configured provisioningProfileId doesn't contain this Exness server (or is invalid),
+      // retry using MetaApi's built-in automatic broker server discovery.
+      const shouldRetryWithoutProfile =
+        Boolean(profileId) &&
+        err instanceof MetaApiHttpError &&
+        (err.status === 400 || err.status === 404) &&
+        /profile|server|not found|invalid/i.test(err.detail);
+
+      if (shouldRetryWithoutProfile) {
+        created = await submitCreate(buildCreatePayload(false));
+      } else {
+        throw err;
+      }
     }
 
-    const created = await metaApiFetch<{ id: string; state?: string }>(
-      `${baseUrl}/users/current/accounts`,
-      {
-        method: 'POST',
-        headers: {
-          'transaction-id': crypto.randomBytes(16).toString('hex'),
-        },
-        body: JSON.stringify(createPayload),
-      }
-    );
     accountId = created.id;
     state = created.state || 'CREATED';
   }
@@ -241,30 +401,32 @@ export async function fetchMt5AccountState(params: {
   region: string;
   connectionStatus: string;
 }> {
-  const { region, detail } = await resolveAccountRegion(params.accountId, params.region);
-  const clientBase = getClientApiBaseUrl(region);
+  const { region: resolvedRegion, detail } = await resolveAccountRegion(params.accountId, params.region);
 
-  const [info, positions] = await Promise.all([
-    metaApiFetch<{
-      balance?: number;
-      equity?: number;
-      server?: string;
-      currency?: string;
-    }>(
-      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/account-information`
-    ),
-    metaApiFetch<Array<{ id?: string }>>(
-      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/positions`
-    ).catch(() => []),
-  ]);
+  const accountPath = `/users/current/accounts/${encodeURIComponent(params.accountId)}`;
+  const infoRes = await metaApiClientFetch<{
+    balance?: number;
+    equity?: number;
+    server?: string;
+    currency?: string;
+  }>(resolvedRegion, `${accountPath}/account-information`);
 
+  const activeRegion = infoRes.region;
+  const positions = await metaApiClientFetch<Array<{ id?: string }>>(
+    activeRegion,
+    `${accountPath}/positions`
+  )
+    .then((r) => r.data)
+    .catch(() => []);
+
+  const info = infoRes.data;
   return {
     balance: typeof info.balance === 'number' ? info.balance : null,
     equity: typeof info.equity === 'number' ? info.equity : null,
     openPositions: Array.isArray(positions) ? positions.length : 0,
     server: info.server || detail?.server || null,
     currency: info.currency || 'USD',
-    region,
+    region: activeRegion,
     connectionStatus: detail?.connectionStatus || 'CONNECTED',
   };
 }
@@ -285,7 +447,6 @@ export async function executeMt5TradeOrder(params: {
   message: string;
 }> {
   const { region } = await resolveAccountRegion(params.accountId, params.region);
-  const clientBase = getClientApiBaseUrl(region);
 
   const payload: Record<string, unknown> = {
     actionType: params.side === 'BUY' ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL',
@@ -300,15 +461,19 @@ export async function executeMt5TradeOrder(params: {
     payload.takeProfit = params.takeProfit;
   }
 
-  const res = await metaApiFetch<{
+  const { data: res } = await metaApiClientFetch<{
     orderId?: string;
     positionId?: string;
     stringCode?: string;
     message?: string;
-  }>(`${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/trade`, {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
+  }>(
+    region,
+    `/users/current/accounts/${encodeURIComponent(params.accountId)}/trade`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
 
   return {
     orderId: String(res.orderId || res.positionId || `MT5-${Date.now()}`),
@@ -323,10 +488,11 @@ export async function closeAllMt5Positions(params: {
   region?: string | null;
 }): Promise<{ closedCount: number }> {
   const { region } = await resolveAccountRegion(params.accountId, params.region);
-  const clientBase = getClientApiBaseUrl(region);
+  const accountPath = `/users/current/accounts/${encodeURIComponent(params.accountId)}`;
 
-  const positions = await metaApiFetch<Array<{ id?: string }>>(
-    `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/positions`
+  const { data: positions, region: activeRegion } = await metaApiClientFetch<Array<{ id?: string }>>(
+    region,
+    `${accountPath}/positions`
   );
 
   if (!Array.isArray(positions) || positions.length === 0) {
@@ -336,8 +502,9 @@ export async function closeAllMt5Positions(params: {
   let closedCount = 0;
   for (const pos of positions) {
     if (!pos?.id) continue;
-    await metaApiFetch<unknown>(
-      `${clientBase}/users/current/accounts/${encodeURIComponent(params.accountId)}/trade`,
+    await metaApiClientFetch<unknown>(
+      activeRegion,
+      `${accountPath}/trade`,
       {
         method: 'POST',
         body: JSON.stringify({
