@@ -95,7 +95,12 @@ class MetaApiHttpError extends Error {
   }
 }
 
-async function metaApiFetch<T>(url: string, init: RequestInit = {}, maxAttempts = 2): Promise<T> {
+async function metaApiFetch<T>(
+  url: string,
+  init: RequestInit = {},
+  maxAttempts = 2,
+  timeoutMs = 15000
+): Promise<T> {
   const token = getMt5ApiToken();
   if (!token) {
     throw new Error('METAAPI_TOKEN is not configured on the backend server.');
@@ -117,13 +122,13 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}, maxAttempts 
       resp = await fetch(url, {
         ...init,
         headers,
-        signal: AbortSignal.timeout(25000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (err) {
       const info = describeFetchError(url, err);
       lastErr = new Error(info.message);
       if (info.retryable && attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 600 * attempt));
+        await new Promise((r) => setTimeout(r, 500 * attempt));
         continue;
       }
       throw lastErr;
@@ -139,11 +144,28 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}, maxAttempts 
 
     if (!resp.ok) {
       const errObj = parsed as { message?: string; error?: string; details?: unknown } | null;
-      const detail = errObj?.message || errObj?.error || text || `HTTP ${resp.status}`;
+      const baseDetail = errObj?.message || errObj?.error || text || `HTTP ${resp.status}`;
+      let extraDetail = '';
+      if (Array.isArray(errObj?.details) && errObj.details.length > 0) {
+        extraDetail = errObj.details
+          .map((d) => {
+            if (typeof d === 'string') return d;
+            if (d && typeof d === 'object') {
+              const obj = d as { parameter?: string; message?: string };
+              return [obj.parameter, obj.message].filter(Boolean).join(': ');
+            }
+            return '';
+          })
+          .filter(Boolean)
+          .join('; ');
+      } else if (typeof errObj?.details === 'string' && errObj.details.trim()) {
+        extraDetail = errObj.details.trim();
+      }
+      const detail = extraDetail ? `${baseDetail} (${extraDetail})` : baseDetail;
       const httpErr = new MetaApiHttpError(resp.status, detail);
       if (resp.status >= 502 && resp.status <= 504 && attempt < maxAttempts) {
         lastErr = httpErr;
-        await new Promise((r) => setTimeout(r, 700 * attempt));
+        await new Promise((r) => setTimeout(r, 600 * attempt));
         continue;
       }
       throw httpErr;
@@ -158,7 +180,8 @@ async function metaApiFetch<T>(url: string, init: RequestInit = {}, maxAttempts 
 async function metaApiClientFetch<T>(
   region: string | null | undefined,
   path: string,
-  init: RequestInit = {}
+  init: RequestInit = {},
+  timeoutMs = 15000
 ): Promise<{ data: T; region: string }> {
   const primaryRegion =
     (region || getOptionalMetaApiRegion() || FALLBACK_CLIENT_REGION)
@@ -175,7 +198,7 @@ async function metaApiClientFetch<T>(
     const candidateRegion = candidates[i];
     const url = `${getClientApiBaseUrl(candidateRegion)}${path}`;
     try {
-      const data = await metaApiFetch<T>(url, init);
+      const data = await metaApiFetch<T>(url, init, timeoutMs <= 6000 ? 1 : 2, timeoutMs);
       return { data, region: candidateRegion };
     } catch (err) {
       lastError = err;
@@ -392,6 +415,8 @@ export async function provisionAndDeployMt5Account(params: {
 export async function fetchMt5AccountState(params: {
   accountId: string;
   region?: string | null;
+  timeoutMs?: number;
+  skipRegionLookup?: boolean;
 }): Promise<{
   balance: number | null;
   equity: number | null;
@@ -401,7 +426,11 @@ export async function fetchMt5AccountState(params: {
   region: string;
   connectionStatus: string;
 }> {
-  const { region: resolvedRegion, detail } = await resolveAccountRegion(params.accountId, params.region);
+  const timeoutMs = params.timeoutMs ?? 15000;
+  const { region: resolvedRegion, detail } =
+    params.skipRegionLookup && params.region
+      ? { region: params.region, detail: null }
+      : await resolveAccountRegion(params.accountId, params.region);
 
   const accountPath = `/users/current/accounts/${encodeURIComponent(params.accountId)}`;
   const infoRes = await metaApiClientFetch<{
@@ -409,12 +438,14 @@ export async function fetchMt5AccountState(params: {
     equity?: number;
     server?: string;
     currency?: string;
-  }>(resolvedRegion, `${accountPath}/account-information`);
+  }>(resolvedRegion, `${accountPath}/account-information`, {}, timeoutMs);
 
   const activeRegion = infoRes.region;
   const positions = await metaApiClientFetch<Array<{ id?: string }>>(
     activeRegion,
-    `${accountPath}/positions`
+    `${accountPath}/positions`,
+    {},
+    timeoutMs
   )
     .then((r) => r.data)
     .catch(() => []);

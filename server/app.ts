@@ -3716,6 +3716,8 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
     const liveState = await fetchMt5AccountState({
       accountId: provisioned.accountId,
       region: provisioned.region,
+      timeoutMs: 4500,
+      skipRegionLookup: true,
     }).catch(() => null);
 
     if (liveState) {
