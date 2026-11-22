@@ -24,18 +24,24 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import { LANDING_IMAGES } from '../assets/landingImages';
-import type { EmailLogItem, MpesaTransaction, Order, PublicConfig, User } from '../types';
+import {
+  computeCyclePricing,
+  describeSubscriptionStatus,
+  formatShortDate,
+  getPlanSpec,
+} from '../lib/subscriptions';
+import type { BillingCycle, EmailLogItem, MpesaTransaction, Order, PublicConfig, User } from '../types';
 
 const DEPOSIT_PRESETS_KES = [500, 1000, 2500, 5000] as const;
 
-/* ---------------- Executive Billing, KES Wallet, Licenses & Order Ledger ---------------- */
+/* ---------------- Executive Subscriptions, KES Wallet & Billing Ledger ---------------- */
 export const OrdersDashboardView: React.FC<{
   orders: Order[];
   user?: User;
   config?: PublicConfig;
   onUserUpdated?: (user: User) => void;
   onResumePayment: (order: Order) => void;
-  onBuyNew: (product: 'analyzer' | 'ea_bots') => void;
+  onBuyNew: (product: 'analyzer' | 'ea_bots', cycle?: BillingCycle) => void;
   onRefresh?: () => Promise<void> | void;
   onLaunchProduct?: (product: 'analyzer' | 'ea_bots') => void;
 }> = ({ orders, user, config, onUserUpdated, onResumePayment, onBuyNew, onRefresh, onLaunchProduct }) => {
@@ -212,10 +218,22 @@ export const OrdersDashboardView: React.FC<{
 
   const tillDisplay = config?.mpesaPartyB || config?.mpesaTillNumber || '1921416';
   const merchantName = config?.mpesaMerchantName || 'AURVIK ENTERPRISES';
+  const analyzerSubInfo = describeSubscriptionStatus(
+    Boolean(user?.hasAnalyzer),
+    user?.analyzerSubscriptionStatus,
+    user?.analyzerExpiresAt,
+    user?.analyzerDaysRemaining
+  );
+  const eaBotsSubInfo = describeSubscriptionStatus(
+    Boolean(user?.hasEaBots),
+    user?.eaBotsSubscriptionStatus,
+    user?.eaBotsExpiresAt,
+    user?.eaBotsDaysRemaining
+  );
 
   return (
     <div className="space-y-6">
-      {/* Unified Executive Billing & Wallet Strip */}
+      {/* Unified Executive Subscriptions & Wallet Strip */}
       <div className="relative overflow-hidden rounded-xl border border-slate-900 bg-[#0B0F19] text-white">
         <img
           src={LANDING_IMAGES.gridPipsBanner}
@@ -232,10 +250,10 @@ export const OrdersDashboardView: React.FC<{
         <div className="relative z-10 px-6 py-5 border-b border-white/10 flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
-              Treasury &amp; Software Entitlements · {merchantName}
+              Subscription Desk &amp; Treasury · {merchantName}
             </div>
             <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white mt-0.5">
-              Orders, KES Wallet &amp; Lifetime Licenses
+              Subscriptions, KES Wallet &amp; Billing Ledger
             </h2>
           </div>
           <div className="flex items-center gap-2.5">
@@ -268,22 +286,22 @@ export const OrdersDashboardView: React.FC<{
           </div>
 
           <div className="px-6 py-4">
-            <div className="text-[11px] uppercase tracking-wider text-slate-400">Settled License Spend</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Subscription Spend</div>
             <div className="text-2xl font-bold font-mono tabular-nums text-white mt-1">
               ${totalSpentUsd.toFixed(2)}
             </div>
             <div className="text-[11px] font-mono tabular-nums text-slate-400 mt-1">
-              KES {totalSpentKes.toLocaleString()} · {paidOrders.length} paid
+              KES {totalSpentKes.toLocaleString()} · {paidOrders.length} settled
             </div>
           </div>
 
           <div className="px-6 py-4">
-            <div className="text-[11px] uppercase tracking-wider text-slate-400">Active Licenses</div>
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Active Subscriptions</div>
             <div className="text-2xl font-bold font-mono tabular-nums text-[#E5A93C] mt-1">
               {activeLicensesCount} / 2
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
-              {activeLicensesCount === 2 ? 'Full Trading Desk unlocked' : 'Lifetime one-time access'}
+              {activeLicensesCount === 2 ? 'Analyzer & EA Bots active' : 'Monthly, Quarterly & Annual plans'}
             </div>
           </div>
 
@@ -303,103 +321,155 @@ export const OrdersDashboardView: React.FC<{
         </div>
       </div>
 
-      {/* Software License Entitlements */}
+      {/* Active Subscriptions & Renewal Desk */}
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-bold text-slate-950">Software License Entitlements</h3>
+            <h3 className="text-sm font-bold text-slate-950">Active Subscriptions &amp; Renewal Plans</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              One-time lifetime unlocks settled via Safaricom M-Pesa Daraja STK Push, USDT, or Bitcoin.
+              Flexible 30-day Monthly, 90-day Quarterly (-10%), or 365-day Annual (-20%) plans. Early renewals automatically extend your current expiry date.
             </p>
           </div>
           <span className="text-xs font-mono text-slate-500">Account: {user?.exnessAccountId || 'Linked'}</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
-          <div className="p-6 flex items-center justify-between gap-4">
+          {/* ICT Analyzer Subscription Card */}
+          <div className="p-6 flex flex-col justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                {user?.hasAnalyzer ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                    <Unlock className="w-3.5 h-3.5" />
-                    <span>Active Lifetime License</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-amber-700">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Available to Unlock</span>
-                  </span>
-                )}
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span
+                  className={`inline-flex items-center gap-1.5 ${
+                    analyzerSubInfo.tone === 'emerald'
+                      ? 'text-emerald-700'
+                      : analyzerSubInfo.tone === 'rose'
+                      ? 'text-rose-700'
+                      : 'text-amber-700'
+                  }`}
+                >
+                  {user?.hasAnalyzer ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  <span>{analyzerSubInfo.label}</span>
+                </span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
                 <span className="font-mono tabular-nums text-slate-600">
-                  ${(config?.analyzerPriceUsd ?? 5.25).toFixed(2)} / KES {(config?.analyzerPriceKes ?? 683).toLocaleString()}
+                  From ${(config?.analyzerPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.analyzerPriceKes ?? 683).toLocaleString()}/mo)
                 </span>
               </div>
               <h4 className="text-base font-bold text-slate-950">ICT Strategy Market Analyzer</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Dual TradingView charts, Premium/Discount dealing ranges, full PD Array matrix, and OTE trade setups.
               </p>
+              <div className="text-[11px] font-mono text-slate-500 pt-1">
+                {analyzerSubInfo.detail}
+              </div>
             </div>
-            {user?.hasAnalyzer ? (
-              <button
-                type="button"
-                onClick={() => onLaunchProduct?.('analyzer')}
-                className="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-              >
-                Open Analyzer
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onBuyNew('analyzer')}
-                className="px-4 py-2.5 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-              >
-                Unlock Now
-              </button>
-            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+              {user?.hasAnalyzer ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onLaunchProduct?.('analyzer')}
+                    className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Open Analyzer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('analyzer', 'monthly')}
+                    className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Renew / Extend Plan
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('analyzer', 'monthly')}
+                    className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    {user?.analyzerSubscriptionStatus === 'expired' ? 'Renew Monthly' : 'Subscribe Monthly'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('analyzer', 'annual')}
+                    className="px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Annual (-20%)
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
-          <div className="p-6 flex items-center justify-between gap-4">
+          {/* MQL5 EA Bots Subscription Card */}
+          <div className="p-6 flex flex-col justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
-              <div className="flex items-center gap-2 text-xs font-semibold">
-                {user?.hasEaBots ? (
-                  <span className="inline-flex items-center gap-1.5 text-emerald-700">
-                    <Unlock className="w-3.5 h-3.5" />
-                    <span>Active Lifetime License</span>
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 text-amber-700">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Available to Unlock</span>
-                  </span>
-                )}
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                <span
+                  className={`inline-flex items-center gap-1.5 ${
+                    eaBotsSubInfo.tone === 'emerald'
+                      ? 'text-emerald-700'
+                      : eaBotsSubInfo.tone === 'rose'
+                      ? 'text-rose-700'
+                      : 'text-amber-700'
+                  }`}
+                >
+                  {user?.hasEaBots ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  <span>{eaBotsSubInfo.label}</span>
+                </span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
                 <span className="font-mono tabular-nums text-slate-600">
-                  ${(config?.eaBotsPriceUsd ?? 5.25).toFixed(2)} / KES {(config?.eaBotsPriceKes ?? 683).toLocaleString()}
+                  From ${(config?.eaBotsPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.eaBotsPriceKes ?? 683).toLocaleString()}/mo)
                 </span>
               </div>
               <h4 className="text-base font-bold text-slate-950">MQL5 EA Bots Pack + MetaApi MT5 Bridge</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Silver Bullet &amp; SMC Order Block .mq5 bots plus one-click MetaApi Cloud MT5 auto-execution.
               </p>
+              <div className="text-[11px] font-mono text-slate-500 pt-1">
+                {eaBotsSubInfo.detail}
+              </div>
             </div>
-            {user?.hasEaBots ? (
-              <button
-                type="button"
-                onClick={() => onLaunchProduct?.('ea_bots')}
-                className="px-4 py-2.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-              >
-                Open EA Bots
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onBuyNew('ea_bots')}
-                className="px-4 py-2.5 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
-              >
-                Unlock Now
-              </button>
-            )}
+
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+              {user?.hasEaBots ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onLaunchProduct?.('ea_bots')}
+                    className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Open EA Bots
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('ea_bots', 'monthly')}
+                    className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Renew / Extend Plan
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('ea_bots', 'monthly')}
+                    className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    {user?.eaBotsSubscriptionStatus === 'expired' ? 'Renew Monthly' : 'Subscribe Monthly'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onBuyNew('ea_bots', 'annual')}
+                    className="px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    Annual (-20%)
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -592,7 +662,7 @@ export const OrdersDashboardView: React.FC<{
                 </div>
                 <div className="text-sm font-semibold text-slate-900">No M-Pesa STK activity yet</div>
                 <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                  Initiate a KES wallet deposit on the left or unlock a license via M-Pesa Daraja to track live callbacks and receipts here.
+                  Initiate a KES wallet deposit on the left or start a subscription via M-Pesa Daraja to track live callbacks and receipts here.
                 </p>
               </div>
             ) : (
@@ -614,7 +684,7 @@ export const OrdersDashboardView: React.FC<{
                         <td className="py-3 pr-3">
                           <div className="font-mono font-semibold text-slate-900">{tx.tx_reference}</div>
                           <div className="text-[11px] text-slate-400">
-                            {tx.purpose === 'wallet_deposit' ? 'Wallet Deposit' : 'License Checkout'} ·{' '}
+                            {tx.purpose === 'wallet_deposit' ? 'Wallet Deposit' : 'Subscription Checkout'} ·{' '}
                             {tx.created_at.slice(0, 16)}
                           </div>
                         </td>
@@ -666,9 +736,9 @@ export const OrdersDashboardView: React.FC<{
       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-bold text-slate-950">Billing Ledger &amp; Official Receipts</h3>
+            <h3 className="text-base font-bold text-slate-950">Subscription Invoices &amp; Official Receipts</h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Complete audit log of Safaricom M-Pesa Daraja and on-chain crypto license invoices.
+              Complete billing ledger of Monthly, Quarterly, and Annual subscription invoices and renewals.
             </p>
           </div>
 
@@ -679,7 +749,7 @@ export const OrdersDashboardView: React.FC<{
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search order # or receipt..."
+                placeholder="Search invoice # or receipt..."
                 className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-48"
               />
             </div>
@@ -708,20 +778,20 @@ export const OrdersDashboardView: React.FC<{
                 <Receipt className="w-5 h-5" />
               </div>
               <div className="text-sm font-semibold text-slate-900">
-                {orders.length === 0 ? 'No license invoices yet' : 'No invoices match your filter'}
+                {orders.length === 0 ? 'No subscription invoices yet' : 'No invoices match your filter'}
               </div>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 {orders.length === 0
-                  ? 'Unlock the ICT Market Analyzer or MQL5 EA Bots Pack above to generate your first M-Pesa Daraja or Crypto invoice.'
+                  ? 'Subscribe to the ICT Market Analyzer or MQL5 EA Bots Pack above to generate your first M-Pesa Daraja or Crypto subscription invoice.'
                   : 'Try clearing your search term or switching status tabs.'}
               </p>
               {orders.length === 0 && !user?.hasAnalyzer && (
                 <button
                   type="button"
-                  onClick={() => onBuyNew('analyzer')}
+                  onClick={() => onBuyNew('analyzer', 'monthly')}
                   className="px-4 py-2 bg-[#0B0F19] text-[#E5A93C] text-xs font-bold rounded-lg hover:bg-slate-800 cursor-pointer"
                 >
-                  Unlock ICT Analyzer (${(config?.analyzerPriceUsd ?? 5.25).toFixed(2)})
+                  Subscribe to ICT Analyzer (${(config?.analyzerPriceUsd ?? 5.25).toFixed(2)}/mo)
                 </button>
               )}
             </div>
@@ -731,7 +801,7 @@ export const OrdersDashboardView: React.FC<{
                 <thead>
                   <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
                     <th className="py-2.5 pr-4">Invoice &amp; Date</th>
-                    <th className="py-2.5 pr-4">Product</th>
+                    <th className="py-2.5 pr-4">Subscription Plan &amp; Coverage</th>
                     <th className="py-2.5 pr-4">Method</th>
                     <th className="py-2.5 pr-4">Receipt / Reference</th>
                     <th className="py-2.5 pr-4 text-right">Amount</th>
@@ -740,7 +810,9 @@ export const OrdersDashboardView: React.FC<{
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map((o) => (
+                  {filtered.map((o) => {
+                    const planSpec = getPlanSpec(o.billing_cycle);
+                    return (
                     <tr key={o.id} className="hover:bg-slate-50/80">
                       <td className="py-3 pr-4">
                         <div className="font-mono text-xs font-semibold text-slate-950">
@@ -750,8 +822,14 @@ export const OrdersDashboardView: React.FC<{
                           {o.created_at.slice(0, 16).replace('T', ' ')}
                         </div>
                       </td>
-                      <td className="py-3 pr-4 text-xs font-medium text-slate-800">
-                        {o.product_name}
+                      <td className="py-3 pr-4 text-xs">
+                        <div className="font-semibold text-slate-900">{o.product_name}</div>
+                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                          {planSpec.label} ({o.duration_days || planSpec.durationDays}d)
+                          {o.subscription_ends_at
+                            ? ` · Valid thru ${formatShortDate(o.subscription_ends_at)}`
+                            : ''}
+                        </div>
                       </td>
                       <td className="py-3 pr-4 text-xs uppercase font-mono text-slate-600">
                         <div>
@@ -829,7 +907,8 @@ export const OrdersDashboardView: React.FC<{
                         )}
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -873,11 +952,25 @@ export const OrdersDashboardView: React.FC<{
                 </div>
               )}
               <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Licensed Product</span>
+                <span className="text-slate-500">Subscription Module</span>
                 <span className="font-semibold text-slate-900 text-right max-w-[220px]">
                   {receiptOrder.product_name}
                 </span>
               </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-500">Billing Cycle</span>
+                <span className="font-mono text-slate-900">
+                  {getPlanSpec(receiptOrder.billing_cycle).label} ({receiptOrder.duration_days || getPlanSpec(receiptOrder.billing_cycle).durationDays} days)
+                </span>
+              </div>
+              {receiptOrder.subscription_ends_at && (
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-500">Coverage Window</span>
+                  <span className="font-mono text-emerald-700">
+                    {formatShortDate(receiptOrder.subscription_starts_at || receiptOrder.paid_at || receiptOrder.created_at)} – {formatShortDate(receiptOrder.subscription_ends_at)}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between py-1 border-b border-slate-100">
                 <span className="text-slate-500">Payment Method</span>
                 <span className="font-mono uppercase text-slate-900">
@@ -1015,8 +1108,13 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
 
   const shareUrl = `${window.location.origin}/?ref=${data.referralCode}`;
   const productPrice = Number(data.analyzerPriceUsd || config.analyzerPriceUsd || 5.25);
-  const perSaleUsd = Number((productPrice * (data.commissionPct / 100)).toFixed(2));
   const usdKesRate = Number(data.usdKesRate || 130);
+  const monthlyPrice = computeCyclePricing(productPrice, usdKesRate, 'monthly').amountUsd;
+  const quarterlyPrice = computeCyclePricing(productPrice, usdKesRate, 'quarterly').amountUsd;
+  const annualPrice = computeCyclePricing(productPrice, usdKesRate, 'annual').amountUsd;
+  const perMonthlyUsd = Number((monthlyPrice * (data.commissionPct / 100)).toFixed(2));
+  const perQuarterlyUsd = Number((quarterlyPrice * (data.commissionPct / 100)).toFixed(2));
+  const perAnnualUsd = Number((annualPrice * (data.commissionPct / 100)).toFixed(2));
   const conversionRate =
     data.clicks > 0 ? Math.min(100, Math.round((data.signups.length / data.clicks) * 1000) / 10) : 0;
   const paidOutTotal = Number(data.paidOutTotal || 0);
@@ -1073,16 +1171,16 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                 <span>Influencer Partner Desk</span>
                 <span aria-hidden="true" className="text-white/25">·</span>
                 <span>
-                  {data.commissionPct}% Commission{data.isCustomCommission ? ' (Custom Tier)' : ''}
+                  {data.commissionPct}% Recurring Payout{data.isCustomCommission ? ' (Custom Tier)' : ''}
                 </span>
                 <span aria-hidden="true" className="text-white/25">·</span>
                 <span>Code: {data.referralCode}</span>
               </div>
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                Earn ${perSaleUsd.toFixed(2)} Per License Sale on Every Referred Trader
+                Earn {data.commissionPct}% on Every New Subscription &amp; Renewal
               </h2>
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-                Share your tracked Grid Pips URL across Telegram, YouTube, X, or WhatsApp. Clicks, signups, and paid license commissions sync directly to your partner ledger and settle via M-Pesa KES or USDT TRC20.
+                Share your tracked Grid Pips URL across Telegram, YouTube, X, or WhatsApp. You earn <strong className="text-white">${perMonthlyUsd.toFixed(2)}</strong> per Monthly plan, <strong className="text-white">${perQuarterlyUsd.toFixed(2)}</strong> per Quarterly plan, and <strong className="text-white">${perAnnualUsd.toFixed(2)}</strong> per Annual plan — paid repeatedly on every renewal via M-Pesa KES or USDT TRC20.
               </p>
             </div>
 
@@ -1172,7 +1270,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
             {data.signups.length.toLocaleString()}
           </div>
           <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
-            {paidConversions} paid license conversion{paidConversions === 1 ? '' : 's'}
+            {paidConversions} paid subscription payment{paidConversions === 1 ? '' : 's'}
           </div>
         </div>
 
@@ -1337,7 +1435,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
             <div>
               <h3 className="text-sm font-bold text-slate-950">Partner Activity Ledger</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Track referred trader signups, license conversions, and disbursement status
+                Track referred trader signups, recurring subscription commissions, and disbursement status
               </p>
             </div>
             <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">

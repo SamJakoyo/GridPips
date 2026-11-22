@@ -149,6 +149,8 @@ interface AdminOverviewResponse {
     commission_pct?: number | null;
     has_analyzer: number;
     has_ea_bots: number;
+    analyzer_expires_at?: string | null;
+    ea_bots_expires_at?: string | null;
     mt5_connected: number;
     mt5_login: string | null;
     wallet_balance_kes?: number;
@@ -259,6 +261,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
     exnessVerified: false,
     hasAnalyzer: false,
     hasEaBots: false,
+    analyzerExpiresAt: '',
+    eaBotsExpiresAt: '',
     isSuspended: false,
   });
   const [savingUser, setSavingUser] = useState(false);
@@ -346,6 +350,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       exnessVerified: Boolean(u.exness_verified),
       hasAnalyzer: Boolean(u.has_analyzer),
       hasEaBots: Boolean(u.has_ea_bots),
+      analyzerExpiresAt: u.analyzer_expires_at ? u.analyzer_expires_at.slice(0, 10) : '',
+      eaBotsExpiresAt: u.ea_bots_expires_at ? u.ea_bots_expires_at.slice(0, 10) : '',
       isSuspended: Boolean(u.is_suspended),
     });
   }
@@ -371,6 +377,12 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             exnessVerified: editForm.exnessVerified,
             hasAnalyzer: editForm.hasAnalyzer,
             hasEaBots: editForm.hasEaBots,
+            analyzerExpiresAt: editForm.analyzerExpiresAt
+              ? `${editForm.analyzerExpiresAt}T23:59:59.000Z`
+              : null,
+            eaBotsExpiresAt: editForm.eaBotsExpiresAt
+              ? `${editForm.eaBotsExpiresAt}T23:59:59.000Z`
+              : null,
             isSuspended: editForm.isSuspended,
           }),
         }
@@ -983,7 +995,13 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     <div className="font-semibold text-slate-900">{o.user_name}</div>
                     <div className="text-slate-500">{o.user_email}</div>
                   </td>
-                  <td className="py-3 pr-4 text-xs text-slate-700">{o.product_name}</td>
+                  <td className="py-3 pr-4 text-xs text-slate-700">
+                    <div className="font-medium text-slate-900">{o.product_name}</div>
+                    <div className="text-[11px] font-mono text-slate-500 capitalize">
+                      {o.billing_cycle || 'monthly'} ({o.duration_days || 30}d)
+                      {o.subscription_ends_at ? ` · thru ${o.subscription_ends_at.slice(0, 10)}` : ''}
+                    </div>
+                  </td>
                   <td className="py-3 pr-4 text-xs font-mono text-slate-600">
                     <div className="uppercase font-semibold">
                       {o.payment_method}{' '}
@@ -1384,40 +1402,49 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                             <option value="admin">admin</option>
                           </select>
                         </td>
-                        <td className="py-3 pr-4 text-xs space-x-1.5 whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() => void updateUser(u.id, { exnessVerified: !u.exness_verified })}
-                            className={`px-2 py-1 rounded border cursor-pointer ${
-                              u.exness_verified
-                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
-                                : 'border-amber-500 text-amber-800 bg-amber-50'
-                            }`}
-                          >
-                            {u.exness_verified ? 'IB OK' : 'Verify IB'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
-                            className={`px-2 py-1 rounded border cursor-pointer ${
-                              u.has_analyzer
-                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                                : 'border-slate-300 text-slate-500'
-                            }`}
-                          >
-                            Analyzer {u.has_analyzer ? 'ON' : 'OFF'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void updateUser(u.id, { hasEaBots: !u.has_ea_bots })}
-                            className={`px-2 py-1 rounded border cursor-pointer ${
-                              u.has_ea_bots
-                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                                : 'border-slate-300 text-slate-500'
-                            }`}
-                          >
-                            EA {u.has_ea_bots ? 'ON' : 'OFF'}
-                          </button>
+                        <td className="py-3 pr-4 text-xs space-y-1 whitespace-nowrap">
+                          <div className="space-x-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void updateUser(u.id, { exnessVerified: !u.exness_verified })}
+                              className={`px-2 py-1 rounded border cursor-pointer ${
+                                u.exness_verified
+                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
+                                  : 'border-amber-500 text-amber-800 bg-amber-50'
+                              }`}
+                            >
+                              {u.exness_verified ? 'IB OK' : 'Verify IB'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
+                              className={`px-2 py-1 rounded border cursor-pointer ${
+                                u.has_analyzer
+                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                                  : 'border-slate-300 text-slate-500'
+                              }`}
+                            >
+                              Analyzer {u.has_analyzer ? 'ON' : 'OFF'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void updateUser(u.id, { hasEaBots: !u.has_ea_bots })}
+                              className={`px-2 py-1 rounded border cursor-pointer ${
+                                u.has_ea_bots
+                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                                  : 'border-slate-300 text-slate-500'
+                              }`}
+                            >
+                              EA {u.has_ea_bots ? 'ON' : 'OFF'}
+                            </button>
+                          </div>
+                          {(u.analyzer_expires_at || u.ea_bots_expires_at) && (
+                            <div className="text-[10px] font-mono text-slate-500">
+                              {u.analyzer_expires_at ? `ICT exp ${u.analyzer_expires_at.slice(0, 10)}` : ''}
+                              {u.analyzer_expires_at && u.ea_bots_expires_at ? ' · ' : ''}
+                              {u.ea_bots_expires_at ? `EA exp ${u.ea_bots_expires_at.slice(0, 10)}` : ''}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 pr-4 font-mono text-xs text-slate-500 whitespace-nowrap">
                           {u.last_login_at ? u.last_login_at.slice(0, 16) : '—'}
@@ -1849,7 +1876,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 </span>
               </div>
               <div className="text-[11px] text-slate-500 mt-1">
-                Global rate: {data.settings.influencer_commission_pct || '20'}%
+                Global rate: {data.settings.influencer_commission_pct || '35'}% (recurring)
               </div>
             </div>
 
@@ -2198,7 +2225,9 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Influencer Commission (%)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Influencer Payout Commission (%)
+              </label>
               <input
                 value={settingsForm.influencer_commission_pct || ''}
                 onChange={(e) =>
@@ -2208,7 +2237,9 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">ICT Analyzer Price (USD)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                ICT Analyzer Monthly Price (USD)
+              </label>
               <input
                 value={settingsForm.analyzer_price_usd || ''}
                 onChange={(e) =>
@@ -2218,7 +2249,9 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">MQL5 EA Bots Price (USD)</label>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                MQL5 EA Bots Monthly Price (USD)
+              </label>
               <input
                 value={settingsForm.ea_bots_price_usd || ''}
                 onChange={(e) =>
@@ -2420,14 +2453,14 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Custom Commission % (blank = site default {data.settings.influencer_commission_pct || 20}%)
+                    Custom Commission % (blank = site default {data.settings.influencer_commission_pct || 35}%)
                   </label>
                   <input
                     type="number"
                     step="0.5"
                     min="0"
                     max="80"
-                    placeholder={`Default (${data.settings.influencer_commission_pct || 20}%)`}
+                    placeholder={`Default (${data.settings.influencer_commission_pct || 35}%)`}
                     value={editForm.commissionPct}
                     onChange={(e) => setEditForm({ ...editForm, commissionPct: e.target.value })}
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
@@ -2444,6 +2477,58 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       setEditForm({ ...editForm, referredByCode: e.target.value.toUpperCase() })
                     }
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono uppercase focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      ICT Analyzer Expiry Date
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = editForm.analyzerExpiresAt
+                          ? Math.max(Date.now(), new Date(`${editForm.analyzerExpiresAt}T00:00:00Z`).getTime())
+                          : Date.now();
+                        const next = new Date(base + 30 * 86400000).toISOString().slice(0, 10);
+                        setEditForm({ ...editForm, hasAnalyzer: true, analyzerExpiresAt: next });
+                      }}
+                      className="text-[11px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                    >
+                      +30 days
+                    </button>
+                  </div>
+                  <input
+                    type="date"
+                    value={editForm.analyzerExpiresAt}
+                    onChange={(e) => setEditForm({ ...editForm, analyzerExpiresAt: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      MQL5 EA Bots Expiry Date
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = editForm.eaBotsExpiresAt
+                          ? Math.max(Date.now(), new Date(`${editForm.eaBotsExpiresAt}T00:00:00Z`).getTime())
+                          : Date.now();
+                        const next = new Date(base + 30 * 86400000).toISOString().slice(0, 10);
+                        setEditForm({ ...editForm, hasEaBots: true, eaBotsExpiresAt: next });
+                      }}
+                      className="text-[11px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                    >
+                      +30 days
+                    </button>
+                  </div>
+                  <input
+                    type="date"
+                    value={editForm.eaBotsExpiresAt}
+                    onChange={(e) => setEditForm({ ...editForm, eaBotsExpiresAt: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
                   />
                 </div>
               </div>

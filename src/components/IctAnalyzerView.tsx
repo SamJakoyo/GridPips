@@ -21,7 +21,12 @@ import {
 import { LiveTradingViewChart } from './LiveTradingViewChart';
 import { TradingViewMappedChart } from './TradingViewMappedChart';
 import { LANDING_IMAGES } from '../assets/landingImages';
-import type { IctAnalysisResult, PdArrayItem, PublicConfig, User } from '../types';
+import {
+  SUBSCRIPTION_PLAN_SPECS,
+  computeCyclePricing,
+  formatShortDate,
+} from '../lib/subscriptions';
+import type { BillingCycle, IctAnalysisResult, PdArrayItem, PublicConfig, User } from '../types';
 
 interface IctAnalyzerViewProps {
   user: User;
@@ -31,7 +36,7 @@ interface IctAnalyzerViewProps {
   onSymbolChange: (symbol: string) => void;
   onTimeframeChange: (timeframe: AnalyzerTimeframe) => void;
   onOpenFreeChart: () => void;
-  onUnlockClick: () => void;
+  onUnlockClick: (cycle?: BillingCycle) => void;
 }
 
 interface SavedSetupItem {
@@ -75,6 +80,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   const [playbookTitle, setPlaybookTitle] = useState('');
   const [playbookRules, setPlaybookRules] = useState('');
   const [cloudNotice, setCloudNotice] = useState('');
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('monthly');
 
   const activeTimeframe = normalizeAnalyzerTimeframe(timeframe);
 
@@ -223,8 +229,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   }
 
   if (!user.hasAnalyzer) {
-    const priceUsd = Number(config.analyzerPriceUsd || 5.25).toFixed(2);
-    const priceKes = Number(config.analyzerPriceKes || 683).toLocaleString();
+    const baseMonthlyUsd = Number(config.analyzerPriceUsd || 5.25);
+    const usdKesRate = Number(config.usdKesRate || 130);
+    const activePlan = computeCyclePricing(baseMonthlyUsd, usdKesRate, selectedCycle);
+    const isExpired = user.analyzerSubscriptionStatus === 'expired';
     return (
       <div className="space-y-6">
         <div className="rounded-xl overflow-hidden border border-slate-900 bg-[#0B0F19] text-white">
@@ -233,7 +241,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#E5A93C]">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>ICT Strategy Market Analyzer · Lifetime License</span>
+                  <span>
+                    ICT Strategy Market Analyzer · {isExpired ? 'Subscription Expired' : 'Pro Subscription'}
+                  </span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight">
                   Institutional Premium &amp; Discount PD Array Engine
@@ -241,15 +251,66 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
                   Built on Inner Circle Trader (ICT) dealing-range structure and dual synchronized TradingView charts. Scan 1M scalps through 1W swing setups for 50% Equilibrium, Order Blocks, Fair Value Gaps, Breaker &amp; Mitigation Blocks, Buy/Sell-Side Liquidity sweeps, and Optimal Trade Entry zones.
                 </p>
+                {isExpired && user.analyzerExpiresAt && (
+                  <div className="p-3 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs text-amber-200">
+                    Your previous ICT Analyzer subscription ended on{' '}
+                    <span className="font-mono font-semibold">{formatShortDate(user.analyzerExpiresAt)}</span>. Renew below to restore live scanner access immediately.
+                  </div>
+                )}
               </div>
 
               <div className="space-y-5">
-                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-4">
+                {/* Interactive Billing Cycle Selector */}
+                <div className="grid grid-cols-3 gap-2.5">
+                  {SUBSCRIPTION_PLAN_SPECS.map((plan) => {
+                    const quote = computeCyclePricing(baseMonthlyUsd, usdKesRate, plan.cycle);
+                    const isSelected = selectedCycle === plan.cycle;
+                    return (
+                      <button
+                        key={plan.cycle}
+                        type="button"
+                        onClick={() => setSelectedCycle(plan.cycle)}
+                        className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-white/10 border-[#E5A93C] text-white'
+                            : 'bg-white/[0.03] border-white/10 hover:border-white/25 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-bold text-white">{plan.label}</span>
+                          {plan.savingsBadge && (
+                            <span className="text-[10px] font-mono font-bold text-[#E5A93C]">
+                              -{plan.discountPct}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-mono tabular-nums text-base font-bold text-white mt-1">
+                          ${quote.amountUsd.toFixed(2)}
+                          <span className="text-[11px] font-normal text-slate-400">{plan.periodSuffix}</span>
+                        </div>
+                        <div className="text-[10px] font-mono tabular-nums text-slate-400 mt-0.5">
+                          {plan.durationDays} days · KES {quote.amountKes.toLocaleString()}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-3.5">
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">One-Time Lifetime Access</div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                      Selected Plan · {activePlan.spec.label} ({activePlan.spec.durationDays} Days)
+                    </div>
                     <div className="flex items-baseline gap-2.5 mt-0.5">
-                      <span className="text-3xl font-bold font-mono tabular-nums text-white">${priceUsd}</span>
-                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">KES {priceKes}</span>
+                      <span className="text-2xl font-bold font-mono tabular-nums text-white">
+                        ${activePlan.amountUsd.toFixed(2)}
+                      </span>
+                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">
+                        KES {activePlan.amountKes.toLocaleString()}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">
+                        (${activePlan.effectiveMonthlyUsd.toFixed(2)}/mo)
+                      </span>
                     </div>
                   </div>
                   <div className="h-8 w-px bg-white/10 hidden sm:block" />
@@ -262,10 +323,12 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={onUnlockClick}
+                    onClick={() => onUnlockClick(selectedCycle)}
                     className="px-6 py-3 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-sm font-bold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
                   >
-                    <span>Unlock ICT Analyzer — ${priceUsd}</span>
+                    <span>
+                      {isExpired ? 'Renew' : 'Subscribe'} ({activePlan.spec.label}) — ${activePlan.amountUsd.toFixed(2)}
+                    </span>
                     <ArrowUpRight className="w-4 h-4" />
                   </button>
                   <button

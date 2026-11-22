@@ -18,13 +18,20 @@ import {
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { apiFetch } from '../lib/api';
-import type { Order, PublicConfig, User } from '../types';
+import {
+  SUBSCRIPTION_PLAN_SPECS,
+  computeCyclePricing,
+  formatShortDate,
+  getPlanSpec,
+} from '../lib/subscriptions';
+import type { BillingCycle, Order, PublicConfig, User } from '../types';
 
 interface CheckoutModalProps {
   productKey: 'analyzer' | 'ea_bots';
   config: PublicConfig;
   user?: User | null;
   existingOrder?: Order | null;
+  initialBillingCycle?: BillingCycle;
   onClose: () => void;
   onUnlocked: (user: User, order: Order) => void;
   onOrderSubmitted?: (order: Order) => void;
@@ -37,11 +44,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   config,
   user,
   existingOrder,
+  initialBillingCycle,
   onClose,
   onUnlocked,
   onOrderSubmitted,
 }) => {
   const [order, setOrder] = useState<Order | null>(existingOrder || null);
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>(
+    existingOrder?.billing_cycle || initialBillingCycle || 'monthly'
+  );
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'crypto'>(
     existingOrder?.payment_method === 'crypto' ? 'crypto' : 'mpesa'
   );
@@ -96,10 +107,27 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const pollIntervalRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
 
-  const priceUsd =
+  const baseMonthlyUsd =
     productKey === 'ea_bots' ? config.eaBotsPriceUsd : config.analyzerPriceUsd;
+  const usdKesRate = Number(config.usdKesRate || 130);
+  const cyclePricing = computeCyclePricing(baseMonthlyUsd, usdKesRate, billingCycle);
+  const planLocked = Boolean(
+    existingOrder && ['processing', 'paid'].includes(existingOrder.payment_status)
+  );
+  const priceUsd =
+    planLocked && order ? Number(order.amount_usd) : cyclePricing.amountUsd;
   const priceKes =
-    productKey === 'ea_bots' ? config.eaBotsPriceKes : config.analyzerPriceKes;
+    planLocked && order && Number(order.amount_kes) > 0
+      ? Number(order.amount_kes)
+      : cyclePricing.amountKes;
+
+  const isRenewal =
+    productKey === 'ea_bots'
+      ? Boolean(user?.hasEaBots || user?.eaBotsExpiresAt)
+      : Boolean(user?.hasAnalyzer || user?.analyzerExpiresAt);
+  const currentExpiry =
+    productKey === 'ea_bots' ? user?.eaBotsExpiresAt : user?.analyzerExpiresAt;
+
   const title =
     productKey === 'ea_bots'
       ? 'MQL5 EA Bots Pack + MT5 Bridge'
@@ -107,7 +135,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const subtitle =
     productKey === 'ea_bots'
       ? 'Silver Bullet & SMC Order Block EAs, MetaApi Cloud Execution & Setup Guide'
-      : 'Live TradingView Liquidity Sweeps, OTE Zones, FVG & Daily Bias Scanner';
+      : 'Live TradingView Liquidity Sweeps, Premium/Discount PD Arrays & Daily Bias Scanner';
 
   const tillOrPaybillLabel =
     config.mpesaTransactionType === 'CustomerPayBillOnline'
@@ -152,7 +180,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (res.status === 'paid') {
         clearPollingTimers();
         setStkPhase('paid');
-        setStkStatusMessage(res.message || 'Payment confirmed and license unlocked.');
+        setStkStatusMessage(res.message || 'Payment confirmed and subscription activated.');
         if (res.user) {
           setConfirmedUser(res.user);
         }
@@ -246,6 +274,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       order &&
       order.payment_status !== 'paid' &&
       order.payment_method === method &&
+      (order.billing_cycle || 'monthly') === billingCycle &&
       (method === 'mpesa' ||
         (order.crypto_currency === cryptoCurrency && order.crypto_network === effectiveNetwork))
     ) {
@@ -255,6 +284,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       method: 'POST',
       body: JSON.stringify({
         productKey,
+        billingCycle,
         paymentMethod: method,
         cryptoCurrency: method === 'crypto' ? cryptoCurrency : undefined,
         cryptoNetwork: effectiveNetwork,
@@ -438,9 +468,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <div>
             <div className="flex items-center gap-2 text-xs font-medium text-slate-600 mb-1">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>GRIDPIPs Billing</span>
+              <span>GRIDPIPs Subscription Billing</span>
               <span aria-hidden="true">·</span>
-              <span>{order ? `Invoice ${order.order_number}` : 'Lifetime License'}</span>
+              <span>
+                {order
+                  ? `Invoice ${order.order_number}`
+                  : isRenewal
+                  ? 'Renew / Extend Plan'
+                  : `${cyclePricing.spec.label} Plan`}
+              </span>
             </div>
             <h2 className="text-lg font-bold text-slate-950 tracking-tight">{title}</h2>
             <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
@@ -455,12 +491,76 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </div>
 
         <div className="p-6 space-y-5">
+          {/* Subscription Billing Cycle Selector */}
+          {stkPhase !== 'paid' && stkPhase !== 'submitted' && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-700">Subscription Billing Cycle</span>
+                {isRenewal && currentExpiry && (
+                  <span className="font-mono text-[11px] text-emerald-700">
+                    Extends +{cyclePricing.spec.durationDays}d from {formatShortDate(currentExpiry)}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {SUBSCRIPTION_PLAN_SPECS.map((plan) => {
+                  const quote = computeCyclePricing(baseMonthlyUsd, usdKesRate, plan.cycle);
+                  const active = billingCycle === plan.cycle;
+                  return (
+                    <button
+                      key={plan.cycle}
+                      type="button"
+                      disabled={planLocked || stkPhase === 'polling'}
+                      onClick={() => {
+                        setBillingCycle(plan.cycle);
+                        setError('');
+                        if (order && (order.billing_cycle || 'monthly') !== plan.cycle) {
+                          setOrder(null);
+                        }
+                      }}
+                      className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer disabled:opacity-60 ${
+                        active
+                          ? 'bg-[#0B0F19] border-[#0B0F19] text-white'
+                          : 'bg-white border-slate-200 hover:border-slate-400 text-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold">{plan.label}</span>
+                        {plan.savingsBadge && (
+                          <span
+                            className={`text-[10px] font-mono font-bold ${
+                              active ? 'text-[#E5A93C]' : 'text-emerald-700'
+                            }`}
+                          >
+                            -{plan.discountPct}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="font-mono tabular-nums text-sm font-bold mt-1">
+                        ${quote.amountUsd.toFixed(2)}
+                      </div>
+                      <div
+                        className={`text-[10px] font-mono tabular-nums mt-0.5 ${
+                          active ? 'text-slate-300' : 'text-slate-500'
+                        }`}
+                      >
+                        {plan.durationDays}d · KES {quote.amountKes.toLocaleString()}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Amount & FX Conversion Ledger */}
           <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-medium text-slate-500">Order Total</div>
+              <div className="text-xs font-medium text-slate-500">
+                {cyclePricing.spec.label} Subscription ({cyclePricing.spec.durationDays} Days)
+              </div>
               <div className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">
-                1 USD = KES {config.usdKesRate.toFixed(0)} · One-time activation
+                1 USD = KES {usdKesRate.toFixed(0)} · ${cyclePricing.effectiveMonthlyUsd.toFixed(2)}/mo equiv.
               </div>
             </div>
             <div className="text-right font-mono tabular-nums">
@@ -478,19 +578,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
                   <h3 className="text-base font-bold text-emerald-950">
-                    Payment Confirmed &amp; Access Unlocked
+                    Subscription Confirmed &amp; Active
                   </h3>
                   <p className="text-xs text-emerald-800 mt-1">
-                    {stkStatusMessage || 'Your GRIDPIPs license is now active on your account.'}
+                    {stkStatusMessage || 'Your GRIDPIPs subscription is now active on your account.'}
                   </p>
                 </div>
               </div>
 
               <div className="bg-white border border-emerald-200 rounded-lg divide-y divide-slate-100 text-xs">
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-500">Order Reference</span>
+                  <span className="text-slate-500">Invoice Reference</span>
                   <span className="font-mono font-semibold text-slate-950">{order.order_number}</span>
                 </div>
+                <div className="px-3.5 py-2.5 flex items-center justify-between">
+                  <span className="text-slate-500">Subscription Plan</span>
+                  <span className="font-semibold text-slate-950">
+                    {getPlanSpec(order.billing_cycle).label} ({order.duration_days || cyclePricing.spec.durationDays} days)
+                  </span>
+                </div>
+                {order.subscription_ends_at && (
+                  <div className="px-3.5 py-2.5 flex items-center justify-between">
+                    <span className="text-slate-500">Valid Through</span>
+                    <span className="font-mono font-semibold text-emerald-700">
+                      {formatShortDate(order.subscription_ends_at)}
+                    </span>
+                  </div>
+                )}
                 {order.mpesa_receipt && (
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
                     <span className="text-slate-500">M-Pesa Receipt</span>
@@ -591,7 +705,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 onClick={onClose}
                 className="w-full py-2.5 px-4 bg-slate-950 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg cursor-pointer"
               >
-                Return to Orders &amp; Billing
+                Return to Subscriptions &amp; Billing
               </button>
             </div>
           ) : (

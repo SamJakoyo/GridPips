@@ -194,14 +194,20 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
         <div className="rounded-2xl bg-white border border-slate-200 p-5">
           <div className="text-xs text-slate-500">ICT Strategy Analyzer</div>
           <div className="text-base font-bold text-slate-950 mt-1.5">
-            {user.hasAnalyzer ? 'Unlocked & active' : 'Locked ($5.25)'}
+            {user.hasAnalyzer
+              ? user.analyzerDaysRemaining != null
+                ? `Active · ${user.analyzerDaysRemaining}d left`
+                : 'Active subscription'
+              : user.analyzerSubscriptionStatus === 'expired'
+              ? 'Subscription expired'
+              : `From $${config.analyzerPriceUsd.toFixed(2)}/mo`}
           </div>
           <button
             type="button"
             onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
             className="text-xs font-semibold text-amber-700 hover:underline mt-2 cursor-pointer"
           >
-            {user.hasAnalyzer ? 'Open live scanner →' : 'Unlock analyzer →'}
+            {user.hasAnalyzer ? 'Open live scanner →' : 'Subscribe to analyzer →'}
           </button>
         </div>
 
@@ -211,15 +217,19 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
             {user.hasEaBots
               ? user.mt5Connected
                 ? `MT5 ${user.mt5Login || 'Connected'}`
-                : 'Unlocked · Standby'
-              : 'Locked ($5.25)'}
+                : user.eaBotsDaysRemaining != null
+                ? `Active · ${user.eaBotsDaysRemaining}d left`
+                : 'Active · Standby'
+              : user.eaBotsSubscriptionStatus === 'expired'
+              ? 'Subscription expired'
+              : `From $${config.eaBotsPriceUsd.toFixed(2)}/mo`}
           </div>
           <button
             type="button"
             onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
             className="text-xs font-semibold text-amber-700 hover:underline mt-2 cursor-pointer"
           >
-            {user.hasEaBots ? 'Manage MT5 bridge →' : 'Unlock EA bots →'}
+            {user.hasEaBots ? 'Manage MT5 bridge →' : 'Subscribe to EA bots →'}
           </button>
         </div>
       </div>

@@ -270,6 +270,8 @@ export function initDatabase(): void {
   if (!userCols.includes('mt5_risk_percent')) db.exec('ALTER TABLE users ADD COLUMN mt5_risk_percent REAL DEFAULT 1.0');
   if (!userCols.includes('mt5_connection_mode')) db.exec("ALTER TABLE users ADD COLUMN mt5_connection_mode TEXT DEFAULT 'metaapi'");
   if (!userCols.includes('commission_pct')) db.exec('ALTER TABLE users ADD COLUMN commission_pct REAL');
+  if (!userCols.includes('analyzer_expires_at')) db.exec('ALTER TABLE users ADD COLUMN analyzer_expires_at TEXT');
+  if (!userCols.includes('ea_bots_expires_at')) db.exec('ALTER TABLE users ADD COLUMN ea_bots_expires_at TEXT');
 
   const orderCols = (db.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');
@@ -279,6 +281,14 @@ export function initDatabase(): void {
     db.exec('ALTER TABLE orders ADD COLUMN mpesa_merchant_request_id TEXT');
   if (!orderCols.includes('mpesa_result_code')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_result_code TEXT');
   if (!orderCols.includes('mpesa_result_desc')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_result_desc TEXT');
+  if (!orderCols.includes('billing_cycle'))
+    db.exec("ALTER TABLE orders ADD COLUMN billing_cycle TEXT NOT NULL DEFAULT 'monthly'");
+  if (!orderCols.includes('duration_days'))
+    db.exec('ALTER TABLE orders ADD COLUMN duration_days INTEGER NOT NULL DEFAULT 30');
+  if (!orderCols.includes('subscription_starts_at'))
+    db.exec('ALTER TABLE orders ADD COLUMN subscription_starts_at TEXT');
+  if (!orderCols.includes('subscription_ends_at'))
+    db.exec('ALTER TABLE orders ADD COLUMN subscription_ends_at TEXT');
 
   const defaultSettings: Record<string, string> = {
     exness_ib_url: 'https://one.exnessonelink.com/a/0p67hxlswg?source=app',
@@ -291,7 +301,7 @@ export function initDatabase(): void {
     mpesa_party_b: '1921416',
     mpesa_transaction_type: 'CustomerBuyGoodsOnline',
     mpesa_merchant_name: 'AURVIK ENTERPRISES',
-    influencer_commission_pct: '20',
+    influencer_commission_pct: '35',
     usdt_trc20_address: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',
     usdt_erc20_address: '0x7ac8dd858f3154d83114d7134a85924fdbb22234',
     btc_address: '13JdKdY8s8iVf5PAwy7popMHCqKvZsSrjD',
@@ -304,6 +314,8 @@ export function initDatabase(): void {
   // Migrate legacy placeholder till number (5984120) to user's Buy Goods Till 1921416
   db.prepare("UPDATE site_settings SET value = '1921416' WHERE key IN ('mpesa_till_number', 'mpesa_party_b') AND value = '5984120'").run();
   db.prepare("UPDATE site_settings SET value = 'AURVIK ENTERPRISES' WHERE key = 'mpesa_merchant_name' AND (value = 'GRIDPIPs Trading' OR value = '')").run();
+  // Upgrade legacy default 20% influencer commission to 35%
+  db.prepare("UPDATE site_settings SET value = '35' WHERE key = 'influencer_commission_pct' AND value = '20'").run();
   // Migrate legacy placeholder crypto addresses to configured real deposit addresses
   db.prepare("UPDATE site_settings SET value = 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ' WHERE key = 'usdt_trc20_address' AND (value = 'TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1' OR value = '')").run();
   db.prepare("UPDATE site_settings SET value = '0x7ac8dd858f3154d83114d7134a85924fdbb22234' WHERE key = 'usdt_erc20_address' AND (value = '0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C' OR value = '')").run();

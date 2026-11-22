@@ -369,6 +369,8 @@ interface DbUser {
   referred_by: number | null;
   has_analyzer: number;
   has_ea_bots: number;
+  analyzer_expires_at?: string | null;
+  ea_bots_expires_at?: string | null;
   mt5_login: string | null;
   mt5_server: string | null;
   mt5_bridge_token: string | null;
@@ -393,6 +395,75 @@ interface DbUser {
   last_login_at: string | null;
 }
 
+type BillingCycle = 'monthly' | 'quarterly' | 'annual';
+
+const SUBSCRIPTION_PLANS: Record<
+  BillingCycle,
+  { days: number; months: number; discountMultiplier: number; label: string; savingsPct: number }
+> = {
+  monthly: { days: 30, months: 1, discountMultiplier: 1, label: 'Monthly', savingsPct: 0 },
+  quarterly: { days: 90, months: 3, discountMultiplier: 0.9, label: 'Quarterly', savingsPct: 10 },
+  annual: { days: 365, months: 12, discountMultiplier: 0.8, label: 'Annual', savingsPct: 20 },
+};
+
+function normalizeBillingCycle(raw: unknown): BillingCycle {
+  if (raw === 'quarterly' || raw === 'annual') return raw;
+  return 'monthly';
+}
+
+function computeSubscriptionPrice(monthlyUsd: number, cycle: BillingCycle, usdKesRate: number) {
+  const plan = SUBSCRIPTION_PLANS[cycle];
+  const amountUsd = Number((monthlyUsd * plan.months * plan.discountMultiplier).toFixed(2));
+  const amountKes = Math.round(amountUsd * usdKesRate);
+  return { ...plan, cycle, amountUsd, amountKes };
+}
+
+function evaluateSubscription(
+  hasFlag: number | boolean | null | undefined,
+  expiresAt: string | null | undefined,
+  role: string
+): {
+  active: boolean;
+  status: 'active' | 'expiring_soon' | 'expired' | 'inactive';
+  daysRemaining: number | null;
+  expiresAt: string | null;
+} {
+  if (role === 'admin') {
+    return { active: true, status: 'active', daysRemaining: null, expiresAt: expiresAt || null };
+  }
+  const parsedExpiry = expiresAt ? Date.parse(expiresAt) : NaN;
+  if (Number.isFinite(parsedExpiry)) {
+    const msLeft = parsedExpiry - Date.now();
+    if (msLeft > 0) {
+      const daysRemaining = Math.max(1, Math.ceil(msLeft / 86_400_000));
+      return {
+        active: Boolean(hasFlag),
+        status: !hasFlag ? 'inactive' : daysRemaining <= 5 ? 'expiring_soon' : 'active',
+        daysRemaining: hasFlag ? daysRemaining : null,
+        expiresAt: new Date(parsedExpiry).toISOString(),
+      };
+    }
+    return {
+      active: false,
+      status: 'expired',
+      daysRemaining: 0,
+      expiresAt: new Date(parsedExpiry).toISOString(),
+    };
+  }
+  if (hasFlag) {
+    return { active: true, status: 'active', daysRemaining: null, expiresAt: null };
+  }
+  return { active: false, status: 'inactive', daysRemaining: null, expiresAt: null };
+}
+
+function hasActiveAnalyzerAccess(u: DbUser): boolean {
+  return evaluateSubscription(u.has_analyzer, u.analyzer_expires_at, u.role).active;
+}
+
+function hasActiveEaBotsAccess(u: DbUser): boolean {
+  return evaluateSubscription(u.has_ea_bots, u.ea_bots_expires_at, u.role).active;
+}
+
 interface AuthedRequest extends Request {
   currentUser?: DbUser;
 }
@@ -400,6 +471,8 @@ interface AuthedRequest extends Request {
 function serializeUser(u: DbUser) {
   const apiReady = isMt5ApiConfigured();
   const profileReady = isMetaApiProfileConfigured();
+  const analyzerSub = evaluateSubscription(u.has_analyzer, u.analyzer_expires_at, u.role);
+  const eaBotsSub = evaluateSubscription(u.has_ea_bots, u.ea_bots_expires_at, u.role);
 
   return {
     id: u.id,
@@ -410,8 +483,14 @@ function serializeUser(u: DbUser) {
     exnessEmail: u.exness_email,
     exnessVerified: Boolean(u.exness_verified),
     referralCode: u.referral_code,
-    hasAnalyzer: Boolean(u.has_analyzer) || u.role === 'admin',
-    hasEaBots: Boolean(u.has_ea_bots) || u.role === 'admin',
+    hasAnalyzer: analyzerSub.active,
+    hasEaBots: eaBotsSub.active,
+    analyzerExpiresAt: analyzerSub.expiresAt,
+    eaBotsExpiresAt: eaBotsSub.expiresAt,
+    analyzerSubscriptionStatus: analyzerSub.status,
+    eaBotsSubscriptionStatus: eaBotsSub.status,
+    analyzerDaysRemaining: analyzerSub.daysRemaining,
+    eaBotsDaysRemaining: eaBotsSub.daysRemaining,
     mt5Login: u.mt5_login,
     mt5Server: u.mt5_server,
     mt5BridgeToken: u.mt5_bridge_token,
@@ -704,7 +783,12 @@ app.get('/api/config/public', async (_req, res) => {
     mpesaMerchantName: s.mpesa_merchant_name || 'AURVIK ENTERPRISES',
     mpesaConfigured: daraja.configured,
     mpesaEnv: daraja.env,
-    commissionPct: Number(s.influencer_commission_pct || 20),
+    commissionPct: Number(s.influencer_commission_pct || 35),
+    subscriptionPlans: {
+      monthly: { days: 30, months: 1, savingsPct: 0, discountMultiplier: 1 },
+      quarterly: { days: 90, months: 3, savingsPct: 10, discountMultiplier: 0.9 },
+      annual: { days: 365, months: 12, savingsPct: 20, discountMultiplier: 0.8 },
+    },
     supabaseConfigured: sb.configured,
     supabaseStatus: sb.status,
     supabaseUrl: sb.url,
@@ -1809,18 +1893,22 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
   await hydrateSiteSettingsFromCloud().catch(() => {});
   const user = req.currentUser!;
   const productKey = req.body?.productKey === 'ea_bots' ? 'ea_bots' : 'analyzer';
+  const billingCycle = normalizeBillingCycle(req.body?.billingCycle);
   const paymentMethod = req.body?.paymentMethod === 'mpesa' ? 'mpesa' : 'crypto';
   const cryptoCurrency = sanitizeText(req.body?.cryptoCurrency || 'USDT', 16);
   const cryptoNetwork = sanitizeText(req.body?.cryptoNetwork || 'TRC20', 16);
 
   const settings = getSettingsMap();
-  const amountUsd =
+  const baseMonthlyUsd =
     productKey === 'ea_bots'
       ? Number(settings.ea_bots_price_usd || 5.25)
       : Number(settings.analyzer_price_usd || 5.25);
   const usdKesRate = Number(settings.usd_kes_rate || 130);
-  const amountKes = Math.round(amountUsd * usdKesRate);
-  let commissionPct = Number(settings.influencer_commission_pct || 20);
+  const planPricing = computeSubscriptionPrice(baseMonthlyUsd, billingCycle, usdKesRate);
+  const amountUsd = planPricing.amountUsd;
+  const amountKes = planPricing.amountKes;
+
+  let commissionPct = Number(settings.influencer_commission_pct || 35);
   if (user.referred_by) {
     const referrerRow = db
       .prepare('SELECT commission_pct FROM users WHERE id = ?')
@@ -1830,10 +1918,11 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
     }
   }
 
-  const productName =
+  const baseName =
     productKey === 'ea_bots'
       ? 'GRIDPIPs MQL5 EA Bots Pack + MT5 Bridge'
       : 'GRIDPIPs ICT Strategy Market Analyzer';
+  const productName = `${baseName} (${planPricing.label} Subscription · ${planPricing.days}d)`;
 
   let depositAddress: string | null = null;
   if (paymentMethod === 'crypto') {
@@ -1841,6 +1930,8 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
     else if (cryptoNetwork === 'ERC20') depositAddress = settings.usdt_erc20_address;
     else depositAddress = settings.usdt_trc20_address;
   }
+
+  const commissionUsd = user.referred_by ? Number(((amountUsd * commissionPct) / 100).toFixed(2)) : 0;
 
   // Reuse recent unpaid pending order for the same product to prevent duplicate clutter
   const existingPending = db
@@ -1854,15 +1945,20 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
   if (existingPending) {
     db.prepare(
       `UPDATE orders
-       SET amount_usd = ?, amount_kes = ?, payment_method = ?, crypto_currency = ?, crypto_network = ?, crypto_address = ?
+       SET product_name = ?, billing_cycle = ?, duration_days = ?, amount_usd = ?, amount_kes = ?,
+           payment_method = ?, crypto_currency = ?, crypto_network = ?, crypto_address = ?, commission_usd = ?
        WHERE id = ?`
     ).run(
+      productName,
+      billingCycle,
+      planPricing.days,
       amountUsd,
       amountKes,
       paymentMethod,
       paymentMethod === 'crypto' ? cryptoCurrency : null,
       paymentMethod === 'crypto' ? cryptoNetwork : null,
       depositAddress,
+      commissionUsd,
       existingPending.id
     );
     const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(existingPending.id);
@@ -1872,21 +1968,22 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
   }
 
   const orderNumber = `GP-${Date.now().toString(36).toUpperCase()}-${Math.floor(100 + Math.random() * 899)}`;
-  const commissionUsd = user.referred_by ? Number(((amountUsd * commissionPct) / 100).toFixed(2)) : 0;
 
   const info = db
     .prepare(
       `INSERT INTO orders (
-        order_number, user_id, product_key, product_name, amount_usd, amount_kes,
-        payment_method, payment_status, crypto_currency, crypto_network,
+        order_number, user_id, product_key, product_name, billing_cycle, duration_days,
+        amount_usd, amount_kes, payment_method, payment_status, crypto_currency, crypto_network,
         crypto_address, referrer_id, commission_usd
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?)`
     )
     .run(
       orderNumber,
       user.id,
       productKey,
       productName,
+      billingCycle,
+      planPricing.days,
       amountUsd,
       amountKes,
       paymentMethod,
@@ -1910,6 +2007,8 @@ async function fulfillOrder(orderId: number): Promise<void> {
         user_id: number;
         product_key: string;
         product_name: string;
+        billing_cycle?: string | null;
+        duration_days?: number | null;
         amount_usd: number;
         amount_kes: number;
         payment_method: string;
@@ -1919,16 +2018,53 @@ async function fulfillOrder(orderId: number): Promise<void> {
   if (!order) return;
 
   const alreadyPaid = order.payment_status === 'paid';
-  if (!alreadyPaid) {
-    db.prepare(
-      "UPDATE orders SET payment_status = 'paid', mpesa_result_code = COALESCE(mpesa_result_code, '0'), paid_at = COALESCE(paid_at, datetime('now')) WHERE id = ?"
-    ).run(orderId);
-  }
+  const durationDays =
+    typeof order.duration_days === 'number' && order.duration_days > 0 ? order.duration_days : 30;
+  const currentUser = db.prepare('SELECT * FROM users WHERE id = ?').get(order.user_id) as
+    | DbUser
+    | undefined;
 
-  if (order.product_key === 'analyzer') {
-    db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(order.user_id);
-  } else if (order.product_key === 'ea_bots') {
-    db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
+  let subscriptionEndsIso: string | null = null;
+  if (!alreadyPaid) {
+    const existingExpiryRaw =
+      order.product_key === 'ea_bots'
+        ? currentUser?.ea_bots_expires_at
+        : currentUser?.analyzer_expires_at;
+    const existingExpiryMs = existingExpiryRaw ? Date.parse(existingExpiryRaw) : NaN;
+    const nowMs = Date.now();
+    const startMs =
+      Number.isFinite(existingExpiryMs) && existingExpiryMs > nowMs ? existingExpiryMs : nowMs;
+    const endMs = startMs + durationDays * 86_400_000;
+    const startIso = new Date(startMs).toISOString();
+    subscriptionEndsIso = new Date(endMs).toISOString();
+
+    db.prepare(
+      `UPDATE orders
+       SET payment_status = 'paid',
+           mpesa_result_code = COALESCE(mpesa_result_code, '0'),
+           paid_at = COALESCE(paid_at, datetime('now')),
+           subscription_starts_at = COALESCE(subscription_starts_at, ?),
+           subscription_ends_at = COALESCE(subscription_ends_at, ?)
+       WHERE id = ?`
+    ).run(startIso, subscriptionEndsIso, orderId);
+
+    if (order.product_key === 'analyzer') {
+      db.prepare('UPDATE users SET has_analyzer = 1, analyzer_expires_at = ? WHERE id = ?').run(
+        subscriptionEndsIso,
+        order.user_id
+      );
+    } else if (order.product_key === 'ea_bots') {
+      db.prepare('UPDATE users SET has_ea_bots = 1, ea_bots_expires_at = ? WHERE id = ?').run(
+        subscriptionEndsIso,
+        order.user_id
+      );
+    }
+  } else {
+    if (order.product_key === 'analyzer') {
+      db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(order.user_id);
+    } else if (order.product_key === 'ea_bots') {
+      db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
+    }
   }
 
   await Promise.all([
@@ -1956,17 +2092,19 @@ async function fulfillOrder(orderId: number): Promise<void> {
       }).catch(() => {});
     }
 
+    const validUntilLabel = subscriptionEndsIso ? subscriptionEndsIso.slice(0, 10) : '30 days';
     await sendAutomatedEmail({
       to: user.email,
-      subject: `GRIDPIPs Receipt & Access Unlocked — ${order.order_number}`,
+      subject: `GRIDPIPs Subscription Activated — ${order.order_number}`,
       category: 'order_receipt',
-      textPreview: `Payment of $${order.amount_usd.toFixed(2)} (KES ${order.amount_kes}) via ${order.payment_method.toUpperCase()} confirmed for ${order.product_name}. Your access is unlocked inside GRIDPIPs.`,
-      html: `<h2>Payment Confirmed — ${order.order_number}</h2>
+      textPreview: `Subscription payment of $${order.amount_usd.toFixed(2)} (KES ${order.amount_kes}) confirmed for ${order.product_name}. Active through ${validUntilLabel}.`,
+      html: `<h2>Subscription Confirmed — ${order.order_number}</h2>
         <p>Hello ${user.name},</p>
-        <p>Your payment of <strong>$${order.amount_usd.toFixed(2)} USD (KES ${order.amount_kes})</strong> via <strong>${order.payment_method.toUpperCase()}</strong> for <strong>${order.product_name}</strong> is confirmed.</p>
+        <p>Your subscription payment of <strong>$${order.amount_usd.toFixed(2)} USD (KES ${order.amount_kes})</strong> via <strong>${order.payment_method.toUpperCase()}</strong> for <strong>${order.product_name}</strong> is confirmed.</p>
+        <p><strong>Active Through:</strong> ${validUntilLabel} UTC (${durationDays} days)</p>
         <p>${
           order.product_key === 'ea_bots'
-            ? 'Open the MQL5 EA Bots panel in your GRIDPIPs account to download the .mq5 source files, installation guide, and connect your MT5 bridge.'
+            ? 'Open the MQL5 EA Bots panel in your GRIDPIPs account to download the .mq5 source files and run your MetaApi Cloud MT5 bridge.'
             : 'Open the ICT Strategy Market Analyzer in your GRIDPIPs account to scan live setups.'
         }</p>`,
     });
@@ -3470,8 +3608,10 @@ app.get('/api/orders/:id/crypto/status', requireAuth, async (req: AuthedRequest,
 app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
   try {
     const user = req.currentUser!;
-    if (!user.has_analyzer && user.role !== 'admin') {
-      res.status(402).json({ error: 'ICT Market Analyzer requires a one-time $5.25 unlock.' });
+    if (!hasActiveAnalyzerAccess(user)) {
+      res.status(402).json({
+        error: 'An active ICT Strategy Market Analyzer subscription is required. Subscribe or renew in Subscriptions & Billing.',
+      });
       return;
     }
     const symbol = sanitizeText(req.query.symbol || 'EURUSD', 12).toUpperCase();
@@ -3588,8 +3728,10 @@ function resolvePublicAppOrigin(req: Request): string {
 
 app.get('/api/ea/source/:bot', requireAuth, (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack requires a $5.25 purchase.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({
+      error: 'An active MQL5 EA Bots subscription is required. Subscribe or renew in Subscriptions & Billing.',
+    });
     return;
   }
   const bot = req.params.bot;
@@ -3623,8 +3765,10 @@ app.get('/api/ea/source/:bot', requireAuth, (req: AuthedRequest, res) => {
 
 app.get('/api/ea/download', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'Purchase the MQL5 EA Bots Pack ($5.25) to download source files.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({
+      error: 'An active MQL5 EA Bots subscription is required to download source files.',
+    });
     return;
   }
 
@@ -3644,8 +3788,8 @@ app.get('/api/ea/download', requireAuth, async (req: AuthedRequest, res) => {
 
 app.get('/api/ea/mt5/status', requireAuth, (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   ensureUserBridgeToken(user);
@@ -3680,8 +3824,10 @@ app.get('/api/ea/mt5/servers', requireAuth, async (_req: AuthedRequest, res) => 
 
 app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'Purchase the MQL5 EA Bots Pack ($5.25) to connect MT5.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({
+      error: 'An active MQL5 EA Bots subscription is required to connect MT5.',
+    });
     return;
   }
 
@@ -3834,8 +3980,8 @@ app.post('/api/ea/mt5/connect', requireAuth, async (req: AuthedRequest, res) => 
 
 app.post('/api/ea/mt5/rotate-token', requireAuth, (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   const freshToken = generateSecureToken(16);
@@ -3850,8 +3996,8 @@ app.post('/api/ea/mt5/rotate-token', requireAuth, (req: AuthedRequest, res) => {
 
 app.post('/api/ea/mt5/auto-trade', requireAuth, (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   const enabled = req.body?.enabled !== undefined ? Boolean(req.body.enabled) : !Boolean(user.mt5_auto_trade);
@@ -3898,8 +4044,8 @@ app.post('/api/ea/mt5/auto-trade', requireAuth, (req: AuthedRequest, res) => {
 
 app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
 
@@ -3967,8 +4113,8 @@ app.post('/api/ea/mt5/sync', requireAuth, async (req: AuthedRequest, res) => {
 
 app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   if (!isMt5ApiConfigured()) {
@@ -4054,8 +4200,8 @@ app.post('/api/ea/mt5/execute', requireAuth, async (req: AuthedRequest, res) => 
 
 app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   if (!isMt5ApiConfigured() || !user.mt5_metaapi_account_id) {
@@ -4097,8 +4243,8 @@ app.post('/api/ea/mt5/close-all', requireAuth, async (req: AuthedRequest, res) =
 
 app.post('/api/ea/mt5/run-auto-scan', requireAuth, async (req: AuthedRequest, res) => {
   const user = req.currentUser!;
-  if (!user.has_ea_bots && user.role !== 'admin') {
-    res.status(402).json({ error: 'MQL5 EA Bots Pack required.' });
+  if (!hasActiveEaBotsAccess(user)) {
+    res.status(402).json({ error: 'Active MQL5 EA Bots subscription required.' });
     return;
   }
   try {
@@ -4437,7 +4583,7 @@ app.get('/api/referrals/dashboard', requireAuth, async (req: AuthedRequest, res)
     .all(user.id);
   const settings = getSettingsMap();
 
-  const globalPct = Number(settings.influencer_commission_pct || 20);
+  const globalPct = Number(settings.influencer_commission_pct || 35);
   const effectiveCommissionPct =
     typeof user.commission_pct === 'number' && Number.isFinite(user.commission_pct)
       ? user.commission_pct
@@ -4528,7 +4674,8 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
       `SELECT
         u.id, u.name, u.email, u.role, u.exness_account_id, u.exness_verified,
         u.referral_code, u.referred_by, u.commission_pct,
-        u.has_analyzer, u.has_ea_bots, u.mt5_connected, u.mt5_login,
+        u.has_analyzer, u.has_ea_bots, u.analyzer_expires_at, u.ea_bots_expires_at,
+        u.mt5_connected, u.mt5_login,
         u.wallet_balance_kes, u.is_suspended, u.created_at, u.last_login_at,
         r.name as referrer_name, r.referral_code as referrer_code
        FROM users u
@@ -4577,7 +4724,7 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
   const securityLogs = db.prepare('SELECT * FROM security_logs ORDER BY id DESC LIMIT 80').all();
   const emailLogs = db.prepare('SELECT * FROM email_logs ORDER BY id DESC LIMIT 60').all();
   const settings = getSettingsMap();
-  const defaultCommissionPct = Number(settings.influencer_commission_pct || 20);
+  const defaultCommissionPct = Number(settings.influencer_commission_pct || 35);
 
   const rawInfluencers = db
     .prepare(
@@ -5024,6 +5171,46 @@ app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest,
       }
     }
 
+    let hasAnalyzerExpiryUpdate = false;
+    let analyzerExpiresAtVal: string | null = existing.analyzer_expires_at || null;
+    if (req.body?.analyzerExpiresAt !== undefined) {
+      hasAnalyzerExpiryUpdate = true;
+      const rawDate = String(req.body.analyzerExpiresAt || '').trim();
+      if (!rawDate) {
+        analyzerExpiresAtVal = null;
+      } else {
+        const parsed = Date.parse(rawDate.length === 10 ? `${rawDate}T23:59:59.000Z` : rawDate);
+        if (!Number.isFinite(parsed)) {
+          res.status(400).json({ error: 'Invalid Analyzer subscription expiration date.' });
+          return;
+        }
+        analyzerExpiresAtVal = new Date(parsed).toISOString();
+      }
+    } else if (hasAnalyzer === 1 && !existing.analyzer_expires_at) {
+      hasAnalyzerExpiryUpdate = true;
+      analyzerExpiresAtVal = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    }
+
+    let hasEaBotsExpiryUpdate = false;
+    let eaBotsExpiresAtVal: string | null = existing.ea_bots_expires_at || null;
+    if (req.body?.eaBotsExpiresAt !== undefined) {
+      hasEaBotsExpiryUpdate = true;
+      const rawDate = String(req.body.eaBotsExpiresAt || '').trim();
+      if (!rawDate) {
+        eaBotsExpiresAtVal = null;
+      } else {
+        const parsed = Date.parse(rawDate.length === 10 ? `${rawDate}T23:59:59.000Z` : rawDate);
+        if (!Number.isFinite(parsed)) {
+          res.status(400).json({ error: 'Invalid EA Bots subscription expiration date.' });
+          return;
+        }
+        eaBotsExpiresAtVal = new Date(parsed).toISOString();
+      }
+    } else if (hasEaBots === 1 && !existing.ea_bots_expires_at) {
+      hasEaBotsExpiryUpdate = true;
+      eaBotsExpiresAtVal = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    }
+
     const tx = db.transaction(() => {
       if (nextName) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(nextName, userId);
       if (nextExnessId)
@@ -5039,6 +5226,10 @@ app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest,
         db.prepare('UPDATE users SET has_analyzer = ? WHERE id = ?').run(hasAnalyzer, userId);
       if (hasEaBots !== undefined)
         db.prepare('UPDATE users SET has_ea_bots = ? WHERE id = ?').run(hasEaBots, userId);
+      if (hasAnalyzerExpiryUpdate)
+        db.prepare('UPDATE users SET analyzer_expires_at = ? WHERE id = ?').run(analyzerExpiresAtVal, userId);
+      if (hasEaBotsExpiryUpdate)
+        db.prepare('UPDATE users SET ea_bots_expires_at = ? WHERE id = ?').run(eaBotsExpiresAtVal, userId);
       if (walletBalanceKes !== undefined)
         db.prepare('UPDATE users SET wallet_balance_kes = ? WHERE id = ?').run(walletBalanceKes, userId);
       if (hasCommissionUpdate)

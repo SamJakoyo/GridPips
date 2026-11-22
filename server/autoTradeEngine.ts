@@ -139,13 +139,14 @@ export async function runCloudAutoTradePass(options?: {
                AND mt5_auto_trade = 1
                AND mt5_metaapi_account_id IS NOT NULL
                AND mt5_metaapi_account_id != ''
-               AND (has_ea_bots = 1 OR role = 'admin')`
+               AND (role = 'admin' OR (has_ea_bots = 1 AND (ea_bots_expires_at IS NULL OR ea_bots_expires_at > datetime('now'))))`
           )
           .all()
   ) as Array<{
     id: number;
     email: string;
     has_ea_bots: number;
+    ea_bots_expires_at?: string | null;
     role: string;
     mt5_connected: number;
     mt5_auto_trade: number;

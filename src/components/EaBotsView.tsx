@@ -20,12 +20,17 @@ import {
   EXNESS_MT5_SERVER_GROUPS,
 } from '../lib/exnessServers';
 import { LANDING_IMAGES } from '../assets/landingImages';
-import type { PublicConfig, User } from '../types';
+import {
+  SUBSCRIPTION_PLAN_SPECS,
+  computeCyclePricing,
+  formatShortDate,
+} from '../lib/subscriptions';
+import type { BillingCycle, PublicConfig, User } from '../types';
 
 interface EaBotsViewProps {
   user: User;
   config: PublicConfig;
-  onUnlockClick: () => void;
+  onUnlockClick: (cycle?: BillingCycle) => void;
   onUserUpdated: (user: User) => void;
 }
 
@@ -67,6 +72,7 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   onUserUpdated,
 }) => {
   const [activeFile, setActiveFile] = useState<'silverbullet' | 'orderblock' | 'guide'>('silverbullet');
+  const [selectedCycle, setSelectedCycle] = useState<BillingCycle>('monthly');
   const [fileContent, setFileContent] = useState('');
   const [fileName, setFileName] = useState('');
   const [discoveredServers, setDiscoveredServers] = useState<string[]>([]);
@@ -209,8 +215,10 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   }, [allKnownPresetServers, hasValidSavedServer, rawSavedServer, serverPreset]);
 
   if (!user.hasEaBots) {
-    const priceUsd = Number(config.eaBotsPriceUsd || 5.25).toFixed(2);
-    const priceKes = Number(config.eaBotsPriceKes || 683).toLocaleString();
+    const baseMonthlyUsd = Number(config.eaBotsPriceUsd || 5.25);
+    const usdKesRate = Number(config.usdKesRate || 130);
+    const activePlan = computeCyclePricing(baseMonthlyUsd, usdKesRate, selectedCycle);
+    const isExpired = user.eaBotsSubscriptionStatus === 'expired';
     return (
       <div className="space-y-6">
         <div className="rounded-xl overflow-hidden border border-slate-900 bg-[#0B0F19] text-white">
@@ -219,7 +227,9 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#E5A93C]">
                   <Lock className="w-3.5 h-3.5" />
-                  <span>MQL5 Automated Trading Pack · Lifetime License</span>
+                  <span>
+                    MQL5 Automated Trading Pack · {isExpired ? 'Subscription Expired' : 'Pro Subscription'}
+                  </span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight">
                   Automated ICT &amp; SMC Expert Advisors + MetaApi Cloud MT5 Bridge
@@ -227,15 +237,66 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                 <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
                   Deploy verified MQL5 source files directly in MetaTrader 5 or link your Exness MT5 account via MetaApi Cloud for server-side Killzone scanning, dynamic risk-% position sizing, live equity telemetry, and instant remote trade execution.
                 </p>
+                {isExpired && user.eaBotsExpiresAt && (
+                  <div className="p-3 rounded-lg border border-amber-400/40 bg-amber-500/10 text-xs text-amber-200">
+                    Your previous MQL5 EA Bots subscription ended on{' '}
+                    <span className="font-mono font-semibold">{formatShortDate(user.eaBotsExpiresAt)}</span>. Renew below to resume MetaApi Cloud auto-trading and EA downloads.
+                  </div>
+                )}
               </div>
 
               <div className="space-y-5">
-                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-4">
+                {/* Interactive Billing Cycle Selector */}
+                <div className="grid grid-cols-3 gap-2.5">
+                  {SUBSCRIPTION_PLAN_SPECS.map((plan) => {
+                    const quote = computeCyclePricing(baseMonthlyUsd, usdKesRate, plan.cycle);
+                    const isSelected = selectedCycle === plan.cycle;
+                    return (
+                      <button
+                        key={plan.cycle}
+                        type="button"
+                        onClick={() => setSelectedCycle(plan.cycle)}
+                        className={`p-3 rounded-lg border text-left transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-white/10 border-[#E5A93C] text-white'
+                            : 'bg-white/[0.03] border-white/10 hover:border-white/25 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs font-bold text-white">{plan.label}</span>
+                          {plan.savingsBadge && (
+                            <span className="text-[10px] font-mono font-bold text-[#E5A93C]">
+                              -{plan.discountPct}%
+                            </span>
+                          )}
+                        </div>
+                        <div className="font-mono tabular-nums text-base font-bold text-white mt-1">
+                          ${quote.amountUsd.toFixed(2)}
+                          <span className="text-[11px] font-normal text-slate-400">{plan.periodSuffix}</span>
+                        </div>
+                        <div className="text-[10px] font-mono tabular-nums text-slate-400 mt-0.5">
+                          {plan.durationDays} days · KES {quote.amountKes.toLocaleString()}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-3.5">
                   <div>
-                    <div className="text-[11px] uppercase tracking-wider text-slate-400">One-Time Lifetime Access</div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400">
+                      Selected Plan · {activePlan.spec.label} ({activePlan.spec.durationDays} Days)
+                    </div>
                     <div className="flex items-baseline gap-2.5 mt-0.5">
-                      <span className="text-3xl font-bold font-mono tabular-nums text-white">${priceUsd}</span>
-                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">KES {priceKes}</span>
+                      <span className="text-2xl font-bold font-mono tabular-nums text-white">
+                        ${activePlan.amountUsd.toFixed(2)}
+                      </span>
+                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">
+                        KES {activePlan.amountKes.toLocaleString()}
+                      </span>
+                      <span className="text-xs font-mono text-slate-400">
+                        (${activePlan.effectiveMonthlyUsd.toFixed(2)}/mo)
+                      </span>
                     </div>
                   </div>
                   <div className="h-8 w-px bg-white/10 hidden sm:block" />
@@ -248,15 +309,17 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
                 <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="button"
-                    onClick={onUnlockClick}
+                    onClick={() => onUnlockClick(selectedCycle)}
                     className="px-6 py-3 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-sm font-bold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <Zap className="w-4 h-4" />
-                    <span>Unlock MQL5 EA Bots Pack — ${priceUsd}</span>
+                    <span>
+                      {isExpired ? 'Renew' : 'Subscribe'} ({activePlan.spec.label}) — ${activePlan.amountUsd.toFixed(2)}
+                    </span>
                   </button>
                   <div className="text-xs text-slate-400 flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Instant ZIP download &amp; MetaApi MT5 unlock on confirmation</span>
+                    <span>Instant ZIP download &amp; MetaApi MT5 activation on confirmation</span>
                   </div>
                 </div>
               </div>
@@ -291,12 +354,12 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">Included in Your MQL5 EA Pack</h3>
+              <h3 className="text-sm font-bold text-slate-950">Included in Your MQL5 EA Subscription</h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Both compiled-ready .mq5 bots plus one-click MetaApi Cloud MT5 account bridging.
               </p>
             </div>
-            <span className="text-xs font-mono text-slate-500">Lifetime Updates · No VPS Required for Cloud Mode</span>
+            <span className="text-xs font-mono text-slate-500">Continuous Strategy Updates · No VPS Required for Cloud Mode</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
             <div className="p-5 space-y-1.5">

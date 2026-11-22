@@ -1,3 +1,14 @@
+export type BillingCycle = 'monthly' | 'quarterly' | 'annual';
+export type SubscriptionStatus = 'active' | 'expiring_soon' | 'expired' | 'inactive';
+
+export interface SubscriptionPlanMeta {
+  cycle: BillingCycle;
+  label: string;
+  durationDays: number;
+  months: number;
+  discountPct: number;
+}
+
 export interface User {
   id: number;
   name: string;
@@ -9,6 +20,12 @@ export interface User {
   referralCode: string;
   hasAnalyzer: boolean;
   hasEaBots: boolean;
+  analyzerExpiresAt?: string | null;
+  eaBotsExpiresAt?: string | null;
+  analyzerSubscriptionStatus?: SubscriptionStatus;
+  eaBotsSubscriptionStatus?: SubscriptionStatus;
+  analyzerDaysRemaining?: number | null;
+  eaBotsDaysRemaining?: number | null;
   mt5Login?: string | null;
   mt5Server?: string | null;
   mt5BridgeToken?: string | null;
@@ -76,6 +93,7 @@ export interface PublicConfig {
   mpesaConfigured?: boolean;
   mpesaEnv?: 'sandbox' | 'production';
   commissionPct: number;
+  subscriptionPlans?: SubscriptionPlanMeta[];
   supabaseConfigured?: boolean;
   supabaseStatus?: 'connected' | 'missing_url' | 'missing_key' | 'not_configured';
   supabaseUrl?: string;
@@ -93,6 +111,10 @@ export interface Order {
   user_id: number;
   product_key: 'analyzer' | 'ea_bots';
   product_name: string;
+  billing_cycle?: BillingCycle;
+  duration_days?: number;
+  subscription_starts_at?: string | null;
+  subscription_ends_at?: string | null;
   amount_usd: number;
   amount_kes: number;
   payment_method: 'mpesa' | 'crypto';

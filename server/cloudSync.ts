@@ -578,6 +578,36 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
       }
     }
 
+    // Hydrate subscription expiry dates & admin overrides for this user
+    const { data: metaRow } = await client
+      .from('gridpips_user_state')
+      .select('plan_json')
+      .eq('user_email', ADMIN_USERS_META_CLOUD_EMAIL)
+      .maybeSingle();
+    if (metaRow?.plan_json && typeof metaRow.plan_json === 'object' && !Array.isArray(metaRow.plan_json)) {
+      const userMeta = (metaRow.plan_json as Record<string, CloudUserMetaRecord>)[cleanEmail];
+      if (userMeta) {
+        db.prepare(
+          `UPDATE users SET
+            has_analyzer = ?,
+            has_ea_bots = ?,
+            analyzer_expires_at = ?,
+            ea_bots_expires_at = ?,
+            commission_pct = ?,
+            is_suspended = ?
+           WHERE id = ?`
+        ).run(
+          userMeta.has_analyzer ? 1 : 0,
+          userMeta.has_ea_bots ? 1 : 0,
+          userMeta.analyzer_expires_at || null,
+          userMeta.ea_bots_expires_at || null,
+          userMeta.commission_pct ?? null,
+          userMeta.is_suspended ? 1 : 0,
+          userId
+        );
+      }
+    }
+
     // Hydrate journal trades if missing locally
     const localJournalCount = (
       db.prepare('SELECT COUNT(*) as cnt FROM journal_trades WHERE user_id = ?').get(userId) as { cnt: number }
@@ -979,6 +1009,7 @@ const LEGACY_PLACEHOLDER_SETTINGS: Record<string, string[]> = {
   usdt_trc20_address: ['TX9kGridPipsUSDT7xR8mN4vQ2wK9pL3zF1'],
   usdt_erc20_address: ['0x71C9GridPips4E8A9B2F1D3c0E6a8b7d9F2a1C'],
   btc_address: ['bc1qgridpips8v9k2x4m7n0p3q5r6s8t9w'],
+  influencer_commission_pct: ['20'],
 };
 
 let lastSiteSettingsHydratedAt = 0;
@@ -1070,6 +1101,8 @@ export interface CloudUserMetaRecord {
   referred_by_email: string | null;
   has_analyzer: boolean;
   has_ea_bots: boolean;
+  analyzer_expires_at: string | null;
+  ea_bots_expires_at: string | null;
   wallet_balance_kes: number;
   is_suspended: boolean;
   commission_pct: number | null;
@@ -1114,6 +1147,8 @@ function buildLocalUserMetaRecord(userId: number): CloudUserMetaRecord | null {
         referred_by_email: string | null;
         has_analyzer: number;
         has_ea_bots: number;
+        analyzer_expires_at: string | null;
+        ea_bots_expires_at: string | null;
         wallet_balance_kes: number;
         is_suspended: number;
         commission_pct: number | null;
@@ -1136,6 +1171,8 @@ function buildLocalUserMetaRecord(userId: number): CloudUserMetaRecord | null {
     referred_by_email: row.referred_by_email ? row.referred_by_email.toLowerCase() : null,
     has_analyzer: Boolean(row.has_analyzer),
     has_ea_bots: Boolean(row.has_ea_bots),
+    analyzer_expires_at: row.analyzer_expires_at || null,
+    ea_bots_expires_at: row.ea_bots_expires_at || null,
     wallet_balance_kes: Number(row.wallet_balance_kes || 0),
     is_suspended: Boolean(row.is_suspended),
     commission_pct:
@@ -1313,6 +1350,8 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
       referred_by_code?: string | null;
       has_analyzer?: boolean;
       has_ea_bots?: boolean;
+      analyzer_expires_at?: string | null;
+      ea_bots_expires_at?: string | null;
       wallet_balance_kes?: number;
       is_suspended?: boolean;
       commission_pct?: number | null;
@@ -1404,6 +1443,8 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
         referred_by_email: meta.referred_by_email ? String(meta.referred_by_email).toLowerCase() : null,
         has_analyzer: Boolean(meta.has_analyzer),
         has_ea_bots: Boolean(meta.has_ea_bots),
+        analyzer_expires_at: meta.analyzer_expires_at || null,
+        ea_bots_expires_at: meta.ea_bots_expires_at || null,
         wallet_balance_kes:
           typeof meta.wallet_balance_kes === 'number' ? Number(meta.wallet_balance_kes) : undefined,
         is_suspended: Boolean(meta.is_suspended),
@@ -1435,10 +1476,10 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
           .prepare(
             `INSERT INTO users (
               supabase_uid, name, email, password_hash, role, exness_account_id, exness_email,
-              exness_verified, referral_code, has_analyzer, has_ea_bots, wallet_balance_kes,
-              mt5_login, mt5_server, mt5_metaapi_account_id, mt5_metaapi_region, mt5_connected,
+              exness_verified, referral_code, has_analyzer, has_ea_bots, analyzer_expires_at, ea_bots_expires_at,
+              wallet_balance_kes, mt5_login, mt5_server, mt5_metaapi_account_id, mt5_metaapi_region, mt5_connected,
               mt5_bridge_token, is_suspended, commission_pct, created_at, last_login_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
           )
           .run(
             u.supabase_uid || null,
@@ -1452,6 +1493,8 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
             refCode,
             u.has_analyzer || u.role === 'admin' ? 1 : 0,
             u.has_ea_bots || u.role === 'admin' ? 1 : 0,
+            u.analyzer_expires_at || null,
+            u.ea_bots_expires_at || null,
             Number(u.wallet_balance_kes || 0),
             u.mt5_login || null,
             u.mt5_server || null,
@@ -1485,6 +1528,8 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
             referral_code = ?,
             has_analyzer = CASE WHEN ? = 1 THEN ? ELSE MAX(has_analyzer, ?) END,
             has_ea_bots = CASE WHEN ? = 1 THEN ? ELSE MAX(has_ea_bots, ?) END,
+            analyzer_expires_at = CASE WHEN ? = 1 THEN ? ELSE COALESCE(analyzer_expires_at, ?) END,
+            ea_bots_expires_at = CASE WHEN ? = 1 THEN ? ELSE COALESCE(ea_bots_expires_at, ?) END,
             wallet_balance_kes = CASE WHEN ? = 1 AND ? IS NOT NULL THEN ? ELSE COALESCE(?, wallet_balance_kes) END,
             is_suspended = CASE WHEN ? = 1 THEN ? ELSE is_suspended END,
             commission_pct = CASE WHEN ? = 1 THEN ? ELSE COALESCE(commission_pct, ?) END,
@@ -1515,6 +1560,12 @@ export async function syncAllCloudAdminDataToLocal(): Promise<{
           hasAdminOverride ? 1 : 0,
           u.has_ea_bots ? 1 : 0,
           u.has_ea_bots ? 1 : 0,
+          hasAdminOverride ? 1 : 0,
+          u.analyzer_expires_at || null,
+          u.analyzer_expires_at || null,
+          hasAdminOverride ? 1 : 0,
+          u.ea_bots_expires_at || null,
+          u.ea_bots_expires_at || null,
           hasAdminOverride ? 1 : 0,
           u.wallet_balance_kes ?? null,
           u.wallet_balance_kes ?? 0,

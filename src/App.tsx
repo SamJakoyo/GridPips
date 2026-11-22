@@ -90,7 +90,7 @@ const DEFAULT_CONFIG: PublicConfig = {
   mpesaPartyB: '1921416',
   mpesaTransactionType: 'CustomerBuyGoodsOnline',
   mpesaMerchantName: 'AURVIK ENTERPRISES',
-  commissionPct: 20,
+  commissionPct: 35,
   cryptoAddresses: {
     USDT_TRC20: 'TDqm7SGqyDT5p9YrrHYmzwh9zPDo1y4AQJ',
     USDT_ERC20: '0x7ac8dd858f3154d83114d7134a85924fdbb22234',
@@ -118,6 +118,7 @@ export default function App() {
   const [checkoutState, setCheckoutState] = useState<{
     productKey: 'analyzer' | 'ea_bots';
     existingOrder?: Order | null;
+    billingCycle?: 'monthly' | 'quarterly' | 'annual';
   } | null>(null);
   const [capturedRefCode, setCapturedRefCode] = useState('');
   const [pendingGoogleOAuth, setPendingGoogleOAuth] = useState<PendingOAuthUser | null>(null);
@@ -343,15 +344,23 @@ export default function App() {
           id: 'analyzer',
           name: 'ICT Analyzer',
           icon: <Activity className="w-4 h-4" />,
-          tag: user.hasAnalyzer ? 'Active' : '$5.25',
+          tag: user.hasAnalyzer
+            ? 'Active'
+            : user.analyzerSubscriptionStatus === 'expired'
+            ? 'Expired'
+            : `$${config.analyzerPriceUsd.toFixed(2)}/mo`,
         },
         {
           id: 'eabots',
           name: 'MQL5 EA Bots',
           icon: <Bot className="w-4 h-4" />,
-          tag: user.hasEaBots ? 'Active' : '$5.25',
+          tag: user.hasEaBots
+            ? 'Active'
+            : user.eaBotsSubscriptionStatus === 'expired'
+            ? 'Expired'
+            : `$${config.eaBotsPriceUsd.toFixed(2)}/mo`,
         },
-        { id: 'orders', name: 'Orders & Billing', icon: <CreditCard className="w-4 h-4" /> },
+        { id: 'orders', name: 'Subscriptions & Billing', icon: <CreditCard className="w-4 h-4" /> },
       ],
     },
     {
@@ -625,10 +634,10 @@ export default function App() {
             </a>
             {!user.hasAnalyzer && (
               <button
-                onClick={() => setCheckoutState({ productKey: 'analyzer' })}
+                onClick={() => setCheckoutState({ productKey: 'analyzer', billingCycle: 'monthly' })}
                 className="px-3.5 py-1.5 bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer transition-colors"
               >
-                Unlock ICT (${config.analyzerPriceUsd.toFixed(2)})
+                Subscribe ICT (${config.analyzerPriceUsd.toFixed(2)}/mo)
               </button>
             )}
           </div>
@@ -653,7 +662,7 @@ export default function App() {
                     journal={journal}
                     orders={orders}
                     onNavigate={setActiveTab}
-                    onUnlock={(productKey) => setCheckoutState({ productKey })}
+                    onUnlock={(productKey) => setCheckoutState({ productKey, billingCycle: 'monthly' })}
                     onOpenSymbolChart={(sym) => {
                       setChartSymbol(sym);
                       setActiveTab('charts');
@@ -669,14 +678,18 @@ export default function App() {
                     onSymbolChange={setChartSymbol}
                     onTimeframeChange={setChartTimeframe}
                     onOpenFreeChart={() => setActiveTab('charts')}
-                    onUnlockClick={() => setCheckoutState({ productKey: 'analyzer' })}
+                    onUnlockClick={(cycle) =>
+                      setCheckoutState({ productKey: 'analyzer', billingCycle: cycle || 'monthly' })
+                    }
                   />
                 )}
                 {activeTab === 'eabots' && (
                   <EaBotsView
                     user={user}
                     config={config}
-                    onUnlockClick={() => setCheckoutState({ productKey: 'ea_bots' })}
+                    onUnlockClick={(cycle) =>
+                      setCheckoutState({ productKey: 'ea_bots', billingCycle: cycle || 'monthly' })
+                    }
                     onUserUpdated={(updated) => setUser(updated)}
                   />
                 )}
@@ -687,9 +700,15 @@ export default function App() {
                     config={config}
                     onUserUpdated={(updated) => setUser(updated)}
                     onResumePayment={(ord) =>
-                      setCheckoutState({ productKey: ord.product_key, existingOrder: ord })
+                      setCheckoutState({
+                        productKey: ord.product_key,
+                        existingOrder: ord,
+                        billingCycle: ord.billing_cycle || 'monthly',
+                      })
                     }
-                    onBuyNew={(productKey) => setCheckoutState({ productKey })}
+                    onBuyNew={(productKey, cycle) =>
+                      setCheckoutState({ productKey, billingCycle: cycle || 'monthly' })
+                    }
                     onRefresh={loadUserWorkspaceData}
                     onLaunchProduct={(productKey) =>
                       setActiveTab(productKey === 'ea_bots' ? 'eabots' : 'analyzer')
@@ -725,7 +744,7 @@ export default function App() {
                     watchlist={watchlist}
                     onUserUpdated={(updated) => setUser(updated)}
                     onNavigate={(tab) => setActiveTab(tab)}
-                    onUnlock={(productKey) => setCheckoutState({ productKey })}
+                    onUnlock={(productKey) => setCheckoutState({ productKey, billingCycle: 'monthly' })}
                   />
                 )}
                 {activeTab === 'referrals' && <ReferralsHubView config={config} />}
@@ -745,6 +764,7 @@ export default function App() {
           config={config}
           user={user}
           existingOrder={checkoutState.existingOrder}
+          initialBillingCycle={checkoutState.billingCycle}
           onClose={() => {
             setCheckoutState(null);
             void loadUserWorkspaceData();
@@ -995,7 +1015,9 @@ const WorkspaceOverview: React.FC<{
                 onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
                 className="px-5 py-2.5 rounded-lg bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
-                {user.hasAnalyzer ? 'Launch ICT Scanner' : `Unlock ICT Analyzer ($${config.analyzerPriceUsd.toFixed(2)})`}
+                {user.hasAnalyzer
+                  ? 'Launch ICT Scanner'
+                  : `Subscribe ICT Analyzer ($${config.analyzerPriceUsd.toFixed(2)}/mo)`}
               </motion.button>
               <motion.button
                 type="button"
@@ -1009,7 +1031,7 @@ const WorkspaceOverview: React.FC<{
                   ? user.mt5Connected
                     ? 'Manage MT5 & EA Auto-Trade'
                     : 'Connect Client MT5 Account'
-                  : `Get MQL5 EA Bots ($${config.eaBotsPriceUsd.toFixed(2)})`}
+                  : `Subscribe EA Bots ($${config.eaBotsPriceUsd.toFixed(2)}/mo)`}
               </motion.button>
             </motion.div>
           </div>
@@ -1177,7 +1199,13 @@ const WorkspaceOverview: React.FC<{
                 )}
               </div>
               <div className="text-lg font-bold text-slate-950 mt-1.5">
-                {user.hasAnalyzer ? 'Unlocked and ready' : `$${config.analyzerPriceUsd.toFixed(2)} required`}
+                {user.hasAnalyzer
+                  ? user.analyzerDaysRemaining != null
+                    ? `Active · ${user.analyzerDaysRemaining}d left`
+                    : 'Active subscription'
+                  : user.analyzerSubscriptionStatus === 'expired'
+                  ? 'Subscription expired'
+                  : `$${config.analyzerPriceUsd.toFixed(2)}/mo plan`}
               </div>
             </div>
             <button
@@ -1185,7 +1213,7 @@ const WorkspaceOverview: React.FC<{
               onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
               className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
             >
-              {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Unlock via M-Pesa / Crypto →'}
+              {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Subscribe via M-Pesa / Crypto →'}
             </button>
           </div>
         </motion.div>
@@ -1216,8 +1244,12 @@ const WorkspaceOverview: React.FC<{
                 {user.hasEaBots
                   ? user.mt5Connected
                     ? `MT5 ${user.mt5Login}`
+                    : user.eaBotsDaysRemaining != null
+                    ? `Active · ${user.eaBotsDaysRemaining}d left`
                     : 'Ready to connect'
-                  : `$${config.eaBotsPriceUsd.toFixed(2)} required`}
+                  : user.eaBotsSubscriptionStatus === 'expired'
+                  ? 'Subscription expired'
+                  : `$${config.eaBotsPriceUsd.toFixed(2)}/mo plan`}
               </div>
             </div>
             <button
@@ -1229,7 +1261,7 @@ const WorkspaceOverview: React.FC<{
                 ? user.mt5Connected
                   ? 'Manage MT5 Auto-Trading →'
                   : 'Connect Client MT5 Account →'
-                : 'Buy EA Bots Pack →'}
+                : 'Subscribe to EA Bots →'}
             </button>
           </div>
         </motion.div>

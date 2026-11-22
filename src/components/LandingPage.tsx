@@ -65,14 +65,14 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
     title: 'Exness IB & Influencer Affiliate Disclosure',
     paragraphs: [
       'Grid Pips operates as an Introducing Broker (IB) partner for Exness. All client trading accounts, deposits, withdrawals, and order executions are handled directly by Exness under their regulated brokerage terms.',
-      'Influencers and partners who refer new traders using their Grid Pips referral link earn a commission percentage (default 20%) on qualifying $5.25 software module purchases.',
+      'Influencers and partners who refer new traders using their Grid Pips referral link earn a recurring commission percentage (default 35%) on every qualifying subscription purchase and renewal.',
     ],
   },
   terms: {
     title: 'Terms of Service',
     paragraphs: [
-      'Access to the free trading tools and paid $5.25 pro modules (ICT Strategy Market Analyzer and MQL5 EA Bots Pack) is granted to registered members upon Exness IB onboarding confirmation.',
-      'Paid software licenses grant single-trader personal usage rights to the downloadable MQL5 (.mq5) source files and ICT Analyzer engine. Redistribution, commercial reselling, or unauthorized reverse-engineering is prohibited.',
+      'Access to the free trading tools and paid subscription modules (ICT Strategy Market Analyzer and MQL5 EA Bots Pack, starting at $5.25/month) is granted to registered members upon Exness IB onboarding confirmation.',
+      'Active software subscriptions grant single-trader personal usage rights to the downloadable MQL5 (.mq5) source files, MetaApi Cloud MT5 execution, and ICT Analyzer engine. Redistribution, commercial reselling, or unauthorized reverse-engineering is prohibited.',
       'Members agree to maintain accurate account credentials and refrain from automated scraping, credential stuffing, or unauthorized API probing.',
     ],
   },
@@ -774,7 +774,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="text-xs font-semibold mb-2 text-amber-700">
-                    01. Market Intelligence · ${config.analyzerPriceUsd.toFixed(2)} One-Time License
+                    01. Market Intelligence · ${config.analyzerPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
                   <h3 className="text-xl font-bold text-slate-950 mb-2">
                     ICT Strategy Market Analyzer
@@ -789,7 +789,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
                     className="text-sm font-semibold cursor-pointer text-amber-700 hover:text-amber-600"
                   >
-                    Get ICT Analyzer →
+                    Subscribe to Analyzer →
                   </button>
                 </div>
               </div>
@@ -807,7 +807,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="text-xs font-semibold mb-2 text-amber-700">
-                    02. Execution Bots · ${config.eaBotsPriceUsd.toFixed(2)} Source &amp; Docs
+                    02. Execution Bots · ${config.eaBotsPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
                   <h3 className="text-xl font-bold text-slate-950 mb-2">
                     MQL5 Expert Advisors &amp; MT5 Bridge
@@ -989,7 +989,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Open your Exness trading account to access Grid Pips.
               </h3>
               <p className="text-sm text-slate-600 leading-relaxed">
-                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free trading tools and $5.25 pro modules.
+                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free trading tools and ${config.analyzerPriceUsd.toFixed(2)}/mo pro subscription modules.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 shrink-0">
@@ -1113,16 +1113,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <p>Link your Exness IB account ID once to access TradingView charts, unlimited journal with screenshots, 8 calculators, and $10,000 paper trading.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">02. $5.25 ICT Strategy Analyzer</div>
-                <p>Detects London &amp; NY Killzones, Fair Value Gaps (BISI/SIBI), Order Blocks, 0.705 OTE Fibs, and BSL/SSL liquidity targets.</p>
+                <div className="font-semibold text-amber-700">02. ${config.analyzerPriceUsd.toFixed(2)}/mo ICT Strategy Analyzer</div>
+                <p>Detects London &amp; NY Killzones, Premium/Discount PD Arrays, Fair Value Gaps (BISI/SIBI), Order Blocks, 0.705 OTE Fibs, and BSL/SSL liquidity targets.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">03. $5.25 MQL5 EA Bots + MT5 Bridge</div>
-                <p>Download compilable .mq5 Expert Advisors with full installation guide and connect directly to your MetaTrader 5 terminal.</p>
+                <div className="font-semibold text-amber-700">03. ${config.eaBotsPriceUsd.toFixed(2)}/mo MQL5 EA Bots + MT5 Bridge</div>
+                <p>Download compilable .mq5 Expert Advisors with full installation guide and connect directly to your MetaTrader 5 terminal via MetaApi Cloud.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">04. JakoyoFX Community &amp; Referrals</div>
-                <p>Join t.me/JakoyoFx for daily setup discussions and share your referral link to earn 20% commission on licenses.</p>
+                <div className="font-semibold text-amber-700">04. JakoyoFX Community &amp; {config.commissionPct}% Referrals</div>
+                <p>Join t.me/JakoyoFx for daily setup discussions and share your referral link to earn {config.commissionPct}% recurring commission on subscriptions and renewals.</p>
               </div>
             </div>
             <div className="pt-2 flex flex-wrap justify-end gap-3">
