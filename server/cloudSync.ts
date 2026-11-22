@@ -1052,3 +1052,630 @@ export async function hydrateSiteSettingsFromCloud(force = false): Promise<void>
   }
 }
 
+const ADMIN_USERS_META_CLOUD_EMAIL = '__admin_users_meta__@system.gridpips';
+const REFERRAL_LEDGER_CLOUD_EMAIL = '__referral_ledger__@system.gridpips';
+const SYSTEM_CLOUD_EMAILS = new Set([
+  SITE_SETTINGS_CLOUD_EMAIL,
+  ADMIN_USERS_META_CLOUD_EMAIL,
+  REFERRAL_LEDGER_CLOUD_EMAIL,
+]);
+
+export interface CloudUserMetaRecord {
+  email: string;
+  name: string;
+  role: 'user' | 'influencer' | 'admin';
+  exness_account_id: string;
+  exness_verified: boolean;
+  referral_code: string;
+  referred_by_email: string | null;
+  has_analyzer: boolean;
+  has_ea_bots: boolean;
+  wallet_balance_kes: number;
+  is_suspended: boolean;
+  commission_pct: number | null;
+  last_login_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface CloudReferralClickRecord {
+  referral_code: string;
+  source_page: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+interface CloudPayoutRecord {
+  user_email: string;
+  amount_usd: number;
+  method: string;
+  destination: string;
+  status: string;
+  created_at: string;
+  processed_at: string | null;
+}
+
+function buildLocalUserMetaRecord(userId: number): CloudUserMetaRecord | null {
+  const row = db
+    .prepare(
+      `SELECT u.*, r.email as referred_by_email
+       FROM users u
+       LEFT JOIN users r ON u.referred_by = r.id
+       WHERE u.id = ?`
+    )
+    .get(userId) as
+    | {
+        email: string;
+        name: string;
+        role: string;
+        exness_account_id: string;
+        exness_verified: number;
+        referral_code: string;
+        referred_by_email: string | null;
+        has_analyzer: number;
+        has_ea_bots: number;
+        wallet_balance_kes: number;
+        is_suspended: number;
+        commission_pct: number | null;
+        last_login_at: string | null;
+        created_at: string;
+      }
+    | undefined;
+  if (!row || !row.email) return null;
+
+  const cleanRole: 'user' | 'influencer' | 'admin' =
+    row.role === 'admin' || row.role === 'influencer' ? row.role : 'user';
+
+  return {
+    email: row.email.toLowerCase(),
+    name: row.name,
+    role: cleanRole,
+    exness_account_id: row.exness_account_id,
+    exness_verified: Boolean(row.exness_verified),
+    referral_code: row.referral_code,
+    referred_by_email: row.referred_by_email ? row.referred_by_email.toLowerCase() : null,
+    has_analyzer: Boolean(row.has_analyzer),
+    has_ea_bots: Boolean(row.has_ea_bots),
+    wallet_balance_kes: Number(row.wallet_balance_kes || 0),
+    is_suspended: Boolean(row.is_suspended),
+    commission_pct:
+      row.commission_pct !== null && row.commission_pct !== undefined && Number.isFinite(Number(row.commission_pct))
+        ? Number(row.commission_pct)
+        : null,
+    last_login_at: row.last_login_at || null,
+    created_at: row.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export async function syncUserDirectoryEntryToCloud(userId: number): Promise<boolean> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) return false;
+
+  const record = buildLocalUserMetaRecord(userId);
+  if (!record || SYSTEM_CLOUD_EMAILS.has(record.email)) return false;
+
+  try {
+    const { data: existingRow } = await client
+      .from('gridpips_user_state')
+      .select('plan_json')
+      .eq('user_email', ADMIN_USERS_META_CLOUD_EMAIL)
+      .maybeSingle();
+
+    const currentMap: Record<string, CloudUserMetaRecord> =
+      existingRow?.plan_json && typeof existingRow.plan_json === 'object' && !Array.isArray(existingRow.plan_json)
+        ? { ...(existingRow.plan_json as Record<string, CloudUserMetaRecord>) }
+        : {};
+
+    currentMap[record.email] = record;
+
+    const { error } = await client.from('gridpips_user_state').upsert(
+      {
+        user_email: ADMIN_USERS_META_CLOUD_EMAIL,
+        plan_json: currentMap,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_email' }
+    );
+    if (error && !isMissingTableError(error)) {
+      console.warn('Cloud user directory sync warning:', error.message);
+      return false;
+    }
+    return !error;
+  } catch (err) {
+    console.warn('Cloud user directory sync failed:', err instanceof Error ? err.message : String(err));
+    return false;
+  }
+}
+
+export async function saveCloudReferralLedger(): Promise<boolean> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) return false;
+
+  try {
+    const clicks = db
+      .prepare('SELECT referral_code, source_page, ip_address, created_at FROM referral_clicks ORDER BY id DESC LIMIT 1000')
+      .all() as CloudReferralClickRecord[];
+
+    const payouts = db
+      .prepare(
+        `SELECT u.email as user_email, p.amount_usd, p.method, p.destination, p.status, p.created_at, p.processed_at
+         FROM payout_requests p
+         JOIN users u ON p.user_id = u.id
+         ORDER BY p.id DESC LIMIT 300`
+      )
+      .all() as CloudPayoutRecord[];
+
+    const { error } = await client.from('gridpips_user_state').upsert(
+      {
+        user_email: REFERRAL_LEDGER_CLOUD_EMAIL,
+        plan_json: {
+          clicks,
+          payouts: payouts.map((p) => ({
+            ...p,
+            user_email: String(p.user_email || '').toLowerCase(),
+            amount_usd: Number(p.amount_usd || 0),
+          })),
+        },
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_email' }
+    );
+    if (error && !isMissingTableError(error)) {
+      console.warn('Cloud referral ledger save warning:', error.message);
+      return false;
+    }
+    return !error;
+  } catch (err) {
+    console.warn('Cloud referral ledger save failed:', err instanceof Error ? err.message : String(err));
+    return false;
+  }
+}
+
+function uniqueReferralCodeForEmail(preferred: string | undefined | null, email: string, existingUserId?: number): string {
+  const cleaned = String(preferred || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '')
+    .slice(0, 24);
+  if (cleaned) {
+    const clash = db
+      .prepare('SELECT id FROM users WHERE referral_code = ?')
+      .get(cleaned) as { id: number } | undefined;
+    if (!clash || (existingUserId && clash.id === existingUserId)) {
+      return cleaned;
+    }
+  }
+  const prefix = (email.split('@')[0] || 'TRADER').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 6) || 'TRADER';
+  for (let i = 0; i < 6; i += 1) {
+    const candidate = `${prefix}${Math.floor(100 + Math.random() * 899)}`;
+    const clash = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(candidate);
+    if (!clash) return candidate;
+  }
+  return `GP${Date.now().toString(36).toUpperCase()}`;
+}
+
+export async function syncAllCloudAdminDataToLocal(): Promise<{
+  syncedUsers: number;
+  syncedOrders: number;
+  syncedPayouts: number;
+}> {
+  const client = getServerSupabaseAdminClient();
+  if (!client) {
+    return { syncedUsers: 0, syncedOrders: 0, syncedPayouts: 0 };
+  }
+
+  let syncedUsers = 0;
+  let syncedOrders = 0;
+  let syncedPayouts = 0;
+
+  try {
+    const [
+      profilesRes,
+      authUsersRes,
+      userStatesRes,
+      adminMetaRes,
+      referralLedgerRes,
+      ordersRes,
+    ] = await Promise.all([
+      client.from('profiles').select('*').limit(500),
+      client.auth.admin.listUsers({ page: 1, perPage: 200 }).catch(() => ({ data: { users: [] }, error: null })),
+      client.from('gridpips_user_state').select('*').limit(500),
+      client
+        .from('gridpips_user_state')
+        .select('plan_json')
+        .eq('user_email', ADMIN_USERS_META_CLOUD_EMAIL)
+        .maybeSingle(),
+      client
+        .from('gridpips_user_state')
+        .select('plan_json')
+        .eq('user_email', REFERRAL_LEDGER_CLOUD_EMAIL)
+        .maybeSingle(),
+      client.from('gridpips_orders').select('*').order('created_at', { ascending: false }).limit(300),
+    ]);
+
+    const adminMetaMap: Record<string, CloudUserMetaRecord> =
+      adminMetaRes.data?.plan_json &&
+      typeof adminMetaRes.data.plan_json === 'object' &&
+      !Array.isArray(adminMetaRes.data.plan_json)
+        ? (adminMetaRes.data.plan_json as Record<string, CloudUserMetaRecord>)
+        : {};
+
+    type MergedCloudUser = {
+      email: string;
+      supabase_uid?: string | null;
+      name?: string;
+      role?: 'user' | 'influencer' | 'admin';
+      exness_account_id?: string;
+      exness_verified?: boolean;
+      referral_code?: string;
+      referred_by_email?: string | null;
+      referred_by_code?: string | null;
+      has_analyzer?: boolean;
+      has_ea_bots?: boolean;
+      wallet_balance_kes?: number;
+      is_suspended?: boolean;
+      commission_pct?: number | null;
+      mt5_login?: string | null;
+      mt5_server?: string | null;
+      mt5_metaapi_account_id?: string | null;
+      mt5_metaapi_region?: string | null;
+      mt5_connected?: boolean;
+      last_login_at?: string | null;
+      created_at?: string | null;
+    };
+
+    const mergedByEmail = new Map<string, MergedCloudUser>();
+    const upsertMerge = (emailRaw: string | undefined | null, patch: Partial<MergedCloudUser>) => {
+      const email = String(emailRaw || '').trim().toLowerCase();
+      if (!email || !email.includes('@') || SYSTEM_CLOUD_EMAILS.has(email)) return;
+      const prev = mergedByEmail.get(email) || { email };
+      mergedByEmail.set(email, { ...prev, ...patch, email });
+    };
+
+    // 1. Auth users (lowest priority defaults)
+    const authUsers = Array.isArray(authUsersRes?.data?.users) ? authUsersRes.data.users : [];
+    for (const au of authUsers) {
+      if (!au.email) continue;
+      const meta = (au.user_metadata || {}) as Record<string, unknown>;
+      upsertMerge(au.email, {
+        supabase_uid: au.id,
+        name: typeof meta.full_name === 'string' && meta.full_name.trim() ? meta.full_name.trim() : undefined,
+        exness_account_id:
+          typeof meta.exness_account_id === 'string' && meta.exness_account_id.trim()
+            ? meta.exness_account_id.trim()
+            : undefined,
+        referred_by_code:
+          typeof meta.referred_by_code === 'string' && meta.referred_by_code.trim()
+            ? meta.referred_by_code.trim().toUpperCase()
+            : undefined,
+        last_login_at: au.last_sign_in_at || undefined,
+        created_at: au.created_at || undefined,
+      });
+    }
+
+    // 2. Supabase profiles table
+    if (!profilesRes.error && Array.isArray(profilesRes.data)) {
+      for (const p of profilesRes.data) {
+        if (!p.email) continue;
+        upsertMerge(String(p.email), {
+          supabase_uid: p.id ? String(p.id) : undefined,
+          name: p.full_name ? String(p.full_name) : undefined,
+          role: p.role === 'admin' || p.role === 'influencer' ? p.role : 'user',
+          exness_account_id: p.exness_account_id ? String(p.exness_account_id) : undefined,
+          exness_verified: Boolean(p.exness_verified),
+          referral_code: p.referral_code ? String(p.referral_code) : undefined,
+          has_analyzer: Boolean(p.has_analyzer),
+          has_ea_bots: Boolean(p.has_ea_bots),
+          created_at: p.created_at ? String(p.created_at) : undefined,
+        });
+      }
+    }
+
+    // 3. gridpips_user_state rows (MT5 & wallet state)
+    if (!userStatesRes.error && Array.isArray(userStatesRes.data)) {
+      for (const s of userStatesRes.data) {
+        const email = String(s.user_email || '').toLowerCase();
+        if (!email || SYSTEM_CLOUD_EMAILS.has(email)) continue;
+        upsertMerge(email, {
+          exness_account_id: s.exness_account_id ? String(s.exness_account_id) : undefined,
+          exness_verified: typeof s.exness_verified === 'boolean' ? s.exness_verified : undefined,
+          wallet_balance_kes: typeof s.wallet_balance_kes === 'number' ? Number(s.wallet_balance_kes) : undefined,
+          mt5_login: s.mt5_login ? String(s.mt5_login) : undefined,
+          mt5_server: s.mt5_server ? String(s.mt5_server) : undefined,
+          mt5_metaapi_account_id: s.mt5_metaapi_account_id ? String(s.mt5_metaapi_account_id) : undefined,
+          mt5_metaapi_region: s.mt5_metaapi_region ? String(s.mt5_metaapi_region) : undefined,
+          mt5_connected: Boolean(s.mt5_connected),
+        });
+      }
+    }
+
+    // 4. Authoritative admin overrides & metadata (__admin_users_meta__)
+    for (const [emailKey, meta] of Object.entries(adminMetaMap)) {
+      if (!meta || typeof meta !== 'object') continue;
+      const email = String(meta.email || emailKey).toLowerCase();
+      if (!email || SYSTEM_CLOUD_EMAILS.has(email)) continue;
+      upsertMerge(email, {
+        name: meta.name || undefined,
+        role: meta.role === 'admin' || meta.role === 'influencer' ? meta.role : 'user',
+        exness_account_id: meta.exness_account_id || undefined,
+        exness_verified: Boolean(meta.exness_verified),
+        referral_code: meta.referral_code || undefined,
+        referred_by_email: meta.referred_by_email ? String(meta.referred_by_email).toLowerCase() : null,
+        has_analyzer: Boolean(meta.has_analyzer),
+        has_ea_bots: Boolean(meta.has_ea_bots),
+        wallet_balance_kes:
+          typeof meta.wallet_balance_kes === 'number' ? Number(meta.wallet_balance_kes) : undefined,
+        is_suspended: Boolean(meta.is_suspended),
+        commission_pct:
+          meta.commission_pct !== null && meta.commission_pct !== undefined && Number.isFinite(Number(meta.commission_pct))
+            ? Number(meta.commission_pct)
+            : null,
+        last_login_at: meta.last_login_at || undefined,
+        created_at: meta.created_at || undefined,
+      });
+    }
+
+    // Upsert all discovered users into local SQLite
+    for (const u of mergedByEmail.values()) {
+      const existing = db.prepare('SELECT * FROM users WHERE email = ?').get(u.email) as
+        | {
+            id: number;
+            name: string;
+            role: string;
+            exness_account_id: string;
+            referral_code: string;
+            supabase_uid: string | null;
+          }
+        | undefined;
+
+      if (!existing) {
+        const refCode = uniqueReferralCodeForEmail(u.referral_code, u.email);
+        const info = db
+          .prepare(
+            `INSERT INTO users (
+              supabase_uid, name, email, password_hash, role, exness_account_id, exness_email,
+              exness_verified, referral_code, has_analyzer, has_ea_bots, wallet_balance_kes,
+              mt5_login, mt5_server, mt5_metaapi_account_id, mt5_metaapi_region, mt5_connected,
+              mt5_bridge_token, is_suspended, commission_pct, created_at, last_login_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          )
+          .run(
+            u.supabase_uid || null,
+            u.name || u.email.split('@')[0] || 'Trader',
+            u.email,
+            hashPassword(generateSecureToken(24)),
+            u.role || 'user',
+            u.exness_account_id || 'EXN-PENDING',
+            u.email,
+            u.exness_verified ? 1 : 0,
+            refCode,
+            u.has_analyzer || u.role === 'admin' ? 1 : 0,
+            u.has_ea_bots || u.role === 'admin' ? 1 : 0,
+            Number(u.wallet_balance_kes || 0),
+            u.mt5_login || null,
+            u.mt5_server || null,
+            u.mt5_metaapi_account_id || null,
+            u.mt5_metaapi_region || null,
+            u.mt5_connected ? 1 : 0,
+            generateSecureToken(16),
+            u.is_suspended ? 1 : 0,
+            u.commission_pct ?? null,
+            u.created_at || new Date().toISOString(),
+            u.last_login_at || null
+          );
+        db.prepare('INSERT OR IGNORE INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(
+          Number(info.lastInsertRowid)
+        );
+        syncedUsers += 1;
+      } else {
+        const hasAdminOverride = Boolean(adminMetaMap[u.email]);
+        const safeRefCode =
+          hasAdminOverride && u.referral_code
+            ? uniqueReferralCodeForEmail(u.referral_code, u.email, existing.id)
+            : existing.referral_code;
+
+        db.prepare(
+          `UPDATE users SET
+            supabase_uid = COALESCE(?, supabase_uid),
+            name = COALESCE(NULLIF(?, ''), name),
+            role = CASE WHEN ? = 1 THEN COALESCE(?, role) ELSE role END,
+            exness_account_id = CASE WHEN ? = 1 AND ? IS NOT NULL AND ? != '' THEN ? ELSE COALESCE(NULLIF(exness_account_id, 'EXN-PENDING'), ?, exness_account_id) END,
+            exness_verified = CASE WHEN ? = 1 THEN ? ELSE MAX(exness_verified, ?) END,
+            referral_code = ?,
+            has_analyzer = CASE WHEN ? = 1 THEN ? ELSE MAX(has_analyzer, ?) END,
+            has_ea_bots = CASE WHEN ? = 1 THEN ? ELSE MAX(has_ea_bots, ?) END,
+            wallet_balance_kes = CASE WHEN ? = 1 AND ? IS NOT NULL THEN ? ELSE COALESCE(?, wallet_balance_kes) END,
+            is_suspended = CASE WHEN ? = 1 THEN ? ELSE is_suspended END,
+            commission_pct = CASE WHEN ? = 1 THEN ? ELSE COALESCE(commission_pct, ?) END,
+            mt5_login = COALESCE(?, mt5_login),
+            mt5_server = COALESCE(?, mt5_server),
+            mt5_metaapi_account_id = COALESCE(?, mt5_metaapi_account_id),
+            mt5_metaapi_region = COALESCE(?, mt5_metaapi_region),
+            mt5_connected = MAX(mt5_connected, ?),
+            last_login_at = COALESCE(?, last_login_at)
+           WHERE id = ?`
+        ).run(
+          u.supabase_uid || null,
+          hasAdminOverride ? u.name || '' : '',
+          hasAdminOverride ? 1 : 0,
+          u.role || existing.role,
+          hasAdminOverride ? 1 : 0,
+          u.exness_account_id || null,
+          u.exness_account_id || null,
+          u.exness_account_id || existing.exness_account_id,
+          u.exness_account_id || null,
+          hasAdminOverride ? 1 : 0,
+          u.exness_verified ? 1 : 0,
+          u.exness_verified ? 1 : 0,
+          safeRefCode,
+          hasAdminOverride ? 1 : 0,
+          u.has_analyzer ? 1 : 0,
+          u.has_analyzer ? 1 : 0,
+          hasAdminOverride ? 1 : 0,
+          u.has_ea_bots ? 1 : 0,
+          u.has_ea_bots ? 1 : 0,
+          hasAdminOverride ? 1 : 0,
+          u.wallet_balance_kes ?? null,
+          u.wallet_balance_kes ?? 0,
+          u.wallet_balance_kes ?? null,
+          hasAdminOverride ? 1 : 0,
+          u.is_suspended ? 1 : 0,
+          hasAdminOverride ? 1 : 0,
+          u.commission_pct ?? null,
+          u.commission_pct ?? null,
+          u.mt5_login || null,
+          u.mt5_server || null,
+          u.mt5_metaapi_account_id || null,
+          u.mt5_metaapi_region || null,
+          u.mt5_connected ? 1 : 0,
+          u.last_login_at || null,
+          existing.id
+        );
+        syncedUsers += 1;
+      }
+    }
+
+    // Second pass: resolve referred_by links across users
+    for (const u of mergedByEmail.values()) {
+      const localUser = db.prepare('SELECT id, referred_by FROM users WHERE email = ?').get(u.email) as
+        | { id: number; referred_by: number | null }
+        | undefined;
+      if (!localUser) continue;
+      let refUserId: number | null = null;
+      if (u.referred_by_email) {
+        const refRow = db.prepare('SELECT id FROM users WHERE email = ?').get(u.referred_by_email) as
+          | { id: number }
+          | undefined;
+        if (refRow && refRow.id !== localUser.id) refUserId = refRow.id;
+      } else if (u.referred_by_code && !localUser.referred_by) {
+        const refRow = db
+          .prepare('SELECT id FROM users WHERE UPPER(referral_code) = UPPER(?)')
+          .get(u.referred_by_code) as { id: number } | undefined;
+        if (refRow && refRow.id !== localUser.id) refUserId = refRow.id;
+      }
+      if (refUserId !== null && refUserId !== localUser.referred_by) {
+        db.prepare('UPDATE users SET referred_by = ? WHERE id = ?').run(refUserId, localUser.id);
+      }
+    }
+
+    // 5. Hydrate all cloud orders into SQLite
+    if (!ordersRes.error && Array.isArray(ordersRes.data) && ordersRes.data.length > 0) {
+      const upsertOrderStmt = db.prepare(
+        `INSERT INTO orders (
+          order_number, user_id, product_key, product_name, amount_usd, amount_kes,
+          payment_method, payment_status, mpesa_phone, mpesa_receipt, mpesa_checkout_id,
+          mpesa_merchant_request_id, mpesa_result_code, mpesa_result_desc,
+          crypto_currency, crypto_network, crypto_address, crypto_tx_hash,
+          referrer_id, commission_usd, created_at, paid_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(order_number) DO UPDATE SET
+          payment_status = CASE WHEN orders.payment_status = 'paid' THEN 'paid' ELSE excluded.payment_status END,
+          mpesa_receipt = COALESCE(excluded.mpesa_receipt, orders.mpesa_receipt),
+          crypto_tx_hash = COALESCE(excluded.crypto_tx_hash, orders.crypto_tx_hash),
+          referrer_id = COALESCE(orders.referrer_id, excluded.referrer_id),
+          commission_usd = CASE WHEN excluded.commission_usd > 0 THEN excluded.commission_usd ELSE orders.commission_usd END,
+          paid_at = COALESCE(excluded.paid_at, orders.paid_at)`
+      );
+
+      for (const o of ordersRes.data) {
+        const email = String(o.user_email || '').toLowerCase();
+        if (!email || SYSTEM_CLOUD_EMAILS.has(email)) continue;
+        const userId = await ensureLocalMirrorUserByEmail(email);
+        if (!userId) continue;
+        const buyer = db.prepare('SELECT referred_by FROM users WHERE id = ?').get(userId) as
+          | { referred_by: number | null }
+          | undefined;
+        upsertOrderStmt.run(
+          o.order_number,
+          userId,
+          o.product_key,
+          o.product_name,
+          Number(o.amount_usd || 0),
+          Number(o.amount_kes || 0),
+          o.payment_method,
+          o.payment_status,
+          o.mpesa_phone ?? null,
+          o.mpesa_receipt ?? null,
+          o.mpesa_checkout_id ?? null,
+          o.mpesa_merchant_request_id ?? null,
+          o.mpesa_result_code ?? null,
+          o.mpesa_result_desc ?? null,
+          o.crypto_currency ?? null,
+          o.crypto_network ?? null,
+          o.crypto_address ?? null,
+          o.crypto_tx_hash ?? null,
+          buyer?.referred_by ?? null,
+          Number(o.commission_usd || 0),
+          o.created_at || new Date().toISOString(),
+          o.paid_at ?? null
+        );
+        syncedOrders += 1;
+      }
+    }
+
+    // 6. Hydrate referral clicks & influencer payouts ledger
+    const ledger = referralLedgerRes.data?.plan_json as
+      | { clicks?: CloudReferralClickRecord[]; payouts?: CloudPayoutRecord[] }
+      | undefined;
+
+    if (ledger && typeof ledger === 'object') {
+      const localClickCount = (db.prepare('SELECT COUNT(*) as cnt FROM referral_clicks').get() as { cnt: number }).cnt;
+      if (localClickCount === 0 && Array.isArray(ledger.clicks) && ledger.clicks.length > 0) {
+        const insClick = db.prepare(
+          'INSERT INTO referral_clicks (referral_code, source_page, ip_address, created_at) VALUES (?, ?, ?, ?)'
+        );
+        for (const c of [...ledger.clicks].reverse()) {
+          if (!c.referral_code) continue;
+          insClick.run(c.referral_code, c.source_page || '/', c.ip_address || null, c.created_at || new Date().toISOString());
+        }
+      }
+
+      if (Array.isArray(ledger.payouts) && ledger.payouts.length > 0) {
+        for (const p of [...ledger.payouts].reverse()) {
+          const email = String(p.user_email || '').toLowerCase();
+          if (!email) continue;
+          const userId = await ensureLocalMirrorUserByEmail(email);
+          if (!userId) continue;
+          const existingPayout = db
+            .prepare(
+              'SELECT id, status FROM payout_requests WHERE user_id = ? AND amount_usd = ? AND destination = ? AND created_at = ?'
+            )
+            .get(userId, Number(p.amount_usd || 0), p.destination || '', p.created_at || '') as
+            | { id: number; status: string }
+            | undefined;
+          if (!existingPayout) {
+            db.prepare(
+              `INSERT INTO payout_requests (user_id, amount_usd, method, destination, status, created_at, processed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?)`
+            ).run(
+              userId,
+              Number(p.amount_usd || 0),
+              p.method || 'mpesa',
+              p.destination || '',
+              p.status || 'pending',
+              p.created_at || new Date().toISOString(),
+              p.processed_at || null
+            );
+            syncedPayouts += 1;
+          } else if (existingPayout.status === 'pending' && p.status && p.status !== 'pending') {
+            db.prepare('UPDATE payout_requests SET status = ?, processed_at = COALESCE(?, processed_at) WHERE id = ?').run(
+              p.status,
+              p.processed_at || null,
+              existingPayout.id
+            );
+          }
+        }
+      }
+    }
+
+    // 7. Also hydrate M-Pesa transactions
+    await syncAllCloudMpesaTransactionsToLocal();
+  } catch (err) {
+    console.warn('Cloud admin full sync warning:', err instanceof Error ? err.message : String(err));
+  }
+
+  return { syncedUsers, syncedOrders, syncedPayouts };
+}
+
+

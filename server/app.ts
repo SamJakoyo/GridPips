@@ -66,8 +66,11 @@ import {
   hydrateUserFromCloud,
   insertCloudJournalTrade,
   insertCloudMt5Command,
+  saveCloudReferralLedger,
   saveCloudSiteSettings,
+  syncAllCloudAdminDataToLocal,
   syncAllCloudMpesaTransactionsToLocal,
+  syncUserDirectoryEntryToCloud,
   syncUserStateToCloud,
   upsertCloudMpesaTransaction,
   upsertCloudOrder,
@@ -384,6 +387,7 @@ interface DbUser {
   mt5_risk_percent?: number | null;
   mt5_connection_mode?: string | null;
   wallet_balance_kes?: number | null;
+  commission_pct?: number | null;
   is_suspended: number;
   created_at: string;
   last_login_at: string | null;
@@ -426,6 +430,7 @@ function serializeUser(u: DbUser) {
     mt5ApiConfigured: apiReady,
     mt5ProvisioningProfileConfigured: profileReady,
     walletBalanceKes: Number(u.wallet_balance_kes || 0),
+    commissionPct: typeof u.commission_pct === 'number' ? u.commission_pct : null,
     isSuspended: Boolean(u.is_suspended),
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
@@ -843,7 +848,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
 
       let user = upsertLocalMirrorUserFromProfile(profile, referredById);
       await hydrateUserFromCloud(user.id, user.email).catch(() => {});
-      void syncUserStateToCloud(user.id);
+      await Promise.all([
+        syncUserStateToCloud(user.id).catch(() => {}),
+        syncUserDirectoryEntryToCloud(user.id).catch(() => {}),
+      ]);
       user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser) || user;
       const sessionToken = setSessionCookie(req, res, user, createdAuth.user.id);
 
@@ -902,7 +910,10 @@ app.post('/api/auth/register', authLimiter, async (req, res) => {
     );
 
     await hydrateUserFromCloud(userId, email).catch(() => {});
-    void syncUserStateToCloud(userId);
+    await Promise.all([
+      syncUserStateToCloud(userId).catch(() => {}),
+      syncUserDirectoryEntryToCloud(userId).catch(() => {}),
+    ]);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser;
     const sessionToken = setSessionCookie(req, res, user);
 
@@ -1148,7 +1159,10 @@ app.patch('/api/auth/profile', requireAuth, async (req: AuthedRequest, res) => {
         has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
       });
     }
-    void syncUserStateToCloud(updated.id);
+    await Promise.all([
+      syncUserStateToCloud(updated.id).catch(() => {}),
+      syncUserDirectoryEntryToCloud(updated.id).catch(() => {}),
+    ]);
 
     res.json({ user: serializeUser(updated) });
   } catch (err) {
@@ -1257,8 +1271,11 @@ async function bridgeSupabaseUserToSession(params: {
   }
 
   let user = upsertLocalMirrorUserFromProfile(profile, referredById);
-  await hydrateUserFromCloud(user.id, user.email);
-  void syncUserStateToCloud(user.id);
+  await hydrateUserFromCloud(user.id, user.email).catch(() => {});
+  await Promise.all([
+    syncUserStateToCloud(user.id).catch(() => {}),
+    syncUserDirectoryEntryToCloud(user.id).catch(() => {}),
+  ]);
   user = (db.prepare('SELECT * FROM users WHERE id = ?').get(user.id) as DbUser | undefined) || user;
   if (user.is_suspended) {
     logSecurityEvent('LOGIN_BLOCKED_SUSPENDED', 'warning', ip, email, 'Suspended Supabase user attempt');
@@ -1803,7 +1820,15 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
       : Number(settings.analyzer_price_usd || 5.25);
   const usdKesRate = Number(settings.usd_kes_rate || 130);
   const amountKes = Math.round(amountUsd * usdKesRate);
-  const commissionPct = Number(settings.influencer_commission_pct || 20);
+  let commissionPct = Number(settings.influencer_commission_pct || 20);
+  if (user.referred_by) {
+    const referrerRow = db
+      .prepare('SELECT commission_pct FROM users WHERE id = ?')
+      .get(user.referred_by) as { commission_pct: number | null } | undefined;
+    if (referrerRow && typeof referrerRow.commission_pct === 'number' && Number.isFinite(referrerRow.commission_pct)) {
+      commissionPct = referrerRow.commission_pct;
+    }
+  }
 
   const productName =
     productKey === 'ea_bots'
@@ -1841,7 +1866,7 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
       existingPending.id
     );
     const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(existingPending.id);
-    void upsertCloudOrder(existingPending.id);
+    await upsertCloudOrder(existingPending.id).catch(() => {});
     res.status(200).json({ order: updatedOrder });
     return;
   }
@@ -1873,7 +1898,7 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
     );
 
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(info.lastInsertRowid);
-  void upsertCloudOrder(Number(info.lastInsertRowid));
+  await upsertCloudOrder(Number(info.lastInsertRowid)).catch(() => {});
   res.status(201).json({ order });
 });
 
@@ -1906,7 +1931,11 @@ async function fulfillOrder(orderId: number): Promise<void> {
     db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
   }
 
-  await Promise.all([upsertCloudOrder(orderId), syncUserStateToCloud(order.user_id)]);
+  await Promise.all([
+    upsertCloudOrder(orderId),
+    syncUserStateToCloud(order.user_id),
+    syncUserDirectoryEntryToCloud(order.user_id),
+  ]);
 
   if (alreadyPaid) return;
 
@@ -4335,7 +4364,7 @@ app.post('/api/workspace/watchlist', requireAuth, (req: AuthedRequest, res) => {
 });
 
 // ---------------- Influencer & Referral System ----------------
-app.post('/api/referrals/track', (req, res) => {
+app.post('/api/referrals/track', async (req, res) => {
   const code = sanitizeText(req.body?.code, 30).toUpperCase();
   const sourcePage = sanitizeText(req.body?.sourcePage || '/', 60);
   if (code) {
@@ -4344,54 +4373,110 @@ app.post('/api/referrals/track', (req, res) => {
       sourcePage,
       getClientIp(req)
     );
+    await saveCloudReferralLedger().catch(() => {});
   }
   res.json({ ok: true });
 });
 
-app.get('/api/referrals/dashboard', requireAuth, (req: AuthedRequest, res) => {
-  const user = req.currentUser!;
+app.get('/api/referrals/dashboard', requireAuth, async (req: AuthedRequest, res) => {
+  await Promise.all([
+    hydrateSiteSettingsFromCloud().catch(() => {}),
+    syncAllCloudAdminDataToLocal().catch(() => {}),
+  ]);
+  const user =
+    (db.prepare('SELECT * FROM users WHERE id = ?').get(req.currentUser!.id) as DbUser | undefined) ||
+    req.currentUser!;
+
   const clicksRow = db
     .prepare('SELECT COUNT(*) as cnt FROM referral_clicks WHERE referral_code = ?')
     .get(user.referral_code) as { cnt: number };
   const signups = db
-    .prepare('SELECT id, name, exness_account_id, has_analyzer, has_ea_bots, created_at FROM users WHERE referred_by = ? ORDER BY id DESC')
-    .all(user.id);
+    .prepare(
+      `SELECT
+        u.id, u.name, u.email, u.exness_account_id, u.exness_verified,
+        u.has_analyzer, u.has_ea_bots, u.created_at,
+        COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0) as paid_orders_count,
+        COALESCE((SELECT SUM(o.commission_usd) FROM orders o WHERE o.user_id = u.id AND o.referrer_id = ? AND o.payment_status = 'paid'), 0) as commission_earned_usd
+       FROM users u
+       WHERE u.referred_by = ?
+       ORDER BY u.id DESC`
+    )
+    .all(user.id, user.id) as Array<{
+    id: number;
+    name: string;
+    email: string;
+    exness_account_id: string;
+    exness_verified: number;
+    has_analyzer: number;
+    has_ea_bots: number;
+    created_at: string;
+    paid_orders_count: number;
+    commission_earned_usd: number;
+  }>;
   const commissionsRow = db
     .prepare(
-      "SELECT COALESCE(SUM(commission_usd), 0) as total FROM orders WHERE referrer_id = ? AND payment_status = 'paid'"
+      `SELECT
+        COALESCE(SUM(commission_usd), 0) as total,
+        COUNT(*) as paidConversions
+       FROM orders
+       WHERE referrer_id = ? AND payment_status = 'paid'`
     )
-    .get(user.id) as { total: number };
-  const paidOutRow = db
+    .get(user.id) as { total: number; paidConversions: number };
+  const payoutSumsRow = db
     .prepare(
-      "SELECT COALESCE(SUM(amount_usd), 0) as total FROM payout_requests WHERE user_id = ? AND status IN ('pending', 'paid')"
+      `SELECT
+        COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_usd ELSE 0 END), 0) as paidOutTotal,
+        COALESCE(SUM(CASE WHEN status = 'pending' THEN amount_usd ELSE 0 END), 0) as pendingPayoutTotal,
+        COALESCE(SUM(CASE WHEN status IN ('pending', 'paid') THEN amount_usd ELSE 0 END), 0) as committedTotal
+       FROM payout_requests
+       WHERE user_id = ?`
     )
-    .get(user.id) as { total: number };
+    .get(user.id) as { paidOutTotal: number; pendingPayoutTotal: number; committedTotal: number };
   const payouts = db
     .prepare('SELECT * FROM payout_requests WHERE user_id = ? ORDER BY id DESC')
     .all(user.id);
   const settings = getSettingsMap();
 
+  const globalPct = Number(settings.influencer_commission_pct || 20);
+  const effectiveCommissionPct =
+    typeof user.commission_pct === 'number' && Number.isFinite(user.commission_pct)
+      ? user.commission_pct
+      : globalPct;
   const totalEarned = Number(commissionsRow.total || 0);
-  const availableBalance = Math.max(0, Number((totalEarned - Number(paidOutRow.total || 0)).toFixed(2)));
+  const paidOutTotal = Number(payoutSumsRow.paidOutTotal || 0);
+  const pendingPayoutTotal = Number(payoutSumsRow.pendingPayoutTotal || 0);
+  const availableBalance = Math.max(
+    0,
+    Number((totalEarned - Number(payoutSumsRow.committedTotal || 0)).toFixed(2))
+  );
 
   res.json({
     referralCode: user.referral_code,
-    commissionPct: Number(settings.influencer_commission_pct || 20),
+    role: user.role,
+    commissionPct: effectiveCommissionPct,
+    isCustomCommission: typeof user.commission_pct === 'number' && Number.isFinite(user.commission_pct),
+    analyzerPriceUsd: Number(settings.analyzer_price_usd || 5.25),
+    eaBotsPriceUsd: Number(settings.ea_bots_price_usd || 5.25),
+    usdKesRate: Number(settings.usd_kes_rate || 130),
     clicks: clicksRow.cnt,
+    paidConversions: Number(commissionsRow.paidConversions || 0),
     signups,
     totalEarned,
+    paidOutTotal,
+    pendingPayoutTotal,
     availableBalance,
     payouts,
   });
 });
 
 app.post('/api/referrals/payout', requireAuth, async (req: AuthedRequest, res) => {
+  await syncAllCloudAdminDataToLocal().catch(() => {});
   const user = req.currentUser!;
   const method = req.body?.method === 'mpesa' ? 'mpesa' : 'crypto';
   const destination = sanitizeText(req.body?.destination, 120);
   const amountUsd = Number(req.body?.amountUsd || 0);
 
-  if (!destination || amountUsd < 5) {
+  if (!destination || !Number.isFinite(amountUsd) || amountUsd < 5) {
     res.status(400).json({ error: 'Minimum payout is $5.00 and a valid destination (M-Pesa Phone or USDT TRC20 Wallet) is required.' });
     return;
   }
@@ -4405,16 +4490,17 @@ app.post('/api/referrals/payout', requireAuth, async (req: AuthedRequest, res) =
   const available = Number(commissionsRow.total || 0) - Number(paidOutRow.total || 0);
 
   if (amountUsd > available + 0.001) {
-    res.status(400).json({ error: `Insufficient commission balance. Available: $${available.toFixed(2)}` });
+    res.status(400).json({ error: `Insufficient commission balance. Available: $${Math.max(0, available).toFixed(2)}` });
     return;
   }
 
   db.prepare('INSERT INTO payout_requests (user_id, amount_usd, method, destination) VALUES (?, ?, ?, ?)').run(
     user.id,
-    amountUsd,
+    Number(amountUsd.toFixed(2)),
     method,
     destination
   );
+  const cloudPersisted = await saveCloudReferralLedger().catch(() => false);
 
   await sendAutomatedEmail({
     to: user.email,
@@ -4424,14 +4510,14 @@ app.post('/api/referrals/payout', requireAuth, async (req: AuthedRequest, res) =
     html: `<p>Your payout request of <strong>$${amountUsd.toFixed(2)}</strong> via ${method.toUpperCase()} to <code>${destination}</code> has been submitted.</p>`,
   });
 
-  res.status(201).json({ ok: true });
+  res.status(201).json({ ok: true, cloudPersisted });
 });
 
 // ---------------- Admin Command Center ----------------
 app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
   await Promise.all([
     hydrateSiteSettingsFromCloud(true).catch(() => {}),
-    syncAllCloudMpesaTransactionsToLocal().catch(() => {}),
+    syncAllCloudAdminDataToLocal().catch(() => {}),
   ]);
   const revenueRow = db
     .prepare("SELECT COALESCE(SUM(amount_usd), 0) as usd, COALESCE(SUM(amount_kes), 0) as kes, COUNT(*) as count FROM orders WHERE payment_status = 'paid'")
@@ -4439,21 +4525,29 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
   const usersCount = (db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number }).cnt;
   const users = db
     .prepare(
-      'SELECT id, name, email, role, exness_account_id, exness_verified, referral_code, has_analyzer, has_ea_bots, mt5_connected, mt5_login, wallet_balance_kes, is_suspended, created_at, last_login_at FROM users ORDER BY id DESC LIMIT 100'
+      `SELECT
+        u.id, u.name, u.email, u.role, u.exness_account_id, u.exness_verified,
+        u.referral_code, u.referred_by, u.commission_pct,
+        u.has_analyzer, u.has_ea_bots, u.mt5_connected, u.mt5_login,
+        u.wallet_balance_kes, u.is_suspended, u.created_at, u.last_login_at,
+        r.name as referrer_name, r.referral_code as referrer_code
+       FROM users u
+       LEFT JOIN users r ON u.referred_by = r.id
+       ORDER BY u.id DESC LIMIT 500`
     )
     .all();
   const orders = db
     .prepare(
       `SELECT o.*, u.name as user_name, u.email as user_email
        FROM orders o JOIN users u ON o.user_id = u.id
-       ORDER BY o.id DESC LIMIT 100`
+       ORDER BY o.id DESC LIMIT 200`
     )
     .all();
   const mpesaTransactions = db
     .prepare(
       `SELECT m.*, u.name as user_name, u.email as user_email
        FROM mpesa_transactions m JOIN users u ON m.user_id = u.id
-       ORDER BY m.id DESC LIMIT 150`
+       ORDER BY m.id DESC LIMIT 200`
     )
     .all();
   const mpesaMetricsRow = db
@@ -4475,14 +4569,99 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
   };
   const payouts = db
     .prepare(
-      `SELECT p.*, u.name as user_name, u.email as user_email
+      `SELECT p.*, u.name as user_name, u.email as user_email, u.referral_code as referral_code
        FROM payout_requests p JOIN users u ON p.user_id = u.id
-       ORDER BY p.id DESC LIMIT 50`
+       ORDER BY p.id DESC LIMIT 100`
     )
     .all();
   const securityLogs = db.prepare('SELECT * FROM security_logs ORDER BY id DESC LIMIT 80').all();
   const emailLogs = db.prepare('SELECT * FROM email_logs ORDER BY id DESC LIMIT 60').all();
   const settings = getSettingsMap();
+  const defaultCommissionPct = Number(settings.influencer_commission_pct || 20);
+
+  const rawInfluencers = db
+    .prepare(
+      `SELECT
+        u.id, u.name, u.email, u.role, u.referral_code, u.exness_account_id,
+        u.commission_pct, u.is_suspended, u.created_at, u.last_login_at,
+        (SELECT COUNT(*) FROM referral_clicks rc WHERE rc.referral_code = u.referral_code) as clicks,
+        (SELECT COUNT(*) FROM users ru WHERE ru.referred_by = u.id) as signups,
+        (SELECT COUNT(*) FROM orders o WHERE o.referrer_id = u.id AND o.payment_status = 'paid') as paid_conversions,
+        COALESCE((SELECT SUM(o.commission_usd) FROM orders o WHERE o.referrer_id = u.id AND o.payment_status = 'paid'), 0) as total_earned_usd,
+        COALESCE((SELECT SUM(p.amount_usd) FROM payout_requests p WHERE p.user_id = u.id AND p.status = 'paid'), 0) as paid_out_usd,
+        COALESCE((SELECT SUM(p.amount_usd) FROM payout_requests p WHERE p.user_id = u.id AND p.status = 'pending'), 0) as pending_payout_usd,
+        (SELECT COUNT(*) FROM payout_requests p WHERE p.user_id = u.id) as payouts_count
+       FROM users u
+       ORDER BY
+         CASE WHEN u.role = 'influencer' THEN 0 ELSE 1 END,
+         total_earned_usd DESC,
+         signups DESC,
+         clicks DESC`
+    )
+    .all() as Array<{
+    id: number;
+    name: string;
+    email: string;
+    role: 'user' | 'influencer' | 'admin';
+    referral_code: string;
+    exness_account_id: string;
+    commission_pct: number | null;
+    is_suspended: number;
+    created_at: string;
+    last_login_at: string | null;
+    clicks: number;
+    signups: number;
+    paid_conversions: number;
+    total_earned_usd: number;
+    paid_out_usd: number;
+    pending_payout_usd: number;
+    payouts_count: number;
+  }>;
+
+  const influencers = rawInfluencers
+    .filter(
+      (inf) =>
+        inf.role === 'influencer' ||
+        inf.clicks > 0 ||
+        inf.signups > 0 ||
+        inf.total_earned_usd > 0 ||
+        inf.payouts_count > 0 ||
+        inf.commission_pct !== null
+    )
+    .map((inf) => {
+      const totalEarned = Number(inf.total_earned_usd || 0);
+      const paidOut = Number(inf.paid_out_usd || 0);
+      const pending = Number(inf.pending_payout_usd || 0);
+      const available = Math.max(0, Number((totalEarned - paidOut - pending).toFixed(2)));
+      return {
+        ...inf,
+        effective_commission_pct:
+          typeof inf.commission_pct === 'number' && Number.isFinite(inf.commission_pct)
+            ? inf.commission_pct
+            : defaultCommissionPct,
+        total_earned_usd: Number(totalEarned.toFixed(2)),
+        paid_out_usd: Number(paidOut.toFixed(2)),
+        pending_payout_usd: Number(pending.toFixed(2)),
+        available_balance_usd: available,
+      };
+    });
+
+  const influencerSummary = {
+    totalInfluencers: influencers.filter((i) => i.role === 'influencer').length,
+    activeReferrersCount: influencers.length,
+    totalClicks: influencers.reduce((acc, i) => acc + Number(i.clicks || 0), 0),
+    totalSignups: influencers.reduce((acc, i) => acc + Number(i.signups || 0), 0),
+    totalPaidConversions: influencers.reduce((acc, i) => acc + Number(i.paid_conversions || 0), 0),
+    totalCommissionsUsd: Number(
+      influencers.reduce((acc, i) => acc + Number(i.total_earned_usd || 0), 0).toFixed(2)
+    ),
+    totalPaidOutUsd: Number(
+      influencers.reduce((acc, i) => acc + Number(i.paid_out_usd || 0), 0).toFixed(2)
+    ),
+    pendingPayoutsUsd: Number(
+      influencers.reduce((acc, i) => acc + Number(i.pending_payout_usd || 0), 0).toFixed(2)
+    ),
+  };
   const darajaStatus = getDarajaConfigStatus(settings);
   const rawEnv = cleanMpesaEnvVar('MPESA_ENV');
   const configuredCallbackUrl = cleanMpesaEnvVar('MPESA_CALLBACK_URL');
@@ -4723,6 +4902,8 @@ app.get('/api/admin/overview', requireAdmin, async (_req, res) => {
       activeTempBlockedIps: getActiveBlockedIpCount(),
     },
     users,
+    influencers,
+    influencerSummary,
     orders,
     mpesaTransactions,
     payouts,
@@ -4743,55 +4924,227 @@ app.post('/api/admin/orders/:id/status', requireAdmin, async (req: AuthedRequest
     await fulfillOrder(orderId);
   } else {
     db.prepare('UPDATE orders SET payment_status = ? WHERE id = ?').run(status, orderId);
-    void upsertCloudOrder(orderId);
+    await upsertCloudOrder(orderId).catch(() => {});
   }
   logSecurityEvent('ADMIN_ORDER_UPDATE', 'info', getClientIp(req), req.currentUser!.email, `Order #${orderId} -> ${status}`);
   res.json({ ok: true });
 });
 
 app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest, res) => {
-  const userId = Number(req.params.id);
-  const role = ['user', 'influencer', 'admin'].includes(req.body?.role) ? req.body.role : undefined;
-  const isSuspended = typeof req.body?.isSuspended === 'boolean' ? (req.body.isSuspended ? 1 : 0) : undefined;
-  const exnessVerified = typeof req.body?.exnessVerified === 'boolean' ? (req.body.exnessVerified ? 1 : 0) : undefined;
-  const hasAnalyzer = typeof req.body?.hasAnalyzer === 'boolean' ? (req.body.hasAnalyzer ? 1 : 0) : undefined;
-  const hasEaBots = typeof req.body?.hasEaBots === 'boolean' ? (req.body.hasEaBots ? 1 : 0) : undefined;
-
-  if (role) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
-  if (isSuspended !== undefined) db.prepare('UPDATE users SET is_suspended = ? WHERE id = ?').run(isSuspended, userId);
-  if (exnessVerified !== undefined)
-    db.prepare('UPDATE users SET exness_verified = ? WHERE id = ?').run(exnessVerified, userId);
-  if (hasAnalyzer !== undefined) db.prepare('UPDATE users SET has_analyzer = ? WHERE id = ?').run(hasAnalyzer, userId);
-  if (hasEaBots !== undefined) db.prepare('UPDATE users SET has_ea_bots = ? WHERE id = ?').run(hasEaBots, userId);
-
-  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser | undefined;
-  if (updated) {
-    const sbUid = await resolveUserSupabaseUid(updated);
-    if (sbUid && getServerSupabaseAdminClient()) {
-      await upsertSupabaseProfile({
-        id: sbUid,
-        email: updated.email,
-        full_name: updated.name,
-        role: updated.role,
-        exness_account_id: updated.exness_account_id,
-        exness_verified: Boolean(updated.exness_verified),
-        referral_code: updated.referral_code,
-        has_analyzer: Boolean(updated.has_analyzer) || updated.role === 'admin',
-        has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
-      }).catch(() => {});
+  try {
+    const userId = Number(req.params.id);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      res.status(400).json({ error: 'Invalid user ID.' });
+      return;
     }
-    void syncUserStateToCloud(updated.id);
-  }
 
-  logSecurityEvent('ADMIN_USER_UPDATE', 'warning', getClientIp(req), req.currentUser!.email, `Updated user #${userId}`);
-  res.json({ ok: true, user: updated ? serializeUser(updated) : undefined });
+    const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser | undefined;
+    if (!existing) {
+      res.status(404).json({ error: 'User account not found.' });
+      return;
+    }
+
+    const nextName =
+      typeof req.body?.name === 'string' && sanitizeText(req.body.name, 80).length >= 2
+        ? sanitizeText(req.body.name, 80)
+        : undefined;
+    const nextExnessId =
+      typeof req.body?.exnessAccountId === 'string' && sanitizeText(req.body.exnessAccountId, 40).length >= 3
+        ? sanitizeText(req.body.exnessAccountId, 40).toUpperCase()
+        : undefined;
+    const nextReferralCode =
+      typeof req.body?.referralCode === 'string' && sanitizeText(req.body.referralCode, 30).length >= 3
+        ? sanitizeText(req.body.referralCode, 30)
+            .toUpperCase()
+            .replace(/[^A-Z0-9_-]/g, '')
+        : undefined;
+    const role = ['user', 'influencer', 'admin'].includes(req.body?.role) ? req.body.role : undefined;
+    const isSuspended = typeof req.body?.isSuspended === 'boolean' ? (req.body.isSuspended ? 1 : 0) : undefined;
+    const exnessVerified =
+      typeof req.body?.exnessVerified === 'boolean' ? (req.body.exnessVerified ? 1 : 0) : undefined;
+    const hasAnalyzer = typeof req.body?.hasAnalyzer === 'boolean' ? (req.body.hasAnalyzer ? 1 : 0) : undefined;
+    const hasEaBots = typeof req.body?.hasEaBots === 'boolean' ? (req.body.hasEaBots ? 1 : 0) : undefined;
+
+    let walletBalanceKes: number | undefined;
+    if (req.body?.walletBalanceKes !== undefined && req.body?.walletBalanceKes !== '') {
+      const parsedWallet = Number(req.body.walletBalanceKes);
+      if (!Number.isFinite(parsedWallet) || parsedWallet < 0) {
+        res.status(400).json({ error: 'Wallet balance (KES) must be a valid non-negative number.' });
+        return;
+      }
+      walletBalanceKes = Number(parsedWallet.toFixed(2));
+    }
+
+    let hasCommissionUpdate = false;
+    let commissionPctVal: number | null = null;
+    if (req.body?.commissionPct !== undefined) {
+      hasCommissionUpdate = true;
+      if (req.body.commissionPct === null || String(req.body.commissionPct).trim() === '') {
+        commissionPctVal = null;
+      } else {
+        const parsedPct = Number(req.body.commissionPct);
+        if (!Number.isFinite(parsedPct) || parsedPct < 0 || parsedPct > 80) {
+          res.status(400).json({ error: 'Custom commission % must be between 0 and 80 (or blank for site default).' });
+          return;
+        }
+        commissionPctVal = Number(parsedPct.toFixed(2));
+      }
+    }
+
+    let hasReferredByUpdate = false;
+    let referredById: number | null = existing.referred_by;
+    if (typeof req.body?.referredByCode === 'string') {
+      hasReferredByUpdate = true;
+      const cleanCode = sanitizeText(req.body.referredByCode, 30).toUpperCase();
+      if (!cleanCode) {
+        referredById = null;
+      } else {
+        const refRow = db
+          .prepare('SELECT id FROM users WHERE UPPER(referral_code) = ?')
+          .get(cleanCode) as { id: number } | undefined;
+        if (!refRow) {
+          res.status(400).json({ error: `Referrer code "${cleanCode}" was not found.` });
+          return;
+        }
+        if (refRow.id === userId) {
+          res.status(400).json({ error: 'A user cannot be their own referrer.' });
+          return;
+        }
+        referredById = refRow.id;
+      }
+    }
+
+    if (nextReferralCode && nextReferralCode !== existing.referral_code) {
+      const conflict = db
+        .prepare('SELECT id FROM users WHERE UPPER(referral_code) = ? AND id != ?')
+        .get(nextReferralCode, userId);
+      if (conflict) {
+        res.status(409).json({ error: `Referral code "${nextReferralCode}" is already in use by another account.` });
+        return;
+      }
+    }
+
+    const tx = db.transaction(() => {
+      if (nextName) db.prepare('UPDATE users SET name = ? WHERE id = ?').run(nextName, userId);
+      if (nextExnessId)
+        db.prepare('UPDATE users SET exness_account_id = ? WHERE id = ?').run(nextExnessId, userId);
+      if (nextReferralCode)
+        db.prepare('UPDATE users SET referral_code = ? WHERE id = ?').run(nextReferralCode, userId);
+      if (role) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, userId);
+      if (isSuspended !== undefined)
+        db.prepare('UPDATE users SET is_suspended = ? WHERE id = ?').run(isSuspended, userId);
+      if (exnessVerified !== undefined)
+        db.prepare('UPDATE users SET exness_verified = ? WHERE id = ?').run(exnessVerified, userId);
+      if (hasAnalyzer !== undefined)
+        db.prepare('UPDATE users SET has_analyzer = ? WHERE id = ?').run(hasAnalyzer, userId);
+      if (hasEaBots !== undefined)
+        db.prepare('UPDATE users SET has_ea_bots = ? WHERE id = ?').run(hasEaBots, userId);
+      if (walletBalanceKes !== undefined)
+        db.prepare('UPDATE users SET wallet_balance_kes = ? WHERE id = ?').run(walletBalanceKes, userId);
+      if (hasCommissionUpdate)
+        db.prepare('UPDATE users SET commission_pct = ? WHERE id = ?').run(commissionPctVal, userId);
+      if (hasReferredByUpdate)
+        db.prepare('UPDATE users SET referred_by = ? WHERE id = ?').run(referredById, userId);
+    });
+    tx();
+
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(userId) as DbUser | undefined;
+    let cloudSynced = false;
+    if (updated) {
+      const sbUid = await resolveUserSupabaseUid(updated);
+      const profileSyncPromise =
+        sbUid && getServerSupabaseAdminClient()
+          ? upsertSupabaseProfile({
+              id: sbUid,
+              email: updated.email,
+              full_name: updated.name,
+              role: updated.role,
+              exness_account_id: updated.exness_account_id,
+              exness_verified: Boolean(updated.exness_verified),
+              referral_code: updated.referral_code,
+              has_analyzer: Boolean(updated.has_analyzer) || updated.role === 'admin',
+              has_ea_bots: Boolean(updated.has_ea_bots) || updated.role === 'admin',
+            }).catch(() => ({ profile: null, error: 'profile sync failed' }))
+          : Promise.resolve({ profile: null, error: null });
+
+      const [, stateOk, metaOk] = await Promise.all([
+        profileSyncPromise,
+        syncUserStateToCloud(updated.id).catch(() => false),
+        syncUserDirectoryEntryToCloud(updated.id).catch(() => false),
+      ]);
+      cloudSynced = Boolean(stateOk || metaOk);
+    }
+
+    logSecurityEvent(
+      'ADMIN_USER_UPDATE',
+      'warning',
+      getClientIp(req),
+      req.currentUser!.email,
+      `Updated user #${userId} (${updated?.email || existing.email})${cloudSynced ? ' [Cloud Synced]' : ''}`
+    );
+    res.json({ ok: true, cloudSynced, user: updated ? serializeUser(updated) : undefined });
+  } catch (err) {
+    console.error('Admin update user error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to update user.' });
+  }
 });
 
-app.post('/api/admin/payouts/:id/status', requireAdmin, (req: AuthedRequest, res) => {
+app.post('/api/admin/payouts/:id/status', requireAdmin, async (req: AuthedRequest, res) => {
   const payoutId = Number(req.params.id);
   const status = req.body?.status === 'paid' ? 'paid' : 'rejected';
-  db.prepare("UPDATE payout_requests SET status = ?, processed_at = datetime('now') WHERE id = ?").run(status, payoutId);
-  res.json({ ok: true });
+  const payout = db
+    .prepare(
+      `SELECT p.*, u.email as user_email, u.name as user_name
+       FROM payout_requests p JOIN users u ON p.user_id = u.id
+       WHERE p.id = ?`
+    )
+    .get(payoutId) as
+    | {
+        id: number;
+        user_id: number;
+        amount_usd: number;
+        method: string;
+        destination: string;
+        user_email: string;
+        user_name: string;
+      }
+    | undefined;
+  if (!payout) {
+    res.status(404).json({ error: 'Payout request not found.' });
+    return;
+  }
+
+  db.prepare("UPDATE payout_requests SET status = ?, processed_at = datetime('now') WHERE id = ?").run(
+    status,
+    payoutId
+  );
+  const cloudPersisted = await saveCloudReferralLedger().catch(() => false);
+  logSecurityEvent(
+    'ADMIN_PAYOUT_UPDATE',
+    'info',
+    getClientIp(req),
+    req.currentUser!.email,
+    `Payout #${payoutId} ($${Number(payout.amount_usd).toFixed(2)} for ${payout.user_email}) -> ${status}`
+  );
+
+  await sendAutomatedEmail({
+    to: payout.user_email,
+    subject:
+      status === 'paid'
+        ? `Grid Pips Payout Disbursed — $${Number(payout.amount_usd).toFixed(2)}`
+        : `Grid Pips Payout Request Declined — $${Number(payout.amount_usd).toFixed(2)}`,
+    category: 'payout',
+    textPreview:
+      status === 'paid'
+        ? `Your commission payout of $${Number(payout.amount_usd).toFixed(2)} via ${payout.method.toUpperCase()} (${payout.destination}) has been marked paid.`
+        : `Your commission payout request of $${Number(payout.amount_usd).toFixed(2)} was declined and returned to your available balance.`,
+    html:
+      status === 'paid'
+        ? `<p>Hello ${payout.user_name},</p><p>Your influencer commission payout of <strong>$${Number(payout.amount_usd).toFixed(2)}</strong> via ${payout.method.toUpperCase()} to <code>${payout.destination}</code> has been disbursed.</p>`
+        : `<p>Hello ${payout.user_name},</p><p>Your influencer commission payout request of <strong>$${Number(payout.amount_usd).toFixed(2)}</strong> was declined. The balance remains available in your partner ledger.</p>`,
+  }).catch(() => {});
+
+  res.json({ ok: true, cloudPersisted });
 });
 
 app.post('/api/admin/settings', requireAdmin, async (req: AuthedRequest, res) => {

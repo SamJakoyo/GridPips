@@ -269,6 +269,7 @@ export function initDatabase(): void {
   if (!userCols.includes('mt5_active_bot')) db.exec("ALTER TABLE users ADD COLUMN mt5_active_bot TEXT DEFAULT 'both'");
   if (!userCols.includes('mt5_risk_percent')) db.exec('ALTER TABLE users ADD COLUMN mt5_risk_percent REAL DEFAULT 1.0');
   if (!userCols.includes('mt5_connection_mode')) db.exec("ALTER TABLE users ADD COLUMN mt5_connection_mode TEXT DEFAULT 'metaapi'");
+  if (!userCols.includes('commission_pct')) db.exec('ALTER TABLE users ADD COLUMN commission_pct REAL');
 
   const orderCols = (db.prepare('PRAGMA table_info(orders)').all() as Array<{ name: string }>).map((c) => c.name);
   if (!orderCols.includes('mpesa_phone')) db.exec('ALTER TABLE orders ADD COLUMN mpesa_phone TEXT');

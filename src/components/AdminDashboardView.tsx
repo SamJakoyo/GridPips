@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { ShieldAlert, Check, XCircle, RefreshCw, Search, Smartphone, Activity } from 'lucide-react';
+import {
+  ShieldAlert,
+  Check,
+  XCircle,
+  RefreshCw,
+  Search,
+  Smartphone,
+  Activity,
+  Pencil,
+  X,
+  Users,
+  DollarSign,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import type { EmailLogItem, MpesaTransaction, Order, SecurityLogItem } from '../types';
 
@@ -128,6 +143,10 @@ interface AdminOverviewResponse {
     exness_account_id: string;
     exness_verified: number;
     referral_code: string;
+    referred_by?: number | null;
+    referrer_name?: string | null;
+    referrer_code?: string | null;
+    commission_pct?: number | null;
     has_analyzer: number;
     has_ea_bots: number;
     mt5_connected: number;
@@ -137,17 +156,50 @@ interface AdminOverviewResponse {
     created_at: string;
     last_login_at: string | null;
   }>;
+  influencers?: Array<{
+    id: number;
+    name: string;
+    email: string;
+    role: 'user' | 'influencer' | 'admin';
+    referral_code: string;
+    exness_account_id: string;
+    commission_pct: number | null;
+    effective_commission_pct: number;
+    is_suspended: number;
+    clicks: number;
+    signups: number;
+    paid_conversions: number;
+    total_earned_usd: number;
+    paid_out_usd: number;
+    pending_payout_usd: number;
+    available_balance_usd: number;
+    created_at: string;
+    last_login_at: string | null;
+  }>;
+  influencerSummary?: {
+    totalInfluencers: number;
+    activeReferrersCount: number;
+    totalClicks: number;
+    totalSignups: number;
+    totalPaidConversions: number;
+    totalCommissionsUsd: number;
+    totalPaidOutUsd: number;
+    pendingPayoutsUsd: number;
+  };
   orders: Order[];
   mpesaTransactions?: MpesaTransaction[];
   payouts: Array<{
     id: number;
+    user_id?: number;
     user_name: string;
     user_email: string;
+    referral_code?: string;
     amount_usd: number;
     method: string;
     destination: string;
     status: string;
     created_at: string;
+    processed_at?: string | null;
   }>;
   securityLogs: SecurityLogItem[];
   emailLogs: EmailLogItem[];
@@ -189,6 +241,28 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
   const [checkupResult, setCheckupResult] = useState<SiteCheckupResponse | null>(null);
   const [mpesaSearch, setMpesaSearch] = useState('');
   const [mpesaFilter, setMpesaFilter] = useState<'all' | 'completed' | 'pending' | 'cancelled' | 'failed'>('all');
+  const [userSearch, setUserSearch] = useState('');
+  const [userRoleFilter, setUserRoleFilter] = useState<'all' | 'user' | 'influencer' | 'admin'>('all');
+  const [influencerSearch, setInfluencerSearch] = useState('');
+  const [payoutStatusFilter, setPayoutStatusFilter] = useState<'all' | 'pending' | 'paid' | 'rejected'>('all');
+  const [refreshingAdmin, setRefreshingAdmin] = useState(false);
+  const [adminNotice, setAdminNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminOverviewResponse['users'][number] | null>(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    exnessAccountId: '',
+    role: 'user' as 'user' | 'influencer' | 'admin',
+    referralCode: '',
+    walletBalanceKes: '0',
+    commissionPct: '',
+    referredByCode: '',
+    exnessVerified: false,
+    hasAnalyzer: false,
+    hasEaBots: false,
+    isSuspended: false,
+  });
+  const [savingUser, setSavingUser] = useState(false);
+  const [editUserError, setEditUserError] = useState('');
   const [settingsForm, setSettingsForm] = useState<Record<string, string>>({});
   const [savingSettings, setSavingSettings] = useState(false);
   const [feedback, setFeedback] = useState('');
@@ -227,13 +301,18 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
   }
 
   async function loadAdmin() {
-    const [res, healthRes] = await Promise.all([
-      apiFetch<AdminOverviewResponse>('/api/admin/overview'),
-      apiFetch<SupabaseHealthResponse>('/api/health/supabase').catch(() => null),
-    ]);
-    setData(res);
-    setSettingsForm(res.settings);
-    if (healthRes) setHealth(healthRes);
+    setRefreshingAdmin(true);
+    try {
+      const [res, healthRes] = await Promise.all([
+        apiFetch<AdminOverviewResponse>('/api/admin/overview'),
+        apiFetch<SupabaseHealthResponse>('/api/health/supabase').catch(() => null),
+      ]);
+      setData(res);
+      setSettingsForm(res.settings);
+      if (healthRes) setHealth(healthRes);
+    } finally {
+      setRefreshingAdmin(false);
+    }
   }
 
   useEffect(() => {
@@ -243,18 +322,90 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
   if (!data) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-6 text-sm text-slate-500">
-        Loading Admin Command Center...
+      <div className="bg-white border border-slate-200 rounded-xl p-8 flex items-center gap-3 text-sm text-slate-600">
+        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+        <span>Syncing Admin Command Center &amp; Cloud Directory...</span>
       </div>
     );
   }
 
-  async function updateOrderStatus(orderId: number, status: 'paid' | 'failed' | 'refunded') {
-    await apiFetch(`/api/admin/orders/${orderId}/status`, {
-      method: 'POST',
-      body: JSON.stringify({ status }),
+  function openEditUserModal(u: AdminOverviewResponse['users'][number]) {
+    setEditUserError('');
+    setEditingUser(u);
+    setEditForm({
+      name: u.name || '',
+      exnessAccountId: u.exness_account_id || '',
+      role: u.role,
+      referralCode: u.referral_code || '',
+      walletBalanceKes: String(Number(u.wallet_balance_kes || 0)),
+      commissionPct:
+        typeof u.commission_pct === 'number' && Number.isFinite(u.commission_pct)
+          ? String(u.commission_pct)
+          : '',
+      referredByCode: u.referrer_code || '',
+      exnessVerified: Boolean(u.exness_verified),
+      hasAnalyzer: Boolean(u.has_analyzer),
+      hasEaBots: Boolean(u.has_ea_bots),
+      isSuspended: Boolean(u.is_suspended),
     });
-    await loadAdmin();
+  }
+
+  async function handleSaveEditedUser(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingUser) return;
+    setSavingUser(true);
+    setEditUserError('');
+    try {
+      const res = await apiFetch<{ ok: boolean; cloudSynced?: boolean }>(
+        `/api/admin/users/${editingUser.id}/update`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            name: editForm.name.trim(),
+            exnessAccountId: editForm.exnessAccountId.trim(),
+            role: editForm.role,
+            referralCode: editForm.referralCode.trim(),
+            walletBalanceKes: Number(editForm.walletBalanceKes || 0),
+            commissionPct: editForm.commissionPct.trim() === '' ? null : Number(editForm.commissionPct),
+            referredByCode: editForm.referredByCode.trim(),
+            exnessVerified: editForm.exnessVerified,
+            hasAnalyzer: editForm.hasAnalyzer,
+            hasEaBots: editForm.hasEaBots,
+            isSuspended: editForm.isSuspended,
+          }),
+        }
+      );
+      setEditingUser(null);
+      await loadAdmin();
+      setAdminNotice({
+        type: 'success',
+        text: `Saved changes for ${editForm.name.trim() || editingUser.email}${res.cloudSynced ? ' and synced to Cloud DB.' : '.'}`,
+      });
+    } catch (err) {
+      setEditUserError(err instanceof Error ? err.message : 'Unable to save user edits.');
+    } finally {
+      setSavingUser(false);
+    }
+  }
+
+  async function updateOrderStatus(orderId: number, status: 'paid' | 'failed' | 'refunded') {
+    setAdminNotice(null);
+    try {
+      await apiFetch(`/api/admin/orders/${orderId}/status`, {
+        method: 'POST',
+        body: JSON.stringify({ status }),
+      });
+      await loadAdmin();
+      setAdminNotice({
+        type: 'success',
+        text: `Order #${orderId} marked ${status.toUpperCase()} and synced.`,
+      });
+    } catch (err) {
+      setAdminNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Unable to update order status.',
+      });
+    }
   }
 
   async function updateUser(
@@ -267,19 +418,49 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       exnessVerified?: boolean;
     }
   ) {
-    await apiFetch(`/api/admin/users/${userId}/update`, {
-      method: 'POST',
-      body: JSON.stringify(patch),
-    });
-    await loadAdmin();
+    setAdminNotice(null);
+    try {
+      const res = await apiFetch<{ ok: boolean; cloudSynced?: boolean }>(
+        `/api/admin/users/${userId}/update`,
+        {
+          method: 'POST',
+          body: JSON.stringify(patch),
+        }
+      );
+      await loadAdmin();
+      setAdminNotice({
+        type: 'success',
+        text: `User #${userId} updated${res.cloudSynced ? ' and persisted to Cloud DB.' : '.'}`,
+      });
+    } catch (err) {
+      setAdminNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Unable to update user account.',
+      });
+    }
   }
 
   async function updatePayoutStatus(payoutId: number, status: 'paid' | 'rejected') {
-    await apiFetch(`/api/admin/payouts/${payoutId}/status`, {
-      method: 'POST',
-      body: JSON.stringify({ status }),
-    });
-    await loadAdmin();
+    setAdminNotice(null);
+    try {
+      const res = await apiFetch<{ ok: boolean; cloudPersisted?: boolean }>(
+        `/api/admin/payouts/${payoutId}/status`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ status }),
+        }
+      );
+      await loadAdmin();
+      setAdminNotice({
+        type: 'success',
+        text: `Payout #${payoutId} marked ${status.toUpperCase()}${res.cloudPersisted ? ' and synced to Cloud DB.' : '.'}`,
+      });
+    } catch (err) {
+      setAdminNotice({
+        type: 'error',
+        text: err instanceof Error ? err.message : 'Unable to update payout status.',
+      });
+    }
   }
 
   async function handleSaveSettings(e: React.FormEvent) {
@@ -372,36 +553,94 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
   return (
     <div className="space-y-6">
-      {/* Admin KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-slate-950 text-white rounded-xl p-5">
-          <div className="text-xs text-slate-400">Website Revenue (USD / KES)</div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-1">
-            ${data.metrics.totalRevenueUsd.toFixed(2)}
+      {/* Unified Executive Admin KPI Strip */}
+      <div className="rounded-xl overflow-hidden border border-slate-900 bg-[#0B0F19] text-white">
+        <div className="px-6 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
+              Grid Pips Operations · Cloud-Synced Console
+            </div>
+            <h2 className="text-lg font-bold tracking-tight text-white mt-0.5">
+              Admin Command Center
+            </h2>
           </div>
-          <div className="text-xs font-mono text-slate-400 mt-0.5">
-            KES {Number(data.metrics.totalRevenueKes || 0).toLocaleString()}
-          </div>
+          <button
+            type="button"
+            onClick={() => void loadAdmin()}
+            disabled={refreshingAdmin}
+            className="px-3.5 py-2 border border-white/15 bg-white/5 hover:bg-white/10 text-white text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-60"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshingAdmin ? 'animate-spin' : ''}`} />
+            <span>{refreshingAdmin ? 'Syncing Cloud...' : 'Sync All Data'}</span>
+          </button>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Paid Orders</div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
-            {data.metrics.paidOrdersCount}
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 divide-x divide-white/10">
+          <div className="px-6 py-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Website Revenue</div>
+            <div className="text-2xl font-bold font-mono tabular-nums text-emerald-400 mt-1">
+              ${data.metrics.totalRevenueUsd.toFixed(2)}
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 mt-1 tabular-nums">
+              KES {Number(data.metrics.totalRevenueKes || 0).toLocaleString()} · {data.metrics.paidOrdersCount} paid
+            </div>
           </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Registered Exness Users</div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
-            {data.metrics.totalUsers}
+          <div className="px-6 py-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Registered Accounts</div>
+            <div className="text-2xl font-bold font-mono tabular-nums text-white mt-1">
+              {data.metrics.totalUsers.toLocaleString()}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1 tabular-nums">
+              {data.users.filter((u) => u.exness_verified).length} Exness verified
+            </div>
           </div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="text-xs text-slate-500">Security Events Logged</div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-blue-600 mt-1">
-            {data.securityLogs.length}
+          <div className="px-6 py-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Influencer Partners</div>
+            <div className="text-2xl font-bold font-mono tabular-nums text-[#E5A93C] mt-1">
+              {data.influencerSummary?.activeReferrersCount ?? data.influencers?.length ?? 0}
+            </div>
+            <div className="text-[11px] font-mono text-slate-400 mt-1 tabular-nums">
+              ${(data.influencerSummary?.pendingPayoutsUsd ?? 0).toFixed(2)} pending payout
+            </div>
+          </div>
+          <div className="px-6 py-4">
+            <div className="text-[11px] uppercase tracking-wider text-slate-400">Security Events</div>
+            <div className="text-2xl font-bold font-mono tabular-nums text-white mt-1">
+              {data.securityLogs.length}
+            </div>
+            <div className="text-[11px] text-slate-400 mt-1">
+              {health?.cloudSync?.tablesReady ? 'Supabase Cloud DB active' : 'Local SQLite store'}
+            </div>
           </div>
         </div>
       </div>
+
+      {adminNotice && (
+        <div
+          className={`px-4 py-3 rounded-xl border text-xs font-medium flex items-center justify-between gap-3 ${
+            adminNotice.type === 'success'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-rose-50 border-rose-200 text-rose-800'
+          }`}
+        >
+          <span className="inline-flex items-center gap-2">
+            {adminNotice.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            )}
+            <span>{adminNotice.text}</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setAdminNotice(null)}
+            className="text-slate-500 hover:text-slate-900 cursor-pointer"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -411,32 +650,25 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               ['analytics', 'Analytics & Checkups'],
               ['orders', 'Revenue & Orders'],
               ['mpesa', 'M-Pesa Deposits'],
-              ['users', 'Users & Logins'],
+              ['users', `Users (${data.users.length})`],
+              ['payouts', `Influencers & Payouts (${data.influencers?.length ?? 0})`],
               ['security', 'Security Center'],
-              ['payouts', 'Influencer Payouts'],
               ['emails', 'Email Logs'],
               ['settings', 'Site Config'],
             ] as const
           ).map(([key, label]) => (
             <button
               key={key}
+              type="button"
               onClick={() => setTab(key)}
               className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
-                tab === key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                tab === key ? 'bg-[#0B0F19] text-[#E5A93C] shadow-xs' : 'text-slate-600 hover:text-slate-950'
               }`}
             >
               {label}
             </button>
           ))}
         </div>
-
-        <button
-          onClick={() => loadAdmin()}
-          className="px-3 py-1.5 border border-slate-300 bg-white text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
-        >
-          <RefreshCw className="w-3.5 h-3.5" />
-          Refresh
-        </button>
       </div>
 
       {/* Tab 0: Website Analytics & Live Checkups */}
@@ -1026,96 +1258,198 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 3: Users & Logins */}
       {tab === 'users' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 overflow-x-auto">
-          <h3 className="text-base font-bold text-slate-950 mb-4">User Directory, Exness IDs &amp; Logins</h3>
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-xs text-slate-500">
-                <th className="py-2 pr-4">User</th>
-                <th className="py-2 pr-4">Exness ID</th>
-                <th className="py-2 pr-4">Role</th>
-                <th className="py-2 pr-4">Access</th>
-                <th className="py-2 pr-4">Last Login</th>
-                <th className="py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {data.users.map((u) => (
-                <tr key={u.id}>
-                  <td className="py-3 pr-4 text-xs">
-                    <div className="font-semibold text-slate-900">{u.name}</div>
-                    <div className="text-slate-500">{u.email}</div>
-                  </td>
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-700">
-                    <div>{u.exness_account_id}</div>
-                    <div
-                      className={`text-[11px] font-sans font-semibold mt-0.5 ${
-                        u.exness_verified ? 'text-emerald-700' : 'text-amber-700'
-                      }`}
-                    >
-                      {u.exness_verified ? 'Verified Exness Partner' : 'Pending IB Review'}
-                    </div>
-                  </td>
-                  <td className="py-3 pr-4">
-                    <select
-                      value={u.role}
-                      onChange={(e) =>
-                        updateUser(u.id, { role: e.target.value as 'user' | 'influencer' | 'admin' })
-                      }
-                      className="px-2 py-1 text-xs border border-slate-300 rounded bg-white"
-                    >
-                      <option value="user">user</option>
-                      <option value="influencer">influencer</option>
-                      <option value="admin">admin</option>
-                    </select>
-                  </td>
-                  <td className="py-3 pr-4 text-xs space-x-2 whitespace-nowrap">
-                    <button
-                      onClick={() => updateUser(u.id, { exnessVerified: !u.exness_verified })}
-                      className={`px-2 py-1 rounded border cursor-pointer ${
-                        u.exness_verified
-                          ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
-                          : 'border-amber-500 text-amber-800 bg-amber-50'
-                      }`}
-                    >
-                      {u.exness_verified ? 'Revoke IB' : 'Verify IB'}
-                    </button>
-                    <button
-                      onClick={() => updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
-                      className={`px-2 py-1 rounded border cursor-pointer ${
-                        u.has_analyzer ? 'border-emerald-600 text-emerald-700' : 'border-slate-300 text-slate-500'
-                      }`}
-                    >
-                      Analyzer {u.has_analyzer ? 'ON' : 'OFF'}
-                    </button>
-                    <button
-                      onClick={() => updateUser(u.id, { hasEaBots: !u.has_ea_bots })}
-                      className={`px-2 py-1 rounded border cursor-pointer ${
-                        u.has_ea_bots ? 'border-emerald-600 text-emerald-700' : 'border-slate-300 text-slate-500'
-                      }`}
-                    >
-                      EA Bots {u.has_ea_bots ? 'ON' : 'OFF'}
-                    </button>
-                  </td>
-                  <td className="py-3 pr-4 font-mono text-xs text-slate-500">
-                    {u.last_login_at || '—'}
-                  </td>
-                  <td className="py-3 text-right">
-                    <button
-                      onClick={() => updateUser(u.id, { isSuspended: !u.is_suspended })}
-                      className={`px-2.5 py-1 text-xs font-semibold rounded cursor-pointer ${
-                        u.is_suspended
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                      }`}
-                    >
-                      {u.is_suspended ? 'Unsuspend' : 'Suspend'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-950">
+                Website User Directory, Exness IDs &amp; Account Editor
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Synced from Supabase Auth, profiles &amp; Cloud state. Edit any user&apos;s profile, role, wallet, commission %, or licenses.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  placeholder="Search name, email, Exness, ref..."
+                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-56"
+                />
+              </div>
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                {(['all', 'user', 'influencer', 'admin'] as const).map((rf) => (
+                  <button
+                    key={rf}
+                    type="button"
+                    onClick={() => setUserRoleFilter(rf)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer whitespace-nowrap shrink-0 ${
+                      userRoleFilter === rf
+                        ? 'bg-white text-slate-950 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {rf}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="p-6 overflow-x-auto">
+            {(() => {
+              const q = userSearch.trim().toLowerCase();
+              const filteredUsers = data.users.filter((u) => {
+                if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
+                if (!q) return true;
+                return [u.name, u.email, u.exness_account_id, u.referral_code, u.referrer_code]
+                  .filter(Boolean)
+                  .join(' ')
+                  .toLowerCase()
+                  .includes(q);
+              });
+
+              if (filteredUsers.length === 0) {
+                return (
+                  <p className="text-sm text-slate-500 py-6 text-center">
+                    No users match your current search or role filter.
+                  </p>
+                );
+              }
+
+              return (
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                      <th className="py-2.5 pr-4">User</th>
+                      <th className="py-2.5 pr-4">Exness ID</th>
+                      <th className="py-2.5 pr-4">Referral / Wallet</th>
+                      <th className="py-2.5 pr-4">Role</th>
+                      <th className="py-2.5 pr-4">Licenses &amp; IB</th>
+                      <th className="py-2.5 pr-4">Last Login</th>
+                      <th className="py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredUsers.map((u) => (
+                      <tr key={u.id} className="hover:bg-slate-50/70">
+                        <td className="py-3 pr-4 text-xs">
+                          <div className="font-semibold text-slate-950 flex items-center gap-1.5">
+                            <span>{u.name}</span>
+                            {u.is_suspended ? (
+                              <span className="text-[10px] font-bold uppercase text-rose-700">
+                                [Suspended]
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="text-slate-500">{u.email}</div>
+                          {u.referrer_code && (
+                            <div className="text-[11px] text-amber-700 font-mono mt-0.5">
+                              Ref by: {u.referrer_code}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 pr-4 font-mono text-xs text-slate-700">
+                          <div>{u.exness_account_id}</div>
+                          <div
+                            className={`text-[11px] font-sans font-semibold mt-0.5 ${
+                              u.exness_verified ? 'text-emerald-700' : 'text-amber-700'
+                            }`}
+                          >
+                            {u.exness_verified ? 'Verified IB' : 'Pending IB'}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4 font-mono text-xs">
+                          <div className="font-semibold text-slate-900">{u.referral_code}</div>
+                          <div className="text-[11px] text-slate-500 tabular-nums">
+                            KES {Number(u.wallet_balance_kes || 0).toLocaleString()}
+                            {typeof u.commission_pct === 'number' ? ` · ${u.commission_pct}% comm` : ''}
+                          </div>
+                        </td>
+                        <td className="py-3 pr-4">
+                          <select
+                            value={u.role}
+                            onChange={(e) =>
+                              void updateUser(u.id, {
+                                role: e.target.value as 'user' | 'influencer' | 'admin',
+                              })
+                            }
+                            className="px-2 py-1 text-xs border border-slate-300 rounded-md bg-white font-semibold"
+                          >
+                            <option value="user">user</option>
+                            <option value="influencer">influencer</option>
+                            <option value="admin">admin</option>
+                          </select>
+                        </td>
+                        <td className="py-3 pr-4 text-xs space-x-1.5 whitespace-nowrap">
+                          <button
+                            type="button"
+                            onClick={() => void updateUser(u.id, { exnessVerified: !u.exness_verified })}
+                            className={`px-2 py-1 rounded border cursor-pointer ${
+                              u.exness_verified
+                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
+                                : 'border-amber-500 text-amber-800 bg-amber-50'
+                            }`}
+                          >
+                            {u.exness_verified ? 'IB OK' : 'Verify IB'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
+                            className={`px-2 py-1 rounded border cursor-pointer ${
+                              u.has_analyzer
+                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                                : 'border-slate-300 text-slate-500'
+                            }`}
+                          >
+                            Analyzer {u.has_analyzer ? 'ON' : 'OFF'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateUser(u.id, { hasEaBots: !u.has_ea_bots })}
+                            className={`px-2 py-1 rounded border cursor-pointer ${
+                              u.has_ea_bots
+                                ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
+                                : 'border-slate-300 text-slate-500'
+                            }`}
+                          >
+                            EA {u.has_ea_bots ? 'ON' : 'OFF'}
+                          </button>
+                        </td>
+                        <td className="py-3 pr-4 font-mono text-xs text-slate-500 whitespace-nowrap">
+                          {u.last_login_at ? u.last_login_at.slice(0, 16) : '—'}
+                        </td>
+                        <td className="py-3 text-right whitespace-nowrap space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openEditUserModal(u)}
+                            className="px-2.5 py-1 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-semibold rounded inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void updateUser(u.id, { isSuspended: !u.is_suspended })}
+                            className={`px-2.5 py-1 text-xs font-semibold rounded cursor-pointer ${
+                              u.is_suspended
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                            }`}
+                          >
+                            {u.is_suspended ? 'Restore' : 'Suspend'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              );
+            })()}
+          </div>
         </div>
       )}
 
@@ -1498,58 +1832,315 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
         </div>
       )}
 
-      {/* Tab 4: Influencer Payouts */}
+      {/* Tab 4: Influencers & Payouts */}
       {tab === 'payouts' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 overflow-x-auto">
-          <h3 className="text-base font-bold text-slate-950 mb-4">Influencer Commission Payout Queue</h3>
-          {data.payouts.length === 0 ? (
-            <p className="text-sm text-slate-500">No payout requests submitted yet.</p>
-          ) : (
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
-                  <th className="py-2 pr-4">Influencer</th>
-                  <th className="py-2 pr-4">Method</th>
-                  <th className="py-2 pr-4">Destination</th>
-                  <th className="py-2 pr-4 text-right">Amount</th>
-                  <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {data.payouts.map((p) => (
-                  <tr key={p.id}>
-                    <td className="py-3 pr-4 text-xs">
-                      <div className="font-semibold text-slate-900">{p.user_name}</div>
-                      <div className="text-slate-500">{p.user_email}</div>
-                    </td>
-                    <td className="py-3 pr-4 font-mono text-xs uppercase">{p.method}</td>
-                    <td className="py-3 pr-4 font-mono text-xs">{p.destination}</td>
-                    <td className="py-3 pr-4 text-right font-mono font-bold">${p.amount_usd.toFixed(2)}</td>
-                    <td className="py-3 pr-4 text-xs font-semibold capitalize">{p.status}</td>
-                    <td className="py-3 text-right space-x-2">
-                      {p.status === 'pending' && (
-                        <>
-                          <button
-                            onClick={() => updatePayoutStatus(p.id, 'paid')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white text-xs rounded cursor-pointer"
-                          >
-                            <Check className="w-3 h-3" /> Paid
-                          </button>
-                          <button
-                            onClick={() => updatePayoutStatus(p.id, 'rejected')}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-300 text-rose-700 text-xs rounded cursor-pointer"
-                          >
-                            <XCircle className="w-3 h-3" /> Reject
-                          </button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
+        <div className="space-y-6">
+          {/* Influencer Summary KPI Row */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Influencers &amp; Referrers</span>
+                <Users className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+                {data.influencerSummary?.totalInfluencers ?? 0}
+                <span className="text-xs font-normal text-slate-500 ml-1.5">
+                  ({data.influencerSummary?.activeReferrersCount ?? data.influencers?.length ?? 0} active)
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1">
+                Global rate: {data.settings.influencer_commission_pct || '20'}%
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Total Clicks &amp; Signups</span>
+                <Activity className="w-4 h-4 text-slate-400" />
+              </div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+                {(data.influencerSummary?.totalClicks ?? 0).toLocaleString()}
+                <span className="text-xs font-normal text-slate-500 ml-1.5">
+                  / {(data.influencerSummary?.totalSignups ?? 0).toLocaleString()} signups
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+                {data.influencerSummary?.totalPaidConversions ?? 0} paid license conversions
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Total Commissions Earned</span>
+                <DollarSign className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 mt-2">
+                ${(data.influencerSummary?.totalCommissionsUsd ?? 0).toFixed(2)}
+              </div>
+              <div className="text-[11px] font-mono text-slate-500 mt-1 tabular-nums">
+                Disbursed: ${(data.influencerSummary?.totalPaidOutUsd ?? 0).toFixed(2)}
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-500">
+                <span>Pending Payout Queue</span>
+                <DollarSign className="w-4 h-4 text-amber-600" />
+              </div>
+              <div className="text-2xl font-bold font-mono tabular-nums text-amber-700 mt-2">
+                ${(data.influencerSummary?.pendingPayoutsUsd ?? 0).toFixed(2)}
+              </div>
+              <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+                {data.payouts.filter((p) => p.status === 'pending').length} request(s) awaiting action
+              </div>
+            </div>
+          </div>
+
+          {/* Influencer Partner Directory */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-950">Influencer Partner Directory</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Every user with the Influencer role or active referral traffic. Click Edit Partner to adjust their code, role, or custom commission %.
+                </p>
+              </div>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={influencerSearch}
+                  onChange={(e) => setInfluencerSearch(e.target.value)}
+                  placeholder="Search partner or ref code..."
+                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-56"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 overflow-x-auto">
+              {(() => {
+                const list = data.influencers || [];
+                const q = influencerSearch.trim().toLowerCase();
+                const filteredInf = list.filter((inf) => {
+                  if (!q) return true;
+                  return [inf.name, inf.email, inf.referral_code, inf.exness_account_id]
+                    .filter(Boolean)
+                    .join(' ')
+                    .toLowerCase()
+                    .includes(q);
+                });
+
+                if (filteredInf.length === 0) {
+                  return (
+                    <div className="py-8 text-center space-y-2">
+                      <p className="text-sm font-semibold text-slate-800">
+                        No influencer partners or active referrers found yet.
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        Promote any registered user to the <span className="font-mono font-semibold">influencer</span> role in the Users tab to manage them here.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                        <th className="py-2.5 pr-3">Partner</th>
+                        <th className="py-2.5 pr-3">Ref Code</th>
+                        <th className="py-2.5 pr-3 text-right">Rate</th>
+                        <th className="py-2.5 pr-3 text-right">Clicks</th>
+                        <th className="py-2.5 pr-3 text-right">Signups</th>
+                        <th className="py-2.5 pr-3 text-right">Paid Sales</th>
+                        <th className="py-2.5 pr-3 text-right">Earned</th>
+                        <th className="py-2.5 pr-3 text-right">Paid Out</th>
+                        <th className="py-2.5 pr-3 text-right">Available</th>
+                        <th className="py-2.5 text-right">Manage</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredInf.map((inf) => {
+                        const matchingUser = data.users.find((u) => u.id === inf.id);
+                        return (
+                          <tr key={inf.id} className="hover:bg-slate-50/70">
+                            <td className="py-3 pr-3">
+                              <div className="font-semibold text-slate-950">
+                                {inf.name}{' '}
+                                <span className="text-[10px] font-mono uppercase text-amber-700">
+                                  ({inf.role})
+                                </span>
+                              </div>
+                              <div className="text-slate-500">{inf.email}</div>
+                            </td>
+                            <td className="py-3 pr-3 font-mono font-semibold text-slate-900">
+                              {inf.referral_code}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                              {inf.effective_commission_pct}%
+                              {inf.commission_pct !== null ? ' *' : ''}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                              {inf.clicks}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                              {inf.signups}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-slate-900">
+                              {inf.paid_conversions}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-emerald-700">
+                              ${inf.total_earned_usd.toFixed(2)}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-600">
+                              ${inf.paid_out_usd.toFixed(2)}
+                            </td>
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-bold text-slate-950">
+                              ${inf.available_balance_usd.toFixed(2)}
+                            </td>
+                            <td className="py-3 text-right whitespace-nowrap">
+                              {matchingUser && (
+                                <button
+                                  type="button"
+                                  onClick={() => openEditUserModal(matchingUser)}
+                                  className="px-2.5 py-1 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-semibold rounded inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                  <span>Edit Partner</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Payout Requests Queue */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-950">Influencer Commission Payout Queue</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Approving or rejecting a payout persists to Cloud DB and emails the influencer automatically.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                {(['all', 'pending', 'paid', 'rejected'] as const).map((pf) => (
+                  <button
+                    key={pf}
+                    type="button"
+                    onClick={() => setPayoutStatusFilter(pf)}
+                    className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer whitespace-nowrap shrink-0 ${
+                      payoutStatusFilter === pf
+                        ? 'bg-white text-slate-950 shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {pf}
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          )}
+              </div>
+            </div>
+
+            <div className="p-6 overflow-x-auto">
+              {(() => {
+                const filteredPayouts = data.payouts.filter(
+                  (p) => payoutStatusFilter === 'all' || p.status === payoutStatusFilter
+                );
+                if (filteredPayouts.length === 0) {
+                  return (
+                    <p className="text-sm text-slate-500 py-6 text-center">
+                      No payout requests match this filter.
+                    </p>
+                  );
+                }
+                return (
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                        <th className="py-2.5 pr-4">Influencer</th>
+                        <th className="py-2.5 pr-4">Date</th>
+                        <th className="py-2.5 pr-4">Method</th>
+                        <th className="py-2.5 pr-4">Destination</th>
+                        <th className="py-2.5 pr-4 text-right">Amount</th>
+                        <th className="py-2.5 pr-4">Status</th>
+                        <th className="py-2.5 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPayouts.map((p) => (
+                        <tr key={p.id} className="hover:bg-slate-50/70">
+                          <td className="py-3 pr-4 text-xs">
+                            <div className="font-semibold text-slate-950">
+                              {p.user_name}{' '}
+                              {p.referral_code ? (
+                                <span className="font-mono text-[11px] text-slate-500">
+                                  ({p.referral_code})
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="text-slate-500">{p.user_email}</div>
+                          </td>
+                          <td className="py-3 pr-4 font-mono text-xs text-slate-500">
+                            {p.created_at.slice(0, 10)}
+                          </td>
+                          <td className="py-3 pr-4 font-mono text-xs uppercase text-slate-700">
+                            {p.method}
+                          </td>
+                          <td className="py-3 pr-4 font-mono text-xs text-slate-700">{p.destination}</td>
+                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950">
+                            ${Number(p.amount_usd).toFixed(2)}
+                          </td>
+                          <td className="py-3 pr-4 text-xs font-semibold capitalize">
+                            <span
+                              className={
+                                p.status === 'paid'
+                                  ? 'text-emerald-700'
+                                  : p.status === 'rejected'
+                                  ? 'text-rose-700'
+                                  : 'text-amber-700'
+                              }
+                            >
+                              {p.status}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right space-x-2 whitespace-nowrap">
+                            {p.status === 'pending' ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => void updatePayoutStatus(p.id, 'paid')}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded cursor-pointer"
+                                >
+                                  <Check className="w-3 h-3" /> Mark Paid
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void updatePayoutStatus(p.id, 'rejected')}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-300 hover:bg-rose-50 text-rose-700 text-xs font-semibold rounded cursor-pointer"
+                                >
+                                  <XCircle className="w-3 h-3" /> Reject
+                                </button>
+                              </>
+                            ) : (
+                              <span className="text-[11px] font-mono text-slate-400">
+                                {p.processed_at ? p.processed_at.slice(0, 10) : 'Processed'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       )}
 
@@ -1734,11 +2325,195 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           <button
             type="submit"
             disabled={savingSettings}
-            className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer disabled:opacity-60"
+            className="px-5 py-2.5 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg cursor-pointer disabled:opacity-60"
           >
-            {savingSettings ? 'Saving...' : 'Save Global Settings'}
+            {savingSettings ? 'Saving to Cloud DB...' : 'Save Global Settings'}
           </button>
         </form>
+      )}
+
+      {/* Full Edit User & Influencer Partner Modal */}
+      {editingUser && (
+        <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+            <div className="px-6 py-4 bg-[#0B0F19] text-white flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
+                  Edit Website Account · #{editingUser.id}
+                </div>
+                <h3 className="text-base font-bold text-white mt-0.5">{editingUser.email}</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUser(null)}
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer"
+                aria-label="Close edit modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedUser} className="p-6 space-y-5 overflow-y-auto">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                  <input
+                    required
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Exness Account ID
+                  </label>
+                  <input
+                    required
+                    value={editForm.exnessAccountId}
+                    onChange={(e) => setEditForm({ ...editForm, exnessAccountId: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        role: e.target.value as 'user' | 'influencer' | 'admin',
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-semibold"
+                  >
+                    <option value="user">User (Trader)</option>
+                    <option value="influencer">Influencer Partner</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Referral Code (Unique)
+                  </label>
+                  <input
+                    required
+                    value={editForm.referralCode}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, referralCode: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono uppercase focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    KES Wallet Balance
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editForm.walletBalanceKes}
+                    onChange={(e) => setEditForm({ ...editForm, walletBalanceKes: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Custom Commission % (blank = site default {data.settings.influencer_commission_pct || 20}%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    max="80"
+                    placeholder={`Default (${data.settings.influencer_commission_pct || 20}%)`}
+                    value={editForm.commissionPct}
+                    onChange={(e) => setEditForm({ ...editForm, commissionPct: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Referred By Partner Code (optional)
+                  </label>
+                  <input
+                    placeholder="Leave blank if organic signup"
+                    value={editForm.referredByCode}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, referredByCode: e.target.value.toUpperCase() })
+                    }
+                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono uppercase focus:outline-none focus:border-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200 text-xs">
+                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.exnessVerified}
+                    onChange={(e) => setEditForm({ ...editForm, exnessVerified: e.target.checked })}
+                    className="rounded border-slate-300"
+                  />
+                  <span>Exness IB Verified</span>
+                </label>
+                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.hasAnalyzer}
+                    onChange={(e) => setEditForm({ ...editForm, hasAnalyzer: e.target.checked })}
+                    className="rounded border-slate-300"
+                  />
+                  <span>ICT Analyzer</span>
+                </label>
+                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.hasEaBots}
+                    onChange={(e) => setEditForm({ ...editForm, hasEaBots: e.target.checked })}
+                    className="rounded border-slate-300"
+                  />
+                  <span>MQL5 EA Bots</span>
+                </label>
+                <label className="flex items-center gap-2 font-semibold text-rose-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editForm.isSuspended}
+                    onChange={(e) => setEditForm({ ...editForm, isSuspended: e.target.checked })}
+                    className="rounded border-slate-300"
+                  />
+                  <span>Suspended</span>
+                </label>
+              </div>
+
+              {editUserError && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{editUserError}</span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={savingUser}
+                  className="px-5 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg inline-flex items-center gap-2 cursor-pointer disabled:opacity-60"
+                >
+                  {savingUser && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{savingUser ? 'Saving & Syncing...' : 'Save Account Changes'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

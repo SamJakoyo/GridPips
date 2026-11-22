@@ -19,6 +19,7 @@ import {
   BARE_EXNESS_SERVER_PREFIX_RE,
   EXNESS_MT5_SERVER_GROUPS,
 } from '../lib/exnessServers';
+import { LANDING_IMAGES } from '../assets/landingImages';
 import type { PublicConfig, User } from '../types';
 
 interface EaBotsViewProps {
@@ -208,38 +209,126 @@ export const EaBotsView: React.FC<EaBotsViewProps> = ({
   }, [allKnownPresetServers, hasValidSavedServer, rawSavedServer, serverPreset]);
 
   if (!user.hasEaBots) {
+    const priceUsd = Number(config.eaBotsPriceUsd || 5.25).toFixed(2);
+    const priceKes = Number(config.eaBotsPriceKes || 683).toLocaleString();
     return (
-      <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-8">
-        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600 mb-2">
-          <Lock className="w-4 h-4" />
-          <span>MQL5 Automated Trading Pack · ${config.eaBotsPriceUsd.toFixed(2)}</span>
+      <div className="space-y-6">
+        <div className="rounded-xl overflow-hidden border border-slate-900 bg-[#0B0F19] text-white">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+            <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#E5A93C]">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>MQL5 Automated Trading Pack · Lifetime License</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight">
+                  Automated ICT &amp; SMC Expert Advisors + MetaApi Cloud MT5 Bridge
+                </h2>
+                <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+                  Deploy verified MQL5 source files directly in MetaTrader 5 or link your Exness MT5 account via MetaApi Cloud for server-side Killzone scanning, dynamic risk-% position sizing, live equity telemetry, and instant remote trade execution.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-4">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400">One-Time Lifetime Access</div>
+                    <div className="flex items-baseline gap-2.5 mt-0.5">
+                      <span className="text-3xl font-bold font-mono tabular-nums text-white">${priceUsd}</span>
+                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">KES {priceKes}</span>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-white/10 hidden sm:block" />
+                  <div className="text-xs text-slate-300 space-y-0.5">
+                    <div className="font-semibold text-white">Full .mq5 Source + Cloud Execution</div>
+                    <div className="text-slate-400">Safaricom M-Pesa Daraja STK · USDT (TRC20/ERC20) · BTC</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onUnlockClick}
+                    className="px-6 py-3 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-sm font-bold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <Zap className="w-4 h-4" />
+                    <span>Unlock MQL5 EA Bots Pack — ${priceUsd}</span>
+                  </button>
+                  <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>Instant ZIP download &amp; MetaApi MT5 unlock on confirmation</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 relative min-h-[260px] lg:min-h-[380px] border-t lg:border-t-0 lg:border-l border-white/10 overflow-hidden bg-slate-950">
+              <img
+                src={LANDING_IMAGES.automatorCode3d}
+                alt="Grid Pips MQL5 Expert Advisor algorithms and MetaApi Cloud MT5"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-center"
+              />
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19]/45 to-transparent"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 space-y-2">
+                <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
+                  Execution Architecture
+                </div>
+                <div className="text-sm font-semibold text-white">
+                  Silver Bullet 15M FVG + 1H SMC Order Block Engine
+                </div>
+                <div className="text-xs text-slate-300 font-mono">
+                  Exness Real &amp; Trial Servers · Auto Risk % · Cooldown Protection
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-slate-950 mb-3">
-          Purchase MQL5 EA Bots + MetaApi Cloud MT5 Auto-Trade
-        </h2>
-        <p className="text-sm text-slate-600 leading-relaxed mb-6">
-          Connect your clients&apos; MetaTrader 5 accounts directly through MetaApi Cloud with one click for automated execution, live equity monitoring, and instant order management.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6 text-sm text-slate-700">
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · GRIDPIPs_ICT_SilverBullet_EA.mq5 (FVG + Auto-Trade)
+
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Included in Your MQL5 EA Pack</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Both compiled-ready .mq5 bots plus one-click MetaApi Cloud MT5 account bridging.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-slate-500">Lifetime Updates · No VPS Required for Cloud Mode</span>
           </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · GRIDPIPs_SMC_OrderBlock_EA.mq5 (Sweeps + Auto-Trade)
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Direct MetaApi Cloud MT5 Provisioning &amp; Execution
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Live Client MT5 Balance, Equity &amp; Position Controls
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">01 · SILVER BULLET EA</div>
+              <div className="text-sm font-bold text-slate-950">ICT_SilverBullet_EA.mq5</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                London &amp; NY Killzone Fair Value Gap automation with strict risk-per-trade lot sizing and R:R targets.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">02 · SMC ORDER BLOCK EA</div>
+              <div className="text-sm font-bold text-slate-950">SMC_OrderBlock_EA.mq5</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Detects institutional liquidity sweeps and unmitigated order blocks with automated stop-loss protection.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">03 · CLOUD MT5 BRIDGE</div>
+              <div className="text-sm font-bold text-slate-950">MetaApi Cloud Auto-Trade</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Connect any Exness Real or Trial MT5 account directly from the dashboard with live balance &amp; equity sync.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">04 · RISK CONTROLS</div>
+              <div className="text-sm font-bold text-slate-950">Live Position &amp; Cooldown Guard</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Max concurrent position caps, 60-minute per-symbol cooldowns, dry-run scanner tests, and instant close-all.
+              </p>
+            </div>
           </div>
         </div>
-        <button
-          onClick={onUnlockClick}
-          className="px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-        >
-          Buy MQL5 EA Bots Pack — ${config.eaBotsPriceUsd.toFixed(2)} (M-Pesa / Crypto)
-        </button>
       </div>
     );
   }

@@ -27,6 +27,7 @@ export interface User {
   mt5ApiConfigured?: boolean;
   mt5ProvisioningProfileConfigured?: boolean;
   walletBalanceKes?: number;
+  commissionPct?: number | null;
   isSuspended: boolean;
   createdAt: string;
   lastLoginAt?: string | null;

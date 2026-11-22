@@ -20,6 +20,7 @@ import {
 } from '../lib/tradingTimeframes';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
 import { TradingViewMappedChart } from './TradingViewMappedChart';
+import { LANDING_IMAGES } from '../assets/landingImages';
 import type { IctAnalysisResult, PdArrayItem, PublicConfig, User } from '../types';
 
 interface IctAnalyzerViewProps {
@@ -222,48 +223,129 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   }
 
   if (!user.hasAnalyzer) {
+    const priceUsd = Number(config.analyzerPriceUsd || 5.25).toFixed(2);
+    const priceKes = Number(config.analyzerPriceKes || 683).toLocaleString();
     return (
-      <div className="max-w-3xl mx-auto bg-white border border-slate-200 rounded-xl p-8 space-y-5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
-          <Lock className="w-4 h-4" />
-          <span>ICT Strategy Module · ${config.analyzerPriceUsd.toFixed(2)} Unlock</span>
+      <div className="space-y-6">
+        <div className="rounded-xl overflow-hidden border border-slate-900 bg-[#0B0F19] text-white">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-stretch">
+            <div className="lg:col-span-7 p-6 sm:p-8 lg:p-10 flex flex-col justify-between gap-6">
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#E5A93C]">
+                  <Lock className="w-3.5 h-3.5" />
+                  <span>ICT Strategy Market Analyzer · Lifetime License</span>
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white leading-tight">
+                  Institutional Premium &amp; Discount PD Array Engine
+                </h2>
+                <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+                  Built on Inner Circle Trader (ICT) dealing-range structure and dual synchronized TradingView charts. Scan 1M scalps through 1W swing setups for 50% Equilibrium, Order Blocks, Fair Value Gaps, Breaker &amp; Mitigation Blocks, Buy/Sell-Side Liquidity sweeps, and Optimal Trade Entry zones.
+                </p>
+              </div>
+
+              <div className="space-y-5">
+                <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-white/10 py-4">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider text-slate-400">One-Time Lifetime Access</div>
+                    <div className="flex items-baseline gap-2.5 mt-0.5">
+                      <span className="text-3xl font-bold font-mono tabular-nums text-white">${priceUsd}</span>
+                      <span className="text-sm font-mono tabular-nums text-[#E5A93C]">KES {priceKes}</span>
+                    </div>
+                  </div>
+                  <div className="h-8 w-px bg-white/10 hidden sm:block" />
+                  <div className="text-xs text-slate-300 space-y-0.5">
+                    <div className="font-semibold text-white">Instant Automated Activation</div>
+                    <div className="text-slate-400">Safaricom M-Pesa Daraja STK · USDT (TRC20/ERC20) · BTC</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={onUnlockClick}
+                    className="px-6 py-3 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-sm font-bold rounded-lg transition-colors inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer"
+                  >
+                    <span>Unlock ICT Analyzer — ${priceUsd}</span>
+                    <ArrowUpRight className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onOpenFreeChart}
+                    className="px-5 py-3 border border-white/20 hover:bg-white/5 text-white text-sm font-semibold rounded-lg inline-flex items-center gap-2 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                  >
+                    <CandlestickChart className="w-4 h-4 text-[#E5A93C]" />
+                    <span>Open Free Live Chart</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 relative min-h-[260px] lg:min-h-[380px] border-t lg:border-t-0 lg:border-l border-white/10 overflow-hidden bg-slate-950">
+              <img
+                src={LANDING_IMAGES.analystIct3d}
+                alt="Grid Pips ICT Strategy Market Analyzer workspace"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-center"
+              />
+              <div
+                aria-hidden="true"
+                className="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19]/45 to-transparent"
+              />
+              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 space-y-2">
+                <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
+                  Dual Chart Architecture
+                </div>
+                <div className="text-sm font-semibold text-white">
+                  Live TradingView Price Feed + Mapped PD Array Execution Overlay
+                </div>
+                <div className="text-xs text-slate-300 font-mono">
+                  1M · 5M · 15M · 1H · 4H · 1D · 1W · Cloud Playbook Sync
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-slate-950">
-          Unlock the ICT Strategy Market Analyzer
-        </h2>
-        <p className="text-sm text-slate-600 leading-relaxed">
-          Built around Inner Circle Trader (ICT) Premium &amp; Discount methodology from channel{' '}
-          <span className="font-mono text-slate-800">{config.ictYoutubeChannelId}</span>. Scan live candles from 1M scalps up to 1W swing setups for Dealing Range 50% Equilibrium, Full PD Array Matrix (Order Blocks, FVGs, Breaker/Mitigation/Rejection Blocks, Liquidity Voids), Market Structure Shifts, Optimal Trade Entry (0.618–0.786), and active Killzones.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm text-slate-700">
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Premium vs. Discount Dealing Range &amp; 50% Equilibrium
+
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold text-slate-950">Included in Your Analyzer License</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Calibrated to ICT methodology ({config.ictYoutubeChannelId}) with zero recurring monthly subscriptions.
+              </p>
+            </div>
+            <span className="text-xs font-mono text-slate-500">12 Major FX, Gold, Indices &amp; Crypto Pairs</span>
           </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Full ICT PD Array Matrix (OB, FVG, Breaker, Rejection, Void)
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">01 · DEALING RANGE</div>
+              <div className="text-sm font-bold text-slate-950">Premium &amp; Discount Matrix</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Automatic 50% equilibrium, deep discount longs, and premium short zones mapped across every timeframe.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">02 · PD ARRAYS</div>
+              <div className="text-sm font-bold text-slate-950">Order Blocks &amp; FVG Detection</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Identifies unmitigated Bullish/Bearish Order Blocks, Fair Value Gaps, Breaker/Mitigation blocks, and Voids.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">03 · LIQUIDITY</div>
+              <div className="text-sm font-bold text-slate-950">BSL / SSL &amp; Structure Shifts</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Plots Buy-Side and Sell-Side Liquidity pools, equal highs/lows, displacement candles, and MSS confirmations.
+              </p>
+            </div>
+            <div className="p-5 space-y-1.5">
+              <div className="text-[11px] font-mono font-semibold text-amber-700">04 · EXECUTION</div>
+              <div className="text-sm font-bold text-slate-950">OTE Entry, SL &amp; TP Targets</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Generates exact 0.618–0.786 OTE entry coordinates, invalidation stops, multi-target take profits, and cloud setups.
+              </p>
+            </div>
           </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Automated BSL / SSL &amp; Equal Highs/Lows mapping
-          </div>
-          <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-            · Exact Discount-Long / Premium-Short Entry, SL &amp; TP targets
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-3 pt-1">
-          <button
-            onClick={onUnlockClick}
-            className="px-6 py-3 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors cursor-pointer"
-          >
-            Unlock ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)} (M-Pesa / Crypto)
-          </button>
-          <button
-            type="button"
-            onClick={onOpenFreeChart}
-            className="px-5 py-3 border border-slate-300 text-slate-800 text-sm font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-2 cursor-pointer"
-          >
-            <CandlestickChart className="w-4 h-4 text-blue-600" />
-            Open Free Live Chart
-          </button>
         </div>
       </div>
     );
