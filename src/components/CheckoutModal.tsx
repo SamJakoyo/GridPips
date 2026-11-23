@@ -27,7 +27,7 @@ import {
 import type { BillingCycle, Order, PublicConfig, User } from '../types';
 
 interface CheckoutModalProps {
-  productKey: 'analyzer' | 'ea_bots';
+  productKey: 'analyzer' | 'drt_analyzer' | 'ea_bots';
   config: PublicConfig;
   user?: User | null;
   existingOrder?: Order | null;
@@ -107,8 +107,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const pollIntervalRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
 
-  const baseMonthlyUsd =
-    productKey === 'ea_bots' ? config.eaBotsPriceUsd : config.analyzerPriceUsd;
+  const isDrt = productKey === 'drt_analyzer' || productKey === 'ea_bots';
+  const baseMonthlyUsd = isDrt
+    ? Number(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd ?? 5.25)
+    : Number(config.analyzerPriceUsd ?? 5.25);
   const usdKesRate = Number(config.usdKesRate || 130);
   const cyclePricing = computeCyclePricing(baseMonthlyUsd, usdKesRate, billingCycle);
   const planLocked = Boolean(
@@ -121,21 +123,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       ? Number(order.amount_kes)
       : cyclePricing.amountKes;
 
-  const isRenewal =
-    productKey === 'ea_bots'
-      ? Boolean(user?.hasEaBots || user?.eaBotsExpiresAt)
-      : Boolean(user?.hasAnalyzer || user?.analyzerExpiresAt);
-  const currentExpiry =
-    productKey === 'ea_bots' ? user?.eaBotsExpiresAt : user?.analyzerExpiresAt;
+  const isRenewal = isDrt
+    ? Boolean(user?.hasDrtAnalyzer || user?.hasEaBots || user?.drtAnalyzerExpiresAt || user?.eaBotsExpiresAt)
+    : Boolean(user?.hasAnalyzer || user?.analyzerExpiresAt);
+  const currentExpiry = isDrt
+    ? user?.drtAnalyzerExpiresAt ?? user?.eaBotsExpiresAt
+    : user?.analyzerExpiresAt;
 
-  const title =
-    productKey === 'ea_bots'
-      ? 'MQL5 EA Bots Pack + MT5 Bridge'
-      : 'ICT Strategy Market Analyzer';
-  const subtitle =
-    productKey === 'ea_bots'
-      ? 'Silver Bullet & SMC Order Block EAs, MetaApi Cloud Execution & Setup Guide'
-      : 'Live TradingView Liquidity Sweeps, Premium/Discount PD Arrays & Daily Bias Scanner';
+  const title = isDrt
+    ? 'DRT Strategy Market Analyzer'
+    : 'ICT Strategy Market Analyzer';
+  const subtitle = isDrt
+    ? 'Ali Khan Dealing Range Theory (25/50/75 DRT), Type 1/2/3 Ranges, SMT Divergence & PD Arrays'
+    : 'Live TradingView Liquidity Sweeps, Premium/Discount PD Arrays & Daily Bias Scanner';
 
   const tillOrPaybillLabel =
     config.mpesaTransactionType === 'CustomerPayBillOnline'
@@ -630,7 +630,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 }}
                 className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg inline-flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Open {productKey === 'ea_bots' ? 'MQL5 EA Bots' : 'ICT Analyzer'}</span>
+                <span>Open {isDrt ? 'DRT Analyzer' : 'ICT Analyzer'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

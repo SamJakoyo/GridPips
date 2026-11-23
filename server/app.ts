@@ -42,6 +42,7 @@ import {
   buildInstallationGuide,
 } from './mql5Templates.ts';
 import { normalizeServerTimeframe, runIctMarketAnalysis } from './ictEngine.ts';
+import { runDrtMarketAnalysis } from './drtEngine.ts';
 import {
   fetchTradingViewChartData,
   getTradingViewLiveQuotes,
@@ -464,6 +465,10 @@ function hasActiveEaBotsAccess(u: DbUser): boolean {
   return evaluateSubscription(u.has_ea_bots, u.ea_bots_expires_at, u.role).active;
 }
 
+function hasActiveDrtAccess(u: DbUser): boolean {
+  return hasActiveEaBotsAccess(u);
+}
+
 interface AuthedRequest extends Request {
   currentUser?: DbUser;
 }
@@ -472,7 +477,7 @@ function serializeUser(u: DbUser) {
   const apiReady = isMt5ApiConfigured();
   const profileReady = isMetaApiProfileConfigured();
   const analyzerSub = evaluateSubscription(u.has_analyzer, u.analyzer_expires_at, u.role);
-  const eaBotsSub = evaluateSubscription(u.has_ea_bots, u.ea_bots_expires_at, u.role);
+  const drtSub = evaluateSubscription(u.has_ea_bots, u.ea_bots_expires_at, u.role);
 
   return {
     id: u.id,
@@ -484,13 +489,17 @@ function serializeUser(u: DbUser) {
     exnessVerified: Boolean(u.exness_verified),
     referralCode: u.referral_code,
     hasAnalyzer: analyzerSub.active,
-    hasEaBots: eaBotsSub.active,
+    hasDrtAnalyzer: drtSub.active,
+    hasEaBots: drtSub.active,
     analyzerExpiresAt: analyzerSub.expiresAt,
-    eaBotsExpiresAt: eaBotsSub.expiresAt,
+    drtAnalyzerExpiresAt: drtSub.expiresAt,
+    eaBotsExpiresAt: drtSub.expiresAt,
     analyzerSubscriptionStatus: analyzerSub.status,
-    eaBotsSubscriptionStatus: eaBotsSub.status,
+    drtAnalyzerSubscriptionStatus: drtSub.status,
+    eaBotsSubscriptionStatus: drtSub.status,
     analyzerDaysRemaining: analyzerSub.daysRemaining,
-    eaBotsDaysRemaining: eaBotsSub.daysRemaining,
+    drtAnalyzerDaysRemaining: drtSub.daysRemaining,
+    eaBotsDaysRemaining: drtSub.daysRemaining,
     mt5Login: u.mt5_login,
     mt5Server: u.mt5_server,
     mt5BridgeToken: u.mt5_bridge_token,
@@ -772,10 +781,14 @@ app.get('/api/config/public', async (_req, res) => {
     exnessIbUrl: s.exness_ib_url,
     telegramUrl: s.telegram_url,
     ictYoutubeChannelId: s.ict_youtube_channel_id,
+    drtYoutubeChannelUrl:
+      s.drt_youtube_channel_url || 'https://youtube.com/@ali_khan_ict?si=mqOSzAkgagFGdb80',
     analyzerPriceUsd,
+    drtAnalyzerPriceUsd: eaBotsPriceUsd,
     eaBotsPriceUsd,
     usdKesRate,
     analyzerPriceKes: Math.round(analyzerPriceUsd * usdKesRate),
+    drtAnalyzerPriceKes: Math.round(eaBotsPriceUsd * usdKesRate),
     eaBotsPriceKes: Math.round(eaBotsPriceUsd * usdKesRate),
     mpesaTillNumber: s.mpesa_till_number || daraja.partyB || daraja.shortCode || '1921416',
     mpesaPartyB: s.mpesa_party_b || daraja.partyB || s.mpesa_till_number || '1921416',
@@ -1892,17 +1905,17 @@ app.get('/api/orders/my', requireAuth, (req: AuthedRequest, res) => {
 app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
   await hydrateSiteSettingsFromCloud().catch(() => {});
   const user = req.currentUser!;
-  const productKey = req.body?.productKey === 'ea_bots' ? 'ea_bots' : 'analyzer';
+  const isDrtProduct = req.body?.productKey === 'drt_analyzer' || req.body?.productKey === 'ea_bots';
+  const productKey = isDrtProduct ? 'drt_analyzer' : 'analyzer';
   const billingCycle = normalizeBillingCycle(req.body?.billingCycle);
   const paymentMethod = req.body?.paymentMethod === 'mpesa' ? 'mpesa' : 'crypto';
   const cryptoCurrency = sanitizeText(req.body?.cryptoCurrency || 'USDT', 16);
   const cryptoNetwork = sanitizeText(req.body?.cryptoNetwork || 'TRC20', 16);
 
   const settings = getSettingsMap();
-  const baseMonthlyUsd =
-    productKey === 'ea_bots'
-      ? Number(settings.ea_bots_price_usd || 5.25)
-      : Number(settings.analyzer_price_usd || 5.25);
+  const baseMonthlyUsd = isDrtProduct
+    ? Number(settings.ea_bots_price_usd || 5.25)
+    : Number(settings.analyzer_price_usd || 5.25);
   const usdKesRate = Number(settings.usd_kes_rate || 130);
   const planPricing = computeSubscriptionPrice(baseMonthlyUsd, billingCycle, usdKesRate);
   const amountUsd = planPricing.amountUsd;
@@ -1918,10 +1931,9 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
     }
   }
 
-  const baseName =
-    productKey === 'ea_bots'
-      ? 'GRIDPIPs MQL5 EA Bots Pack + MT5 Bridge'
-      : 'GRIDPIPs ICT Strategy Market Analyzer';
+  const baseName = isDrtProduct
+    ? 'GRIDPIPs DRT Strategy Market Analyzer'
+    : 'GRIDPIPs ICT Strategy Market Analyzer';
   const productName = `${baseName} (${planPricing.label} Subscription · ${planPricing.days}d)`;
 
   let depositAddress: string | null = null;
@@ -1934,21 +1946,30 @@ app.post('/api/orders/create', requireAuth, async (req: AuthedRequest, res) => {
   const commissionUsd = user.referred_by ? Number(((amountUsd * commissionPct) / 100).toFixed(2)) : 0;
 
   // Reuse recent unpaid pending order for the same product to prevent duplicate clutter
-  const existingPending = db
-    .prepare(
-      `SELECT * FROM orders
-       WHERE user_id = ? AND product_key = ? AND payment_status = 'pending'
-       ORDER BY id DESC LIMIT 1`
-    )
-    .get(user.id, productKey) as { id: number } | undefined;
+  const existingPending = isDrtProduct
+    ? (db
+        .prepare(
+          `SELECT * FROM orders
+           WHERE user_id = ? AND product_key IN ('drt_analyzer', 'ea_bots') AND payment_status = 'pending'
+           ORDER BY id DESC LIMIT 1`
+        )
+        .get(user.id) as { id: number } | undefined)
+    : (db
+        .prepare(
+          `SELECT * FROM orders
+           WHERE user_id = ? AND product_key = 'analyzer' AND payment_status = 'pending'
+           ORDER BY id DESC LIMIT 1`
+        )
+        .get(user.id) as { id: number } | undefined);
 
   if (existingPending) {
     db.prepare(
       `UPDATE orders
-       SET product_name = ?, billing_cycle = ?, duration_days = ?, amount_usd = ?, amount_kes = ?,
+       SET product_key = ?, product_name = ?, billing_cycle = ?, duration_days = ?, amount_usd = ?, amount_kes = ?,
            payment_method = ?, crypto_currency = ?, crypto_network = ?, crypto_address = ?, commission_usd = ?
        WHERE id = ?`
     ).run(
+      productKey,
       productName,
       billingCycle,
       planPricing.days,
@@ -2024,12 +2045,12 @@ async function fulfillOrder(orderId: number): Promise<void> {
     | DbUser
     | undefined;
 
+  const isDrtOrder = order.product_key === 'drt_analyzer' || order.product_key === 'ea_bots';
   let subscriptionEndsIso: string | null = null;
   if (!alreadyPaid) {
-    const existingExpiryRaw =
-      order.product_key === 'ea_bots'
-        ? currentUser?.ea_bots_expires_at
-        : currentUser?.analyzer_expires_at;
+    const existingExpiryRaw = isDrtOrder
+      ? currentUser?.ea_bots_expires_at
+      : currentUser?.analyzer_expires_at;
     const existingExpiryMs = existingExpiryRaw ? Date.parse(existingExpiryRaw) : NaN;
     const nowMs = Date.now();
     const startMs =
@@ -2053,7 +2074,7 @@ async function fulfillOrder(orderId: number): Promise<void> {
         subscriptionEndsIso,
         order.user_id
       );
-    } else if (order.product_key === 'ea_bots') {
+    } else if (isDrtOrder) {
       db.prepare('UPDATE users SET has_ea_bots = 1, ea_bots_expires_at = ? WHERE id = ?').run(
         subscriptionEndsIso,
         order.user_id
@@ -2062,7 +2083,7 @@ async function fulfillOrder(orderId: number): Promise<void> {
   } else {
     if (order.product_key === 'analyzer') {
       db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(order.user_id);
-    } else if (order.product_key === 'ea_bots') {
+    } else if (isDrtOrder) {
       db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(order.user_id);
     }
   }
@@ -2103,8 +2124,8 @@ async function fulfillOrder(orderId: number): Promise<void> {
         <p>Your subscription payment of <strong>$${order.amount_usd.toFixed(2)} USD (KES ${order.amount_kes})</strong> via <strong>${order.payment_method.toUpperCase()}</strong> for <strong>${order.product_name}</strong> is confirmed.</p>
         <p><strong>Active Through:</strong> ${validUntilLabel} UTC (${durationDays} days)</p>
         <p>${
-          order.product_key === 'ea_bots'
-            ? 'Open the MQL5 EA Bots panel in your GRIDPIPs account to download the .mq5 source files and run your MetaApi Cloud MT5 bridge.'
+          isDrtOrder
+            ? 'Open the DRT Strategy Market Analyzer in your GRIDPIPs account to scan live Dealing Range Theory (25/50/75 DRT) setups, Type 1/2/3 ranges, SMT divergence, and Premium/Discount PD Arrays.'
             : 'Open the ICT Strategy Market Analyzer in your GRIDPIPs account to scan live setups.'
         }</p>`,
     });
@@ -2298,7 +2319,10 @@ app.post('/api/orders/:id/mpesa/stk', requireAuth, stkIpLimiter, stkUserLimiter,
       phone,
       amountKes: order.amount_kes,
       accountReference: order.order_number,
-      transactionDesc: order.product_key === 'ea_bots' ? 'GRIDPIPs EAs' : 'GRIDPIPs ICT',
+      transactionDesc:
+        order.product_key === 'drt_analyzer' || order.product_key === 'ea_bots'
+          ? 'GRIDPIPs DRT'
+          : 'GRIDPIPs ICT',
       callbackUrl,
       settings,
     });
@@ -3622,6 +3646,31 @@ app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
   } catch (err) {
     console.error('Analyzer scan error:', err);
     res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to complete ICT market scan.' });
+  }
+});
+
+// ---------------- DRT Strategy Market Analyzer (Ali Khan Dealing Range Theory) ----------------
+app.get('/api/drt/scan', requireAuth, async (req: AuthedRequest, res) => {
+  try {
+    const user = req.currentUser!;
+    if (!hasActiveDrtAccess(user)) {
+      res.status(402).json({
+        error: 'An active DRT Strategy Market Analyzer subscription is required. Subscribe or renew in Subscriptions & Billing.',
+      });
+      return;
+    }
+    const symbol = sanitizeText(req.query.symbol || 'EURUSD', 12).toUpperCase();
+    const timeframe = normalizeServerTimeframe(sanitizeText(req.query.timeframe || '15M', 8));
+    const settings = getSettingsMap();
+    const analysis = await runDrtMarketAnalysis(
+      symbol,
+      timeframe,
+      settings.drt_youtube_channel_url || 'https://youtube.com/@ali_khan_ict?si=mqOSzAkgagFGdb80'
+    );
+    res.json({ analysis });
+  } catch (err) {
+    console.error('DRT Analyzer scan error:', err);
+    res.status(500).json({ error: err instanceof Error ? err.message : 'Unable to complete DRT market scan.' });
   }
 });
 
@@ -5110,7 +5159,9 @@ app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest,
     const exnessVerified =
       typeof req.body?.exnessVerified === 'boolean' ? (req.body.exnessVerified ? 1 : 0) : undefined;
     const hasAnalyzer = typeof req.body?.hasAnalyzer === 'boolean' ? (req.body.hasAnalyzer ? 1 : 0) : undefined;
-    const hasEaBots = typeof req.body?.hasEaBots === 'boolean' ? (req.body.hasEaBots ? 1 : 0) : undefined;
+    const rawHasDrt =
+      typeof req.body?.hasDrtAnalyzer === 'boolean' ? req.body.hasDrtAnalyzer : req.body?.hasEaBots;
+    const hasEaBots = typeof rawHasDrt === 'boolean' ? (rawHasDrt ? 1 : 0) : undefined;
 
     let walletBalanceKes: number | undefined;
     if (req.body?.walletBalanceKes !== undefined && req.body?.walletBalanceKes !== '') {
@@ -5193,15 +5244,19 @@ app.post('/api/admin/users/:id/update', requireAdmin, async (req: AuthedRequest,
 
     let hasEaBotsExpiryUpdate = false;
     let eaBotsExpiresAtVal: string | null = existing.ea_bots_expires_at || null;
-    if (req.body?.eaBotsExpiresAt !== undefined) {
+    const incomingDrtExpiry =
+      req.body?.drtAnalyzerExpiresAt !== undefined
+        ? req.body.drtAnalyzerExpiresAt
+        : req.body?.eaBotsExpiresAt;
+    if (incomingDrtExpiry !== undefined) {
       hasEaBotsExpiryUpdate = true;
-      const rawDate = String(req.body.eaBotsExpiresAt || '').trim();
+      const rawDate = String(incomingDrtExpiry || '').trim();
       if (!rawDate) {
         eaBotsExpiresAtVal = null;
       } else {
         const parsed = Date.parse(rawDate.length === 10 ? `${rawDate}T23:59:59.000Z` : rawDate);
         if (!Number.isFinite(parsed)) {
-          res.status(400).json({ error: 'Invalid EA Bots subscription expiration date.' });
+          res.status(400).json({ error: 'Invalid DRT Analyzer subscription expiration date.' });
           return;
         }
         eaBotsExpiresAtVal = new Date(parsed).toISOString();
@@ -5343,6 +5398,7 @@ app.post('/api/admin/settings', requireAdmin, async (req: AuthedRequest, res) =>
     'exness_ib_url',
     'telegram_url',
     'ict_youtube_channel_id',
+    'drt_youtube_channel_url',
     'analyzer_price_usd',
     'ea_bots_price_usd',
     'usd_kes_rate',

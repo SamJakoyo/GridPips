@@ -2,13 +2,11 @@ import React, { useState } from 'react';
 import {
   Check,
   Copy,
-  Eye,
-  EyeOff,
   ArrowUpRight,
   Save,
   ShieldCheck,
   UserCheck,
-  KeyRound,
+  Layers,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import type { JournalTrade, Order, PublicConfig, User } from '../types';
@@ -20,8 +18,8 @@ interface AccountProfileViewProps {
   journal: JournalTrade[];
   watchlist: string[];
   onUserUpdated: (user: User) => void;
-  onNavigate: (tab: 'analyzer' | 'eabots' | 'orders' | 'referrals' | 'journal' | 'charts') => void;
-  onUnlock: (productKey: 'analyzer' | 'ea_bots') => void;
+  onNavigate: (tab: 'analyzer' | 'drt' | 'orders' | 'referrals' | 'journal' | 'charts') => void;
+  onUnlock: (productKey: 'analyzer' | 'drt_analyzer') => void;
 }
 
 function formatDateTime(iso?: string | null): string {
@@ -54,7 +52,11 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [showBridgeToken, setShowBridgeToken] = useState(false);
+  const hasDrt = Boolean(user.hasDrtAnalyzer ?? user.hasEaBots);
+  const drtDaysRemaining = user.drtAnalyzerDaysRemaining ?? user.eaBotsDaysRemaining;
+  const drtStatus = user.drtAnalyzerSubscriptionStatus ?? user.eaBotsSubscriptionStatus;
+  const drtExpiresAt = user.drtAnalyzerExpiresAt ?? user.eaBotsExpiresAt;
+  const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
 
   const initials = (user.name || user.email || 'TR')
     .trim()
@@ -212,24 +214,22 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
         </div>
 
         <div className="rounded-2xl bg-white border border-slate-200 p-5">
-          <div className="text-xs text-slate-500">MQL5 EA Bots &amp; MT5</div>
+          <div className="text-xs text-slate-500">DRT Strategy Analyzer</div>
           <div className="text-base font-bold text-slate-950 mt-1.5">
-            {user.hasEaBots
-              ? user.mt5Connected
-                ? `MT5 ${user.mt5Login || 'Connected'}`
-                : user.eaBotsDaysRemaining != null
-                ? `Active · ${user.eaBotsDaysRemaining}d left`
-                : 'Active · Standby'
-              : user.eaBotsSubscriptionStatus === 'expired'
+            {hasDrt
+              ? drtDaysRemaining != null
+                ? `Active · ${drtDaysRemaining}d left`
+                : 'Active subscription'
+              : drtStatus === 'expired'
               ? 'Subscription expired'
-              : `From $${config.eaBotsPriceUsd.toFixed(2)}/mo`}
+              : `From $${drtPriceUsd.toFixed(2)}/mo`}
           </div>
           <button
             type="button"
-            onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
+            onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
             className="text-xs font-semibold text-amber-700 hover:underline mt-2 cursor-pointer"
           >
-            {user.hasEaBots ? 'Manage MT5 bridge →' : 'Subscribe to EA bots →'}
+            {hasDrt ? 'Open DRT scanner →' : 'Subscribe to DRT analyzer →'}
           </button>
         </div>
       </div>
@@ -318,69 +318,74 @@ export const AccountProfileView: React.FC<AccountProfileViewProps> = ({
           </form>
         </div>
 
-        {/* MT5 Credentials, Security & Workspace Summary */}
+        {/* Active Analyzer Subscriptions & Workspace Summary */}
         <div className="lg:col-span-5 space-y-5">
           <div className="rounded-2xl bg-white border border-slate-200 p-6 space-y-4">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-amber-600" />
-              <h3 className="text-base font-bold text-slate-950">MT5 Terminal &amp; Bridge Details</h3>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Layers className="w-4 h-4 text-amber-600" />
+                <h3 className="text-base font-bold text-slate-950">Active Analyzer Subscriptions</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => onNavigate('orders')}
+                className="text-xs font-semibold text-amber-700 hover:underline cursor-pointer"
+              >
+                Manage →
+              </button>
             </div>
 
             <div className="divide-y divide-slate-200 text-xs">
               <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500">Connection Status</span>
-                <span className={user.mt5Connected ? 'font-semibold text-emerald-600' : 'font-semibold text-slate-700'}>
-                  {user.mt5Connected ? 'Live Telemetry Connected' : 'Not Connected'}
+                <span className="text-slate-500">ICT Strategy Analyzer</span>
+                <span className={user.hasAnalyzer ? 'font-semibold text-emerald-600' : 'font-semibold text-slate-600'}>
+                  {user.hasAnalyzer
+                    ? user.analyzerDaysRemaining != null
+                      ? `Active (${user.analyzerDaysRemaining}d left)`
+                      : 'Active'
+                    : user.analyzerSubscriptionStatus === 'expired'
+                    ? 'Expired'
+                    : 'Not Subscribed'}
                 </span>
               </div>
               <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500">MT5 Login / Server</span>
-                <span className="font-mono text-slate-900">
-                  {user.mt5Login || '—'} · {user.mt5Server || '—'}
+                <span className="text-slate-500">ICT Renewal / Expiry</span>
+                <span className="font-mono tabular-nums text-slate-700">
+                  {user.analyzerExpiresAt ? formatDateTime(user.analyzerExpiresAt) : '—'}
                 </span>
               </div>
               <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500">MT5 Balance / Equity</span>
-                <span className="font-mono tabular-nums text-slate-900">
-                  {typeof user.mt5Balance === 'number'
-                    ? `$${user.mt5Balance.toFixed(2)} / $${(user.mt5Equity ?? user.mt5Balance).toFixed(2)}`
-                    : '—'}
+                <span className="text-slate-500">DRT Strategy Analyzer</span>
+                <span className={hasDrt ? 'font-semibold text-emerald-600' : 'font-semibold text-slate-600'}>
+                  {hasDrt
+                    ? drtDaysRemaining != null
+                      ? `Active (${drtDaysRemaining}d left)`
+                      : 'Active'
+                    : drtStatus === 'expired'
+                    ? 'Expired'
+                    : 'Not Subscribed'}
                 </span>
               </div>
               <div className="py-2.5 flex items-center justify-between gap-3">
-                <span className="text-slate-500">Last MT5 Heartbeat</span>
-                <span className="font-mono tabular-nums text-slate-600">{formatDateTime(user.mt5LastSync)}</span>
+                <span className="text-slate-500">DRT Renewal / Expiry</span>
+                <span className="font-mono tabular-nums text-slate-700">
+                  {drtExpiresAt ? formatDateTime(drtExpiresAt) : '—'}
+                </span>
               </div>
             </div>
 
-            {user.mt5BridgeToken && (
-              <div className="pt-1">
-                <div className="text-xs text-slate-500 mb-1.5">MT5 Bridge Token</div>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200">
-                  <span className="flex-1 font-mono text-xs text-amber-700 truncate">
-                    {showBridgeToken ? user.mt5BridgeToken : '••••••••••••••••••••'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setShowBridgeToken((v) => !v)}
-                    className="p-1 text-slate-500 hover:text-slate-950 cursor-pointer"
-                    aria-label={showBridgeToken ? 'Hide token' : 'Reveal token'}
-                  >
-                    {showBridgeToken ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => copyValue('bridgeToken', user.mt5BridgeToken || '')}
-                    className="p-1 text-slate-500 hover:text-amber-600 cursor-pointer"
-                    aria-label="Copy Bridge Token"
-                  >
-                    {copiedKey === 'bridgeToken' ? (
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
-                </div>
+            {config.drtYoutubeChannelUrl && (
+              <div className="pt-1 flex items-center justify-between gap-2 text-xs">
+                <span className="text-slate-500">DRT Strategy Framework</span>
+                <a
+                  href={config.drtYoutubeChannelUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-amber-700 hover:underline"
+                >
+                  Ali Khan ICT YouTube
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </a>
               </div>
             )}
           </div>

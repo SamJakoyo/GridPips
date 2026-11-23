@@ -1435,14 +1435,14 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                                   : 'border-slate-300 text-slate-500'
                               }`}
                             >
-                              EA {u.has_ea_bots ? 'ON' : 'OFF'}
+                              DRT {u.has_ea_bots ? 'ON' : 'OFF'}
                             </button>
                           </div>
                           {(u.analyzer_expires_at || u.ea_bots_expires_at) && (
                             <div className="text-[10px] font-mono text-slate-500">
                               {u.analyzer_expires_at ? `ICT exp ${u.analyzer_expires_at.slice(0, 10)}` : ''}
                               {u.analyzer_expires_at && u.ea_bots_expires_at ? ' · ' : ''}
-                              {u.ea_bots_expires_at ? `EA exp ${u.ea_bots_expires_at.slice(0, 10)}` : ''}
+                              {u.ea_bots_expires_at ? `DRT exp ${u.ea_bots_expires_at.slice(0, 10)}` : ''}
                             </div>
                           )}
                         </td>
@@ -2226,6 +2226,18 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
+                DRT Strategy YouTube Channel URL
+              </label>
+              <input
+                value={settingsForm.drt_youtube_channel_url || ''}
+                onChange={(e) =>
+                  setSettingsForm({ ...settingsForm, drt_youtube_channel_url: e.target.value })
+                }
+                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
                 Influencer Payout Commission (%)
               </label>
               <input
@@ -2250,7 +2262,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                MQL5 EA Bots Monthly Price (USD)
+                DRT Analyzer Monthly Price (USD)
               </label>
               <input
                 value={settingsForm.ea_bots_price_usd || ''}
@@ -2508,7 +2520,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-semibold text-slate-700">
-                      MQL5 EA Bots Expiry Date
+                      DRT Analyzer Expiry Date
                     </label>
                     <button
                       type="button"
@@ -2559,7 +2571,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     onChange={(e) => setEditForm({ ...editForm, hasEaBots: e.target.checked })}
                     className="rounded border-slate-300"
                   />
-                  <span>MQL5 EA Bots</span>
+                  <span>DRT Analyzer</span>
                 </label>
                 <label className="flex items-center gap-2 font-semibold text-rose-700 cursor-pointer">
                   <input

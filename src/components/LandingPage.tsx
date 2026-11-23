@@ -29,7 +29,7 @@ interface LandingPageProps {
   marketStatus?: TradingViewMarketStatus | null;
   onGoAuth: (mode: 'login' | 'register') => void;
   onGoWorkspace: () => void;
-  onSelectProduct: (product: 'analyzer' | 'ea_bots', symbol?: string, timeframe?: AnalyzerTimeframe) => void;
+  onSelectProduct: (product: 'analyzer' | 'drt_analyzer', symbol?: string, timeframe?: AnalyzerTimeframe) => void;
 }
 
 type LegalDocKey = 'risk' | 'affiliate' | 'terms' | 'privacy';
@@ -38,12 +38,12 @@ const HERO_FRAMES = [
   {
     src: LANDING_IMAGES.heroTrader3d,
     alt: '3D quantitative forex trader analyzing candlestick markets at an architectural desk',
-    caption: 'Execution Desk · ICT Killzone Mapping',
+    caption: 'ICT Analyzer · Killzone Liquidity & FVG Mapping',
   },
   {
     src: LANDING_IMAGES.automatorCode3d,
-    alt: 'Quantitative developer coding MQL5 Expert Advisors beside live candlestick price charts',
-    caption: 'MQL5 Automation · Code & MetaTrader 5 Bridge',
+    alt: 'Quantitative analyst mapping Dealing Range Theory 4-quadrant PD Arrays beside live charts',
+    caption: 'DRT Analyzer · 4-Quadrant Dealing Ranges & PD Arrays',
   },
   {
     src: LANDING_IMAGES.gridPipsBanner,
@@ -57,8 +57,8 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
     title: 'Risk Disclosure',
     paragraphs: [
       'Trading foreign exchange (Forex), CFDs, commodities, indices, and cryptocurrencies on margin carries a high level of risk and may not be suitable for all investors. Leverage can amplify both profits and losses.',
-      'Grid Pips provides market structure education, ICT analytical software, and MQL5 Expert Advisor source templates for informational and automation research purposes only. Nothing on this platform constitutes personalized financial or investment advice.',
-      'Past backtest or live performance of any ICT strategy or MQL5 Expert Advisor does not guarantee future results. Only trade with capital you can afford to lose.',
+      'Grid Pips provides market structure education, the ICT Strategy Market Analyzer, and the DRT (Dealing Range Theory) Strategy Analyzer for informational and analytical research purposes only. Nothing on this platform constitutes personalized financial or investment advice.',
+      'Past backtest or live performance of any ICT or DRT strategy setup does not guarantee future results. Only trade with capital you can afford to lose.',
     ],
   },
   affiliate: {
@@ -71,8 +71,8 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
   terms: {
     title: 'Terms of Service',
     paragraphs: [
-      'Access to the free trading tools and paid subscription modules (ICT Strategy Market Analyzer and MQL5 EA Bots Pack, starting at $5.25/month) is granted to registered members upon Exness IB onboarding confirmation.',
-      'Active software subscriptions grant single-trader personal usage rights to the downloadable MQL5 (.mq5) source files, MetaApi Cloud MT5 execution, and ICT Analyzer engine. Redistribution, commercial reselling, or unauthorized reverse-engineering is prohibited.',
+      'Access to the free trading tools and paid subscription modules (ICT Strategy Market Analyzer and DRT Strategy Market Analyzer, starting at $5.25/month each) is granted to registered members upon Exness IB onboarding confirmation.',
+      'Active software subscriptions grant single-trader personal usage rights to the ICT Analyzer engine, the separate DRT Dealing Range Theory engine, dual TradingView mapped charts, and Pine Script exports. Redistribution, commercial reselling, or unauthorized reverse-engineering is prohibited.',
       'Members agree to maintain accurate account credentials and refrain from automated scraping, credential stuffing, or unauthorized API probing.',
     ],
   },
@@ -81,7 +81,7 @@ const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> =
     paragraphs: [
       'Grid Pips stores only the account details necessary to operate your trading account, journal records, Exness IB verification, order receipts, and referral commissions.',
       'Passwords are protected with scrypt key derivation and per-user cryptographic salts. Sessions use HMAC-SHA256 signed HTTP-only cookies alongside Helmet security headers and strict rate limiting.',
-      'We do not sell personal trader data to third parties. Automated notifications for registrations, payments, MT5 bindings, and payouts are stored securely in your member Email Inbox.',
+      'We do not sell personal trader data to third parties. Automated notifications for registrations, subscription activations, and partner payouts are stored securely in your member Email Inbox.',
     ],
   },
 };
@@ -389,7 +389,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </h1>
 
               <p className="text-[15px] lg:text-base font-normal text-slate-600 leading-relaxed mb-8 max-w-lg">
-                Join Grid Pips — an institutional ICT market analyzer and MQL5 automation platform built for Exness traders, analysts, and automators worldwide.
+                Join Grid Pips — two dedicated institutional market analyzers (ICT Strategy Analyzer &amp; Ali Khan DRT Dealing Range Analyzer) built for Exness traders worldwide.
               </p>
 
               <div className="flex flex-wrap items-center gap-4">
@@ -416,7 +416,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <TrendingUp className="w-4 h-4 shrink-0" />
                     <span>${config.analyzerPriceUsd.toFixed(2)}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">ICT &amp; MQL5 Modules</div>
+                  <div className="text-xs text-slate-500 mt-1">ICT &amp; DRT Analyzers</div>
                 </div>
                 <div className="pr-4 border-r border-slate-300">
                   <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-amber-600">
@@ -757,13 +757,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="max-w-2xl mb-10">
             <p className="text-xs font-semibold mb-2 text-amber-700">Core Architecture</p>
             <h2 className="text-3xl font-bold tracking-tight text-slate-950" style={{ textWrap: 'balance' }}>
-              Built for Inner Circle Trader precision and automated MT5 execution.
+              Two separate institutional analyzers: ICT Liquidity &amp; Ali Khan DRT Dealing Ranges.
             </h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Card 1: ICT Analyzer */}
-            <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+            <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
               <div className="h-64 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
                 <ImageWithFallback
                   src={LANDING_IMAGES.analystIct3d}
@@ -774,7 +774,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="text-xs font-semibold mb-2 text-amber-700">
-                    01. Market Intelligence · ${config.analyzerPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
+                    01. ICT Liquidity Engine · ${config.analyzerPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
                   <h3 className="text-xl font-bold text-slate-950 mb-2">
                     ICT Strategy Market Analyzer
@@ -789,40 +789,40 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
                     className="text-sm font-semibold cursor-pointer text-amber-700 hover:text-amber-600"
                   >
-                    Subscribe to Analyzer →
+                    Subscribe ICT Analyzer →
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Card 2: MQL5 EA Bots */}
-            <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
+            {/* Card 2: DRT Analyzer */}
+            <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
               <div className="h-64 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
                 <ImageWithFallback
                   src={LANDING_IMAGES.automatorEa3d}
-                  alt="3D Black institutional trader operating multi-monitor MetaTrader 5 execution desk"
+                  alt="3D institutional trader mapping Dealing Range Theory quadrants and PD Arrays"
                   className="w-full h-full object-cover object-top"
                 />
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="text-xs font-semibold mb-2 text-amber-700">
-                    02. Execution Bots · ${config.eaBotsPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
+                    02. Dealing Range Theory · ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
                   <h3 className="text-xl font-bold text-slate-950 mb-2">
-                    MQL5 Expert Advisors &amp; MT5 Bridge
+                    DRT Strategy Market Analyzer
                   </h3>
                   <p className="text-sm text-slate-600 leading-relaxed mb-5">
-                    Receive two clean, compilable MQL5 (.mq5) bots (ICT Silver Bullet FVG &amp; SMC Liquidity Sweep), complete step-by-step MetaTrader 5 installation documentation, and direct MT5 WebRequest bridge telemetry inside your Grid Pips dashboard.
+                    Built strictly around Ali Khan ICT&apos;s Dealing Range Theory. Maps 0.00 / 0.25 / 0.50 / 0.75 / 1.00 DRT quadrants, classifies Type 1/2/3 dealing ranges, detects live correlated SMT Divergence, 50% DRT Equilibrium Flips, and Premium vs. Discount PD Arrays (FVG, OB, Breaker &amp; Rejection Blocks).
                   </p>
                 </div>
                 <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                  <span className="text-xs font-mono text-slate-500">.mq5 Source + Setup Guide</span>
+                  <span className="text-xs font-mono text-slate-500">0/25/50/75/100 DRT + SMT + PD Arrays</span>
                   <button
-                    onClick={() => (user ? onSelectProduct('ea_bots') : onGoAuth('register'))}
+                    onClick={() => (user ? onSelectProduct('drt_analyzer') : onGoAuth('register'))}
                     className="text-sm font-semibold cursor-pointer text-amber-700 hover:text-amber-600"
                   >
-                    Get MQL5 Bots →
+                    Subscribe DRT Analyzer →
                   </button>
                 </div>
               </div>
@@ -931,45 +931,47 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <span className="text-3xl font-bold font-mono tabular-nums text-slate-950">
                     ${config.analyzerPriceUsd.toFixed(2)}
                   </span>
+                  <span className="text-xs text-slate-500 ml-1">/month</span>
                 </div>
                 <ul className="space-y-2.5 text-sm text-slate-700 mb-6">
                   <li>· Automated FVG (BISI / SIBI) Detection</li>
                   <li>· Bullish &amp; Bearish Order Block Mapping</li>
                   <li>· BSL / SSL Liquidity Sweep Targets</li>
                   <li>· 0.618–0.786 OTE &amp; NY Killzone Timing</li>
-                  <li>· Actionable Entry, SL &amp; TP Projections</li>
+                  <li>· Dual Live &amp; Mapped TradingView Charts</li>
                 </ul>
               </div>
               <button
                 onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
                 className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors cursor-pointer"
               >
-                Get ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)}
+                Subscribe ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)}/mo
               </button>
             </div>
 
             <div className="border border-slate-900 rounded-xl p-7 flex flex-col justify-between bg-slate-950 text-white">
               <div>
-                <div className="text-xs font-semibold text-amber-400 mb-1">Full MQL5 Source + MT5 Connect</div>
-                <h3 className="text-lg font-bold text-white">MQL5 EA Bots Pack</h3>
+                <div className="text-xs font-semibold text-amber-400 mb-1">Ali Khan Dealing Range Theory</div>
+                <h3 className="text-lg font-bold text-white">DRT Strategy Market Analyzer</h3>
                 <div className="my-4">
                   <span className="text-3xl font-bold font-mono tabular-nums text-white">
-                    ${config.eaBotsPriceUsd.toFixed(2)}
+                    ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}
                   </span>
+                  <span className="text-xs text-slate-400 ml-1">/month</span>
                 </div>
                 <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
-                  <li>· Grid Pips ICT Silver Bullet EA (.mq5)</li>
-                  <li>· Grid Pips SMC Order Block EA (.mq5)</li>
-                  <li>· Complete MT5 Installation Guide</li>
-                  <li>· Live MT5 Account Bridge Connection</li>
-                  <li>· Automated Risk % &amp; Daily Drawdown Guard</li>
+                  <li>· 0.00 / 0.25 / 0.50 / 0.75 / 1.00 DRT Grid</li>
+                  <li>· Type 1, Type 2 &amp; Type 3 Dealing Ranges</li>
+                  <li>· Live Correlated SMT Divergence Engine</li>
+                  <li>· Premium &amp; Discount PD Array Matrix</li>
+                  <li>· 50% Equilibrium Flips &amp; DRT Pine Script</li>
                 </ul>
               </div>
               <button
-                onClick={() => (user ? onSelectProduct('ea_bots') : onGoAuth('register'))}
+                onClick={() => (user ? onSelectProduct('drt_analyzer') : onGoAuth('register'))}
                 className="w-full py-2.5 bg-amber-400 text-black text-sm font-semibold rounded-full hover:bg-amber-300 transition-colors cursor-pointer"
               >
-                Buy MQL5 Bots — ${config.eaBotsPriceUsd.toFixed(2)}
+                Subscribe DRT Analyzer — ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo
               </button>
             </div>
           </div>
@@ -1019,7 +1021,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="md:col-span-2">
             <BrandLogo variant="dark" size="md" showTagline className="mb-3" />
             <p className="text-xs text-slate-500 leading-relaxed max-w-md">
-              Risk Disclosure: CFDs and leveraged forex instruments carry a high risk of losing money rapidly. Grid Pips provides educational tools, ICT market analysis software, and MQL5 source code templates only. We do not hold client funds or execute brokerage orders.
+              Risk Disclosure: CFDs and leveraged forex instruments carry a high risk of losing money rapidly. Grid Pips provides educational tools, the ICT Strategy Market Analyzer, and the DRT Dealing Range Theory Analyzer only. We do not hold client funds or execute brokerage orders.
             </p>
           </div>
           <div>
@@ -1045,6 +1047,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   ICT YouTube Mentorship
                 </a>
               </li>
+              {config.drtYoutubeChannelUrl && (
+                <li>
+                  <a
+                    href={config.drtYoutubeChannelUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-slate-950"
+                  >
+                    Ali Khan ICT (DRT Strategy)
+                  </a>
+                </li>
+              )}
             </ul>
           </div>
           <div>
@@ -1096,7 +1110,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="flex items-center justify-between border-b border-slate-200 pb-3">
               <div>
                 <h3 className="text-base font-bold text-slate-950">Grid Pips Platform Walkthrough</h3>
-                <p className="text-xs text-slate-500">ICT Strategy Market Analyzer + MQL5 EA Bots Pack</p>
+                <p className="text-xs text-slate-500">ICT Strategy Market Analyzer + DRT Strategy Market Analyzer</p>
               </div>
               <button
                 type="button"
@@ -1117,8 +1131,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <p>Detects London &amp; NY Killzones, Premium/Discount PD Arrays, Fair Value Gaps (BISI/SIBI), Order Blocks, 0.705 OTE Fibs, and BSL/SSL liquidity targets.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">03. ${config.eaBotsPriceUsd.toFixed(2)}/mo MQL5 EA Bots + MT5 Bridge</div>
-                <p>Download compilable .mq5 Expert Advisors with full installation guide and connect directly to your MetaTrader 5 terminal via MetaApi Cloud.</p>
+                <div className="font-semibold text-amber-700">03. ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo DRT Strategy Analyzer</div>
+                <p>Standalone Ali Khan Dealing Range Theory scanner mapping 0/25/50/75/100 DRT quadrants, Type 1/2/3 ranges, live SMT divergence, 50% equilibrium flips, and PD Arrays.</p>
               </div>
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
                 <div className="font-semibold text-amber-700">04. JakoyoFX Community &amp; {config.commissionPct}% Referrals</div>

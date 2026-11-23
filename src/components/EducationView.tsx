@@ -108,15 +108,30 @@ const LESSONS: LessonModule[] = [
     youtubeSearchQuery: 'Smart Money Concepts Inducement Order Block',
   },
   {
+    id: 'drt-1',
+    track: 'ICT Core',
+    title: 'Ali Khan DRT: Dealing Range Theory, 4 Quadrants & PD Arrays',
+    duration: 'DRT Framework',
+    summary:
+      'Master Ali Khan ICT’s mechanical Dealing Range Theory (DRT): split every active range into 0.00 / 0.25 / 0.50 / 0.75 / 1.00 quadrants, confirm Type 1/2/3 ranges with SMT divergence, and trade Premium/Discount PD Arrays after a 50% DRT Equilibrium Flip.',
+    keyPoints: [
+      'Anchor Dealing Range High (1.00 DRH) and Dealing Range Low (0.00 DRL) across the active structural range, then divide into 25%, 50% Equilibrium, and 75% quadrants.',
+      'Only look for Discount longs below 50% (especially Deep Discount 0–25% and 25 DRT reclaim) and Premium shorts above 50% (especially Deep Premium 75–100% and 75 DRT rejection).',
+      'Classify Type 1 (Expansion), Type 2 (EQH/EQL Liquidity Sweep + Correlated SMT Divergence Reversal), and Type 3 (Consolidation) dealing ranges before committing risk.',
+      'Stack aligned PD Arrays inside your quadrant: External DRH/DRL, FVGs (BISI/SIBI + 50% CE), Order Blocks, Breaker Blocks, and Rejection Blocks targeting ±0.25 SD extensions.',
+    ],
+    youtubeSearchQuery: 'Ali Khan ICT Dealing Range Theory DRT',
+  },
+  {
     id: 'risk-1',
     track: 'Risk & Psychology',
     title: 'Institutional Risk Sizing & Prop-Firm Drawdown Protection',
     duration: 'Capital Defense',
     summary:
-      'Consistent execution beats lucky big bets. Enforce strict 0.5%-1.0% risk per trade and hard daily drawdown limits across both manual ICT trades and MQL5 EA bots.',
+      'Consistent execution beats lucky big bets. Enforce strict 0.5%-1.0% risk per trade and hard daily drawdown limits across both ICT Analyzer and DRT Analyzer setups.',
     keyPoints: [
       'Never risk more than 1% on a single setup; cap daily drawdown at 2%-3%.',
-      'Use GRIDPIPs Position Size Calculator before opening any Exness MT5 order.',
+      'Use GRIDPIPs Position Size Calculator before opening any Exness order.',
       'Log every winning and losing trade in your GRIDPIPs Journal with entry rationale.',
       'Stop trading for the day after 2 consecutive losses or hitting your daily target.',
     ],
@@ -172,6 +187,17 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
               Open Full ICT YouTube Channel
               <ArrowUpRight className="w-4 h-4" />
             </a>
+            {config.drtYoutubeChannelUrl && (
+              <a
+                href={config.drtYoutubeChannelUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full py-2.5 px-4 bg-amber-50 border border-amber-300 text-amber-900 text-xs font-semibold rounded-lg hover:bg-amber-100 inline-flex items-center justify-center gap-2"
+              >
+                Open Ali Khan ICT (DRT Strategy)
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            )}
             <a
               href={config.telegramUrl}
               target="_blank"

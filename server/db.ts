@@ -294,6 +294,7 @@ export function initDatabase(): void {
     exness_ib_url: 'https://one.exnessonelink.com/a/0p67hxlswg?source=app',
     telegram_url: 'https://t.me/JakoyoFx',
     ict_youtube_channel_id: 'UCtjxa77NqamhVC8atV85Rog',
+    drt_youtube_channel_url: 'https://youtube.com/@ali_khan_ict?si=mqOSzAkgagFGdb80',
     analyzer_price_usd: '5.25',
     ea_bots_price_usd: '5.25',
     usd_kes_rate: '130',

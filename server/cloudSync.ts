@@ -570,7 +570,7 @@ export async function hydrateUserFromCloud(userId: number, email: string): Promi
           if (o.payment_status === 'paid') {
             if (o.product_key === 'analyzer') {
               db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(userId);
-            } else if (o.product_key === 'ea_bots') {
+            } else if (o.product_key === 'drt_analyzer' || o.product_key === 'ea_bots') {
               db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(userId);
             }
           }
@@ -866,7 +866,7 @@ export async function hydrateMpesaCheckoutFromCloud(checkoutRequestId: string): 
         if (cloudOrder.payment_status === 'paid') {
           if (cloudOrder.product_key === 'analyzer') {
             db.prepare('UPDATE users SET has_analyzer = 1 WHERE id = ?').run(userId);
-          } else if (cloudOrder.product_key === 'ea_bots') {
+          } else if (cloudOrder.product_key === 'drt_analyzer' || cloudOrder.product_key === 'ea_bots') {
             db.prepare('UPDATE users SET has_ea_bots = 1 WHERE id = ?').run(userId);
           }
         }

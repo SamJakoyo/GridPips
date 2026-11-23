@@ -8,7 +8,6 @@ import {
   Trash2,
   BookMarked,
   CandlestickChart,
-  Zap,
   AlertTriangle,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
@@ -190,34 +189,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
     }
   }
 
-  const [autoTradingMt5, setAutoTradingMt5] = useState(false);
-
-  async function handleAutoTradeSetupOnMt5() {
-    if (!analysis) return;
-    setError('');
-    setCloudNotice('');
-    setAutoTradingMt5(true);
-    try {
-      const side = analysis.dailyBias === 'Bullish' ? 'BUY' : 'SELL';
-      const res = await apiFetch<{ ok: boolean; message: string }>('/api/ea/mt5/execute', {
-        method: 'POST',
-        body: JSON.stringify({
-          symbol: analysis.symbol,
-          side,
-          volume: 0.05,
-          stopLoss: analysis.setup.stopLoss,
-          takeProfit: analysis.setup.tp1,
-          sourceEa: `ICT ${analysis.timeframe} Scanner`,
-        }),
-      });
-      setCloudNotice(res.message);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to send setup to connected MT5 account.');
-    } finally {
-      setAutoTradingMt5(false);
-    }
-  }
-
   async function handleDeletePlaybook(id: string) {
     setError('');
     try {
@@ -372,9 +343,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">Included in Your Analyzer License</h3>
+              <h3 className="text-sm font-bold text-slate-950">Included in Your ICT Analyzer Subscription</h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Calibrated to ICT methodology ({config.ictYoutubeChannelId}) with zero recurring monthly subscriptions.
+                Calibrated to ICT methodology ({config.ictYoutubeChannelId}) with flexible Monthly, Quarterly (-10%), and Annual (-20%) billing.
               </p>
             </div>
             <span className="text-xs font-mono text-slate-500">12 Major FX, Gold, Indices &amp; Crypto Pairs</span>
@@ -865,21 +836,6 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   )}
                 </div>
 
-                {user.hasEaBots && (
-                  <div className="mt-4 pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      disabled={autoTradingMt5}
-                      onClick={handleAutoTradeSetupOnMt5}
-                      className="w-full py-2.5 px-4 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-2 cursor-pointer transition-colors disabled:opacity-60"
-                    >
-                      <Zap className="w-3.5 h-3.5 text-[#E5A93C]" />
-                      {autoTradingMt5
-                        ? 'Sending Order to MT5...'
-                        : `Auto-Trade ${analysis.dailyBias === 'Bullish' ? 'BUY' : 'SELL'} ${analysis.symbol} on MT5`}
-                    </button>
-                  </div>
-                )}
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl p-5">

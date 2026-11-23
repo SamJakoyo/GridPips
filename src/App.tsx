@@ -4,12 +4,12 @@ import {
   Activity,
   BarChart3,
   BookOpen,
-  Bot,
   Calculator,
   Calendar,
   CandlestickChart,
   CheckSquare,
   CreditCard,
+  Layers,
   LayoutDashboard,
   LogOut,
   Mail,
@@ -38,7 +38,7 @@ import { LandingPage } from './components/LandingPage';
 import { AuthView, type PendingOAuthUser } from './components/AuthView';
 import { CheckoutModal } from './components/CheckoutModal';
 import { IctAnalyzerView } from './components/IctAnalyzerView';
-import { EaBotsView } from './components/EaBotsView';
+import { DrtAnalyzerView } from './components/DrtAnalyzerView';
 import { EducationView } from './components/EducationView';
 import {
   AnalyticsView,
@@ -62,7 +62,7 @@ import { LANDING_IMAGES } from './assets/landingImages';
 type WorkspaceTab =
   | 'overview'
   | 'analyzer'
-  | 'eabots'
+  | 'drt'
   | 'orders'
   | 'charts'
   | 'journal'
@@ -81,10 +81,13 @@ const DEFAULT_CONFIG: PublicConfig = {
   exnessIbUrl: 'https://one.exnessonelink.com/a/0p67hxlswg?source=app',
   telegramUrl: 'https://t.me/JakoyoFx',
   ictYoutubeChannelId: 'UCtjxa77NqamhVC8atV85Rog',
+  drtYoutubeChannelUrl: 'https://youtube.com/@ali_khan_ict?si=mqOSzAkgagFGdb80',
   analyzerPriceUsd: 5.25,
+  drtAnalyzerPriceUsd: 5.25,
   eaBotsPriceUsd: 5.25,
   usdKesRate: 130,
   analyzerPriceKes: 683,
+  drtAnalyzerPriceKes: 683,
   eaBotsPriceKes: 683,
   mpesaTillNumber: '1921416',
   mpesaPartyB: '1921416',
@@ -114,9 +117,11 @@ export default function App() {
   const [watchlist, setWatchlist] = useState<string[]>(['EURUSD', 'GBPUSD', 'XAUUSD', 'NAS100', 'BTCUSD']);
   const [chartSymbol, setChartSymbol] = useState('EURUSD');
   const [chartTimeframe, setChartTimeframe] = useState<AnalyzerTimeframe>('1M');
+  const [drtSymbol, setDrtSymbol] = useState('EURUSD');
+  const [drtTimeframe, setDrtTimeframe] = useState<AnalyzerTimeframe>('15M');
 
   const [checkoutState, setCheckoutState] = useState<{
-    productKey: 'analyzer' | 'ea_bots';
+    productKey: 'analyzer' | 'drt_analyzer' | 'ea_bots';
     existingOrder?: Order | null;
     billingCycle?: 'monthly' | 'quarterly' | 'annual';
   } | null>(null);
@@ -296,17 +301,24 @@ export default function App() {
         }}
         onGoWorkspace={() => setScreen('workspace')}
         onSelectProduct={(product, selectedSym, selectedTf) => {
-          if (selectedSym) setChartSymbol(selectedSym);
-          if (selectedTf) setChartTimeframe(selectedTf);
+          if (product === 'drt_analyzer') {
+            if (selectedSym) setDrtSymbol(selectedSym);
+            if (selectedTf) setDrtTimeframe(selectedTf);
+          } else {
+            if (selectedSym) setChartSymbol(selectedSym);
+            if (selectedTf) setChartTimeframe(selectedTf);
+          }
           if (!user) {
             setAuthMode('register');
             setScreen('auth');
             return;
           }
           setScreen('workspace');
-          setActiveTab(product === 'analyzer' ? 'analyzer' : 'eabots');
-          if ((product === 'analyzer' && !user.hasAnalyzer) || (product === 'ea_bots' && !user.hasEaBots)) {
-            setCheckoutState({ productKey: product });
+          const isDrt = product === 'drt_analyzer';
+          setActiveTab(isDrt ? 'drt' : 'analyzer');
+          const hasDrt = Boolean(user.hasDrtAnalyzer ?? user.hasEaBots);
+          if ((product === 'analyzer' && !user.hasAnalyzer) || (isDrt && !hasDrt)) {
+            setCheckoutState({ productKey: product, billingCycle: 'monthly' });
           }
         }}
       />
@@ -351,14 +363,14 @@ export default function App() {
             : `$${config.analyzerPriceUsd.toFixed(2)}/mo`,
         },
         {
-          id: 'eabots',
-          name: 'MQL5 EA Bots',
-          icon: <Bot className="w-4 h-4" />,
-          tag: user.hasEaBots
+          id: 'drt',
+          name: 'DRT Analyzer',
+          icon: <Layers className="w-4 h-4" />,
+          tag: (user.hasDrtAnalyzer ?? user.hasEaBots)
             ? 'Active'
-            : user.eaBotsSubscriptionStatus === 'expired'
+            : (user.drtAnalyzerSubscriptionStatus ?? user.eaBotsSubscriptionStatus) === 'expired'
             ? 'Expired'
-            : `$${config.eaBotsPriceUsd.toFixed(2)}/mo`,
+            : `$${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo`,
         },
         { id: 'orders', name: 'Subscriptions & Billing', icon: <CreditCard className="w-4 h-4" /> },
       ],
@@ -605,24 +617,6 @@ export default function App() {
               </span>
               <span>{firstName}</span>
             </button>
-            {user.hasEaBots && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('eabots')}
-                className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
-                  user.mt5Connected
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:border-emerald-500'
-                    : 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100'
-                }`}
-              >
-                <Bot className="w-3.5 h-3.5" />
-                {user.mt5Connected
-                  ? user.mt5AutoTrade
-                    ? 'MT5 Auto-Trade ON'
-                    : 'MT5 Linked'
-                  : 'Connect MT5'}
-              </button>
-            )}
             <a
               href={config.exnessIbUrl}
               target="_blank"
@@ -683,14 +677,22 @@ export default function App() {
                     }
                   />
                 )}
-                {activeTab === 'eabots' && (
-                  <EaBotsView
+                {activeTab === 'drt' && (
+                  <DrtAnalyzerView
                     user={user}
                     config={config}
+                    symbol={drtSymbol}
+                    timeframe={drtTimeframe}
+                    onSymbolChange={setDrtSymbol}
+                    onTimeframeChange={setDrtTimeframe}
+                    onOpenFreeChart={() => {
+                      setChartSymbol(drtSymbol);
+                      setChartTimeframe(drtTimeframe);
+                      setActiveTab('charts');
+                    }}
                     onUnlockClick={(cycle) =>
-                      setCheckoutState({ productKey: 'ea_bots', billingCycle: cycle || 'monthly' })
+                      setCheckoutState({ productKey: 'drt_analyzer', billingCycle: cycle || 'monthly' })
                     }
-                    onUserUpdated={(updated) => setUser(updated)}
                   />
                 )}
                 {activeTab === 'orders' && (
@@ -711,7 +713,7 @@ export default function App() {
                     }
                     onRefresh={loadUserWorkspaceData}
                     onLaunchProduct={(productKey) =>
-                      setActiveTab(productKey === 'ea_bots' ? 'eabots' : 'analyzer')
+                      setActiveTab(productKey === 'drt_analyzer' ? 'drt' : 'analyzer')
                     }
                   />
                 )}
@@ -776,7 +778,11 @@ export default function App() {
             setUser(updatedUser);
             setCheckoutState(null);
             void loadUserWorkspaceData();
-            setActiveTab(checkoutState.productKey === 'ea_bots' ? 'eabots' : 'analyzer');
+            setActiveTab(
+              checkoutState.productKey === 'drt_analyzer' || checkoutState.productKey === 'ea_bots'
+                ? 'drt'
+                : 'analyzer'
+            );
           }}
         />
       )}
@@ -871,7 +877,7 @@ const WorkspaceOverview: React.FC<{
   journal: JournalTrade[];
   orders: Order[];
   onNavigate: (tab: WorkspaceTab) => void;
-  onUnlock: (productKey: 'analyzer' | 'ea_bots') => void;
+  onUnlock: (productKey: 'analyzer' | 'drt_analyzer') => void;
   onOpenSymbolChart: (sym: string) => void;
 }> = ({ user, config, quotes, marketStatus, journal, orders, onNavigate, onUnlock, onOpenSymbolChart }) => {
   const [nyClock, setNyClock] = useState(() => new Date());
@@ -909,15 +915,19 @@ const WorkspaceOverview: React.FC<{
   const featuredUp = (featuredGold?.chgPct ?? 0) >= 0;
   const featuredTickDir = featuredGold ? tickDirs[featuredGold.sym] : undefined;
   const killzone = getKillzoneTimelineState(nyClock);
+  const hasDrt = Boolean(user.hasDrtAnalyzer ?? user.hasEaBots);
+  const drtDaysRemaining = user.drtAnalyzerDaysRemaining ?? user.eaBotsDaysRemaining;
+  const drtStatus = user.drtAnalyzerSubscriptionStatus ?? user.eaBotsSubscriptionStatus;
+  const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
 
   let heroSubtext =
-    'Analyze live TradingView liquidity sweeps, automate MT5 execution, and log every setup in one platform.';
-  if (user.hasAnalyzer && user.hasEaBots) {
-    heroSubtext = 'Your ICT analyzer and EA bots are unlocked. Pick up where you left off.';
+    'Scan live TradingView liquidity sweeps in the ICT Analyzer, map 4-quadrant Dealing Ranges & PD Arrays in the DRT Analyzer, and log every setup in one desk.';
+  if (user.hasAnalyzer && hasDrt) {
+    heroSubtext = 'Both your ICT Strategy Analyzer and DRT Strategy Analyzer are active. Pick up where you left off.';
   } else if (user.hasAnalyzer) {
-    heroSubtext = 'Your ICT Strategy Analyzer is unlocked and synced with live TradingView data.';
-  } else if (user.hasEaBots) {
-    heroSubtext = 'Your MQL5 EA Bots Pack is unlocked. Connect your MT5 terminal below.';
+    heroSubtext = 'Your ICT Strategy Analyzer is active and synced with live TradingView data.';
+  } else if (hasDrt) {
+    heroSubtext = 'Your DRT Strategy Analyzer (Dealing Range Theory) is active and ready to scan 4-quadrant PD Arrays.';
   }
 
   return (
@@ -1023,15 +1033,13 @@ const WorkspaceOverview: React.FC<{
                 type="button"
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.985 }}
-                onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
+                onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
                 className="px-5 py-2.5 rounded-lg bg-white border border-slate-300 hover:border-amber-500 text-slate-900 text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
-                <Bot className="w-4 h-4 text-amber-600" />
-                {user.hasEaBots
-                  ? user.mt5Connected
-                    ? 'Manage MT5 & EA Auto-Trade'
-                    : 'Connect Client MT5 Account'
-                  : `Subscribe EA Bots ($${config.eaBotsPriceUsd.toFixed(2)}/mo)`}
+                <Layers className="w-4 h-4 text-amber-600" />
+                {hasDrt
+                  ? 'Launch DRT Analyzer'
+                  : `Subscribe DRT Analyzer ($${drtPriceUsd.toFixed(2)}/mo)`}
               </motion.button>
             </motion.div>
           </div>
@@ -1228,40 +1236,41 @@ const WorkspaceOverview: React.FC<{
           <div className="relative h-28 overflow-hidden bg-slate-900">
             <img
               src={LANDING_IMAGES.automatorCode3d}
-              alt="Quant developer coding MQL5 Expert Advisors beside live charts"
+              alt="Quant trader mapping Dealing Range Theory 4-quadrant PD Arrays beside live charts"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
             <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
-              MQL5 &amp; MT5 Bridge
+              Ali Khan DRT Engine
             </span>
           </div>
           <div className="p-5 flex-1 flex flex-col justify-between">
             <div>
-              <div className="text-xs text-slate-500">MQL5 EA Bots and MT5</div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-slate-500">DRT Strategy Analyzer</span>
+                {hasDrt && (
+                  <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </span>
+                )}
+              </div>
               <div className="text-lg font-bold text-slate-950 mt-1.5">
-                {user.hasEaBots
-                  ? user.mt5Connected
-                    ? `MT5 ${user.mt5Login}`
-                    : user.eaBotsDaysRemaining != null
-                    ? `Active · ${user.eaBotsDaysRemaining}d left`
-                    : 'Ready to connect'
-                  : user.eaBotsSubscriptionStatus === 'expired'
+                {hasDrt
+                  ? drtDaysRemaining != null
+                    ? `Active · ${drtDaysRemaining}d left`
+                    : 'Active subscription'
+                  : drtStatus === 'expired'
                   ? 'Subscription expired'
-                  : `$${config.eaBotsPriceUsd.toFixed(2)}/mo plan`}
+                  : `$${drtPriceUsd.toFixed(2)}/mo plan`}
               </div>
             </div>
             <button
               type="button"
-              onClick={() => (user.hasEaBots ? onNavigate('eabots') : onUnlock('ea_bots'))}
+              onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
               className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
             >
-              {user.hasEaBots
-                ? user.mt5Connected
-                  ? 'Manage MT5 Auto-Trading →'
-                  : 'Connect Client MT5 Account →'
-                : 'Subscribe to EA Bots →'}
+              {hasDrt ? 'Launch DRT Scanner →' : 'Subscribe to DRT Analyzer →'}
             </button>
           </div>
         </motion.div>
@@ -1479,7 +1488,7 @@ const WorkspaceOverview: React.FC<{
               <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
               <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
               <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
-                Trade alongside fellow ICT and SMC traders, review live killzone setups, and get fast EA setup help.
+                Trade alongside fellow ICT, DRT, and SMC traders, review live killzone setups, and refine Premium/Discount PD Array entries.
               </p>
               <motion.a
                 whileHover={{ scale: 1.01 }}

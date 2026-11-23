@@ -9,6 +9,8 @@ export interface SubscriptionPlanMeta {
   discountPct: number;
 }
 
+export type ProductKey = 'analyzer' | 'drt_analyzer';
+
 export interface User {
   id: number;
   name: string;
@@ -19,12 +21,16 @@ export interface User {
   exnessVerified: boolean;
   referralCode: string;
   hasAnalyzer: boolean;
+  hasDrtAnalyzer: boolean;
   hasEaBots: boolean;
   analyzerExpiresAt?: string | null;
+  drtAnalyzerExpiresAt?: string | null;
   eaBotsExpiresAt?: string | null;
   analyzerSubscriptionStatus?: SubscriptionStatus;
+  drtAnalyzerSubscriptionStatus?: SubscriptionStatus;
   eaBotsSubscriptionStatus?: SubscriptionStatus;
   analyzerDaysRemaining?: number | null;
+  drtAnalyzerDaysRemaining?: number | null;
   eaBotsDaysRemaining?: number | null;
   mt5Login?: string | null;
   mt5Server?: string | null;
@@ -81,10 +87,13 @@ export interface PublicConfig {
   exnessIbUrl: string;
   telegramUrl: string;
   ictYoutubeChannelId: string;
+  drtYoutubeChannelUrl?: string;
   analyzerPriceUsd: number;
+  drtAnalyzerPriceUsd?: number;
   eaBotsPriceUsd: number;
   usdKesRate: number;
   analyzerPriceKes: number;
+  drtAnalyzerPriceKes?: number;
   eaBotsPriceKes: number;
   mpesaTillNumber: string;
   mpesaPartyB?: string;
@@ -109,7 +118,7 @@ export interface Order {
   id: number;
   order_number: string;
   user_id: number;
-  product_key: 'analyzer' | 'ea_bots';
+  product_key: 'analyzer' | 'drt_analyzer' | 'ea_bots';
   product_name: string;
   billing_cycle?: BillingCycle;
   duration_days?: number;
@@ -265,6 +274,156 @@ export interface IctAnalysisResult {
   ictReferenceChannel: string;
   dataSource?: 'tradingview_live';
   lastUpdated?: string;
+}
+
+export type DrtRangeType = 'Type 1' | 'Type 2' | 'Type 3';
+
+export type DrtQuadrantLabel =
+  | 'Deep Premium (75–100%)'
+  | 'Upper Premium (50–75%)'
+  | 'Equilibrium (50%)'
+  | 'Lower Discount (25–50%)'
+  | 'Deep Discount (0–25%)';
+
+export type DrtZoneType =
+  | 'Bullish FVG'
+  | 'Bearish FVG'
+  | 'Bullish OB'
+  | 'Bearish OB'
+  | 'Bullish Breaker'
+  | 'Bearish Breaker'
+  | 'Bullish Mitigation'
+  | 'Bearish Mitigation'
+  | 'Bullish Rejection'
+  | 'Bearish Rejection'
+  | 'Liquidity Void';
+
+export interface DrtZone {
+  type: DrtZoneType;
+  top: number;
+  bottom: number;
+  ceMid: number;
+  startIndex: number;
+  endIndex: number;
+  mitigated: boolean;
+  pdZone: 'Premium' | 'Discount' | 'Equilibrium';
+  quadrant: DrtQuadrantLabel;
+}
+
+export type DrtPdArrayCategory =
+  | 'DRH / External BSL (1.00)'
+  | 'DRL / External SSL (0.00)'
+  | 'Relative Equal Highs (EQH)'
+  | 'Relative Equal Lows (EQL)'
+  | 'Fair Value Gap (FVG)'
+  | 'Order Block (OB)'
+  | 'Breaker Block'
+  | 'Mitigation Block'
+  | 'Rejection Block'
+  | 'Liquidity Void';
+
+export interface DrtPdArrayItem {
+  id: string;
+  name: string;
+  category: DrtPdArrayCategory;
+  direction: 'Bullish' | 'Bearish' | 'Neutral';
+  zone: 'Premium' | 'Discount' | 'Equilibrium';
+  quadrant: DrtQuadrantLabel;
+  priority: number;
+  top: number;
+  bottom: number;
+  midpoint: number;
+  status: 'Unmitigated' | 'In Zone' | 'Mitigated' | 'Target Liquidity';
+  distancePct: number;
+  description: string;
+  startIndex: number;
+}
+
+export interface DrtDealingRange {
+  drh: number;
+  q75: number;
+  eq50: number;
+  q25: number;
+  drl: number;
+  sdPos25: number;
+  sdPos50: number;
+  sdNeg25: number;
+  sdNeg50: number;
+  rangeHighIndex: number;
+  rangeLowIndex: number;
+  currentPositionPct: number;
+  currentZone: 'Premium' | 'Discount' | 'Equilibrium';
+  quadrant: DrtQuadrantLabel;
+  alignedWithBias: boolean;
+  guidance: string;
+}
+
+export interface DrtSmtStatus {
+  correlatedSymbol: string;
+  inverseCorrelation: boolean;
+  status: 'Bullish SMT Divergence' | 'Bearish SMT Divergence' | 'Aligned Correlation' | 'Unavailable';
+  summary: string;
+}
+
+export interface DrtTriggerStatus {
+  name:
+    | '50% DRT Equilibrium Flip'
+    | '25 DRT Discount Reclaim'
+    | '75 DRT Premium Rejection'
+    | 'DRH / DRL External Sweep'
+    | 'Awaiting Quadrant Reaction';
+  confirmed: boolean;
+  triggerIndex: number | null;
+  detail: string;
+}
+
+export interface DrtAnalysisResult {
+  symbol: string;
+  tvSymbol: string;
+  tradingViewUrl: string;
+  timeframe: string;
+  currentPrice: number;
+  bid: number | null;
+  ask: number | null;
+  changePct: number | null;
+  bias: 'Bullish' | 'Bearish';
+  rangeType: DrtRangeType;
+  rangeTypeTitle: string;
+  rangeTypeSummary: string;
+  deliveryCycle: 'ERL → IRL (Rebalancing)' | 'IRL → ERL (Expanding)';
+  deliveryCycleDetail: string;
+  activeSessionWindow: string;
+  dealingRange: DrtDealingRange;
+  smt: DrtSmtStatus;
+  trigger: DrtTriggerStatus;
+  equalHighsLevel: number | null;
+  equalLowsLevel: number | null;
+  sweepIndex: number | null;
+  sweepLabel: string;
+  flipIndex: number | null;
+  drawOnLiquidity: {
+    label: string;
+    price: number;
+    side: 'DRH / Premium Liquidity' | 'DRL / Discount Liquidity' | '50% DRT Equilibrium';
+  };
+  pdArrays: DrtPdArrayItem[];
+  zones: DrtZone[];
+  setup: {
+    direction: 'Long (Buy)' | 'Short (Sell)';
+    entryModel: string;
+    entryZone: string;
+    entryArrayName: string;
+    stopLoss: number;
+    tp1: number;
+    tp2: number;
+    tp3: number;
+    rrRatio: number;
+    confluences: string[];
+  };
+  candles: Candle[];
+  drtReferenceUrl: string;
+  dataSource: 'tradingview_live';
+  lastUpdated: string;
 }
 
 export interface JournalTrade {

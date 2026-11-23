@@ -41,9 +41,9 @@ export const OrdersDashboardView: React.FC<{
   config?: PublicConfig;
   onUserUpdated?: (user: User) => void;
   onResumePayment: (order: Order) => void;
-  onBuyNew: (product: 'analyzer' | 'ea_bots', cycle?: BillingCycle) => void;
+  onBuyNew: (product: 'analyzer' | 'drt_analyzer', cycle?: BillingCycle) => void;
   onRefresh?: () => Promise<void> | void;
-  onLaunchProduct?: (product: 'analyzer' | 'ea_bots') => void;
+  onLaunchProduct?: (product: 'analyzer' | 'drt_analyzer') => void;
 }> = ({ orders, user, config, onUserUpdated, onResumePayment, onBuyNew, onRefresh, onLaunchProduct }) => {
   const [filter, setFilter] = useState<'all' | 'paid' | 'processing' | 'failed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -202,7 +202,8 @@ export const OrdersDashboardView: React.FC<{
   const totalSpentUsd = paidOrders.reduce((acc, o) => acc + Number(o.amount_usd || 0), 0);
   const totalSpentKes = paidOrders.reduce((acc, o) => acc + Number(o.amount_kes || 0), 0);
   const pendingCount = orders.filter((o) => ['pending', 'processing'].includes(o.payment_status)).length;
-  const activeLicensesCount = (user?.hasAnalyzer ? 1 : 0) + (user?.hasEaBots ? 1 : 0);
+  const hasDrtActive = Boolean(user?.hasDrtAnalyzer ?? user?.hasEaBots);
+  const activeLicensesCount = (user?.hasAnalyzer ? 1 : 0) + (hasDrtActive ? 1 : 0);
 
   async function handleRefresh() {
     setRefreshing(true);
@@ -224,11 +225,11 @@ export const OrdersDashboardView: React.FC<{
     user?.analyzerExpiresAt,
     user?.analyzerDaysRemaining
   );
-  const eaBotsSubInfo = describeSubscriptionStatus(
-    Boolean(user?.hasEaBots),
-    user?.eaBotsSubscriptionStatus,
-    user?.eaBotsExpiresAt,
-    user?.eaBotsDaysRemaining
+  const drtSubInfo = describeSubscriptionStatus(
+    hasDrtActive,
+    user?.drtAnalyzerSubscriptionStatus ?? user?.eaBotsSubscriptionStatus,
+    user?.drtAnalyzerExpiresAt ?? user?.eaBotsExpiresAt,
+    user?.drtAnalyzerDaysRemaining ?? user?.eaBotsDaysRemaining
   );
 
   return (
@@ -301,7 +302,7 @@ export const OrdersDashboardView: React.FC<{
               {activeLicensesCount} / 2
             </div>
             <div className="text-[11px] text-slate-400 mt-1">
-              {activeLicensesCount === 2 ? 'Analyzer & EA Bots active' : 'Monthly, Quarterly & Annual plans'}
+              {activeLicensesCount === 2 ? 'ICT & DRT Analyzers active' : 'Monthly, Quarterly & Annual plans'}
             </div>
           </div>
 
@@ -403,49 +404,49 @@ export const OrdersDashboardView: React.FC<{
             </div>
           </div>
 
-          {/* MQL5 EA Bots Subscription Card */}
+          {/* DRT Analyzer Subscription Card */}
           <div className="p-6 flex flex-col justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
               <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
                 <span
                   className={`inline-flex items-center gap-1.5 ${
-                    eaBotsSubInfo.tone === 'emerald'
+                    drtSubInfo.tone === 'emerald'
                       ? 'text-emerald-700'
-                      : eaBotsSubInfo.tone === 'rose'
+                      : drtSubInfo.tone === 'rose'
                       ? 'text-rose-700'
                       : 'text-amber-700'
                   }`}
                 >
-                  {user?.hasEaBots ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                  <span>{eaBotsSubInfo.label}</span>
+                  {hasDrtActive ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
+                  <span>{drtSubInfo.label}</span>
                 </span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
                 <span className="font-mono tabular-nums text-slate-600">
-                  From ${(config?.eaBotsPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.eaBotsPriceKes ?? 683).toLocaleString()}/mo)
+                  From ${(config?.drtAnalyzerPriceUsd ?? config?.eaBotsPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.drtAnalyzerPriceKes ?? config?.eaBotsPriceKes ?? 683).toLocaleString()}/mo)
                 </span>
               </div>
-              <h4 className="text-base font-bold text-slate-950">MQL5 EA Bots Pack + MetaApi MT5 Bridge</h4>
+              <h4 className="text-base font-bold text-slate-950">DRT Strategy Market Analyzer</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Silver Bullet &amp; SMC Order Block .mq5 bots plus one-click MetaApi Cloud MT5 auto-execution.
+                Ali Khan Dealing Range Theory (0.25/0.50/0.75 DRT), Type 1/2/3 ranges, live SMT divergence, and Premium/Discount PD Arrays.
               </p>
               <div className="text-[11px] font-mono text-slate-500 pt-1">
-                {eaBotsSubInfo.detail}
+                {drtSubInfo.detail}
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
-              {user?.hasEaBots ? (
+              {hasDrtActive ? (
                 <>
                   <button
                     type="button"
-                    onClick={() => onLaunchProduct?.('ea_bots')}
+                    onClick={() => onLaunchProduct?.('drt_analyzer')}
                     className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
-                    Open EA Bots
+                    Open DRT Analyzer
                   </button>
                   <button
                     type="button"
-                    onClick={() => onBuyNew('ea_bots', 'monthly')}
+                    onClick={() => onBuyNew('drt_analyzer', 'monthly')}
                     className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Renew / Extend Plan
@@ -455,14 +456,16 @@ export const OrdersDashboardView: React.FC<{
                 <>
                   <button
                     type="button"
-                    onClick={() => onBuyNew('ea_bots', 'monthly')}
+                    onClick={() => onBuyNew('drt_analyzer', 'monthly')}
                     className="px-4 py-2 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-bold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
-                    {user?.eaBotsSubscriptionStatus === 'expired' ? 'Renew Monthly' : 'Subscribe Monthly'}
+                    {(user?.drtAnalyzerSubscriptionStatus ?? user?.eaBotsSubscriptionStatus) === 'expired'
+                      ? 'Renew Monthly'
+                      : 'Subscribe Monthly'}
                   </button>
                   <button
                     type="button"
-                    onClick={() => onBuyNew('ea_bots', 'annual')}
+                    onClick={() => onBuyNew('drt_analyzer', 'annual')}
                     className="px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Annual (-20%)
@@ -782,7 +785,7 @@ export const OrdersDashboardView: React.FC<{
               </div>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
                 {orders.length === 0
-                  ? 'Subscribe to the ICT Market Analyzer or MQL5 EA Bots Pack above to generate your first M-Pesa Daraja or Crypto subscription invoice.'
+                  ? 'Subscribe to the ICT Market Analyzer or DRT Strategy Analyzer above to generate your first M-Pesa Daraja or Crypto subscription invoice.'
                   : 'Try clearing your search term or switching status tabs.'}
               </p>
               {orders.length === 0 && !user?.hasAnalyzer && (
@@ -1128,7 +1131,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
   }
 
   function copyPromoScript() {
-    const script = `Trade with institutional ICT Premium & Discount PD Arrays, dual TradingView charts, and MQL5 EA Bots on Grid Pips. Register free with my partner link: ${shareUrl}`;
+    const script = `Trade with institutional ICT Premium & Discount PD Arrays, Ali Khan DRT Dealing Range Quadrants, and dual TradingView charts on Grid Pips. Register free with my partner link: ${shareUrl}`;
     navigator.clipboard.writeText(script);
     setCopiedPromo(true);
     setTimeout(() => setCopiedPromo(false), 1800);
@@ -1497,7 +1500,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                           </td>
                           <td className="py-3 pr-3 font-mono text-slate-600">{s.exness_account_id}</td>
                           <td className="py-3 pr-3 text-slate-700 font-medium">
-                            {[s.has_analyzer ? 'ICT Analyzer' : null, s.has_ea_bots ? 'EA Bots' : null]
+                            {[s.has_analyzer ? 'ICT Analyzer' : null, s.has_ea_bots ? 'DRT Analyzer' : null]
                               .filter(Boolean)
                               .join(' · ') || 'Free Tier'}
                           </td>
