@@ -12,7 +12,8 @@ import {
 import { apiFetch } from '../lib/api';
 import {
   ANALYZER_TIMEFRAMES,
-  TRADING_SYMBOLS,
+  MARKET_CATALOG_BY_SYM,
+  MARKET_CATALOG_GROUPS,
   normalizeAnalyzerTimeframe,
   type AnalyzerTimeframe,
 } from '../lib/tradingTimeframes';
@@ -311,9 +312,7 @@ export const DrtAnalyzerView: React.FC<DrtAnalyzerViewProps> = ({
     );
   }
 
-  const symbolOptions = TRADING_SYMBOLS.includes(symbol as (typeof TRADING_SYMBOLS)[number])
-    ? [...TRADING_SYMBOLS]
-    : [symbol, ...TRADING_SYMBOLS];
+  const isCustomSymbol = !MARKET_CATALOG_BY_SYM[symbol];
 
   const dr = analysis?.dealingRange;
   const allPdArrays = analysis?.pdArrays || [];
@@ -335,12 +334,21 @@ export const DrtAnalyzerView: React.FC<DrtAnalyzerViewProps> = ({
             value={symbol}
             onChange={(e) => onSymbolChange(e.target.value)}
             aria-label="Select DRT trading pair"
-            className="px-3 py-2 text-sm font-mono font-semibold border border-slate-300 rounded-lg bg-white"
+            className="px-3 py-2 text-sm font-mono font-semibold border border-slate-300 rounded-lg bg-white max-w-[230px]"
           >
-            {symbolOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
+            {isCustomSymbol && (
+              <optgroup label="Custom">
+                <option value={symbol}>{symbol}</option>
+              </optgroup>
+            )}
+            {MARKET_CATALOG_GROUPS.map((group) => (
+              <optgroup key={group.assetClass} label={group.label}>
+                {group.items.map((item) => (
+                  <option key={item.sym} value={item.sym}>
+                    {item.sym} · {item.name}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </select>
 

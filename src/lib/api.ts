@@ -1,3 +1,5 @@
+import { MARKET_CATALOG, type AssetClass } from './tradingTimeframes';
+
 const TOKEN_STORAGE_KEY = 'gridpips_auth_token';
 let memorySessionToken: string | null = null;
 
@@ -100,7 +102,7 @@ export interface MarketSymbolQuote {
   bid?: number | null;
   ask?: number | null;
   digits: number;
-  assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+  assetClass: AssetClass;
   currentSession?: string | null;
   isMarketOpen?: boolean | null;
   marketStatusLabel?: string;
@@ -109,16 +111,15 @@ export interface MarketSymbolQuote {
   exchangeTimezone?: string | null;
 }
 
-export const INITIAL_MARKET_QUOTES: MarketSymbolQuote[] = [
-  { sym: 'EURUSD', tvSymbol: 'FX:EURUSD', name: 'Euro / US Dollar', price: 1.10216, chgPct: 0, digits: 5, assetClass: 'fx' },
-  { sym: 'GBPUSD', tvSymbol: 'FX:GBPUSD', name: 'British Pound / US Dollar', price: 1.32109, chgPct: 0, digits: 5, assetClass: 'fx' },
-  { sym: 'USDJPY', tvSymbol: 'FX:USDJPY', name: 'US Dollar / Japanese Yen', price: 159.713, chgPct: 0, digits: 3, assetClass: 'fx' },
-  { sym: 'XAUUSD', tvSymbol: 'OANDA:XAUUSD', name: 'Gold Spot / US Dollar', price: 3884.69, chgPct: 0, digits: 2, assetClass: 'metal' },
-  { sym: 'NAS100', tvSymbol: 'CAPITALCOM:US100', name: 'US Tech 100 Index', price: 27835.9, chgPct: 0, digits: 2, assetClass: 'index' },
-  { sym: 'US30', tvSymbol: 'CAPITALCOM:US30', name: 'Wall Street 30', price: 52261.8, chgPct: 0, digits: 2, assetClass: 'index' },
-  { sym: 'BTCUSD', tvSymbol: 'BITSTAMP:BTCUSD', name: 'Bitcoin / US Dollar', price: 65362.76, chgPct: 0, digits: 2, assetClass: 'crypto' },
-  { sym: 'ETHUSD', tvSymbol: 'BITSTAMP:ETHUSD', name: 'Ethereum / US Dollar', price: 1831.96, chgPct: 0, digits: 2, assetClass: 'crypto' },
-];
+export const INITIAL_MARKET_QUOTES: MarketSymbolQuote[] = MARKET_CATALOG.map((item) => ({
+  sym: item.sym,
+  tvSymbol: item.tvSymbol,
+  name: item.name,
+  price: item.baselinePrice,
+  chgPct: 0,
+  digits: item.digits,
+  assetClass: item.assetClass,
+}));
 
 export interface MarketMiniBar {
   timestampSec: number;

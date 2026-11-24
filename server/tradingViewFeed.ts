@@ -9,6 +9,8 @@ export interface TradingViewBar {
   volume: number;
 }
 
+export type ServerAssetClass = 'fx' | 'commodity' | 'index' | 'etf' | 'stock' | 'crypto';
+
 export interface TradingViewLiveQuote {
   symbol: string;
   tvSymbol: string;
@@ -21,7 +23,7 @@ export interface TradingViewLiveQuote {
   low: number | null;
   digits: number;
   name: string;
-  assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+  assetClass: ServerAssetClass;
   currentSession: string | null;
   isMarketOpen: boolean | null;
   marketStatusLabel: string;
@@ -64,17 +66,93 @@ export const SYMBOL_METADATA: Record<
     name: string;
     digits: number;
     quoteDigits: number;
-    assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+    assetClass: ServerAssetClass;
   }
 > = {
+  // Forex Majors, Crosses & Exotics (21 pairs)
   EURUSD: { tvSymbol: 'FX:EURUSD', name: 'Euro / US Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
   GBPUSD: { tvSymbol: 'FX:GBPUSD', name: 'British Pound / US Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
   USDJPY: { tvSymbol: 'FX:USDJPY', name: 'US Dollar / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
-  XAUUSD: { tvSymbol: 'OANDA:XAUUSD', name: 'Gold Spot / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'metal' },
+  USDCHF: { tvSymbol: 'FX:USDCHF', name: 'US Dollar / Swiss Franc', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  AUDUSD: { tvSymbol: 'FX:AUDUSD', name: 'Australian Dollar / US Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  USDCAD: { tvSymbol: 'FX:USDCAD', name: 'US Dollar / Canadian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  NZDUSD: { tvSymbol: 'FX:NZDUSD', name: 'New Zealand Dollar / US Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  EURGBP: { tvSymbol: 'FX:EURGBP', name: 'Euro / British Pound', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  EURJPY: { tvSymbol: 'FX:EURJPY', name: 'Euro / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
+  GBPJPY: { tvSymbol: 'FX:GBPJPY', name: 'British Pound / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
+  AUDJPY: { tvSymbol: 'FX:AUDJPY', name: 'Australian Dollar / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
+  CADJPY: { tvSymbol: 'FX:CADJPY', name: 'Canadian Dollar / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
+  CHFJPY: { tvSymbol: 'FX:CHFJPY', name: 'Swiss Franc / Japanese Yen', digits: 3, quoteDigits: 3, assetClass: 'fx' },
+  EURAUD: { tvSymbol: 'FX:EURAUD', name: 'Euro / Australian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  EURCAD: { tvSymbol: 'FX:EURCAD', name: 'Euro / Canadian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  EURCHF: { tvSymbol: 'FX:EURCHF', name: 'Euro / Swiss Franc', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  GBPAUD: { tvSymbol: 'FX:GBPAUD', name: 'British Pound / Australian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  GBPCAD: { tvSymbol: 'FX:GBPCAD', name: 'British Pound / Canadian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  AUDCAD: { tvSymbol: 'FX:AUDCAD', name: 'Australian Dollar / Canadian Dollar', digits: 5, quoteDigits: 5, assetClass: 'fx' },
+  USDMXN: { tvSymbol: 'FX:USDMXN', name: 'US Dollar / Mexican Peso', digits: 4, quoteDigits: 4, assetClass: 'fx' },
+  USDZAR: { tvSymbol: 'FX:USDZAR', name: 'US Dollar / South African Rand', digits: 4, quoteDigits: 4, assetClass: 'fx' },
+
+  // Commodities: Metals, Energy & Agriculture (10 instruments)
+  XAUUSD: { tvSymbol: 'OANDA:XAUUSD', name: 'Gold Spot / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'commodity' },
+  XAGUSD: { tvSymbol: 'OANDA:XAGUSD', name: 'Silver Spot / US Dollar', digits: 3, quoteDigits: 3, assetClass: 'commodity' },
+  XPTUSD: { tvSymbol: 'OANDA:XPTUSD', name: 'Platinum Spot / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'commodity' },
+  XPDUSD: { tvSymbol: 'OANDA:XPDUSD', name: 'Palladium Spot / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'commodity' },
+  USOIL: { tvSymbol: 'TVC:USOIL', name: 'WTI Crude Oil', digits: 2, quoteDigits: 2, assetClass: 'commodity' },
+  UKOIL: { tvSymbol: 'TVC:UKOIL', name: 'Brent Crude Oil', digits: 2, quoteDigits: 2, assetClass: 'commodity' },
+  NATGAS: { tvSymbol: 'OANDA:NATGASUSD', name: 'Natural Gas', digits: 3, quoteDigits: 3, assetClass: 'commodity' },
+  COPPER: { tvSymbol: 'OANDA:XCUUSD', name: 'Copper Spot', digits: 4, quoteDigits: 4, assetClass: 'commodity' },
+  CORN: { tvSymbol: 'OANDA:CORNUSD', name: 'Corn Futures Spot', digits: 3, quoteDigits: 3, assetClass: 'commodity' },
+  WHEAT: { tvSymbol: 'OANDA:WHEATUSD', name: 'Wheat Futures Spot', digits: 3, quoteDigits: 3, assetClass: 'commodity' },
+
+  // Global Indices (6 instruments)
   NAS100: { tvSymbol: 'CAPITALCOM:US100', name: 'US Tech 100 Index', digits: 2, quoteDigits: 2, assetClass: 'index' },
   US30: { tvSymbol: 'CAPITALCOM:US30', name: 'Wall Street 30', digits: 2, quoteDigits: 2, assetClass: 'index' },
+  SPX500: { tvSymbol: 'CAPITALCOM:US500', name: 'S&P 500 Index', digits: 2, quoteDigits: 2, assetClass: 'index' },
+  US2000: { tvSymbol: 'CAPITALCOM:RTY', name: 'Russell 2000 Index', digits: 2, quoteDigits: 2, assetClass: 'index' },
+  GER40: { tvSymbol: 'CAPITALCOM:DE40', name: 'Germany 40 (DAX)', digits: 2, quoteDigits: 2, assetClass: 'index' },
+  UK100: { tvSymbol: 'CAPITALCOM:UK100', name: 'FTSE 100 Index', digits: 2, quoteDigits: 2, assetClass: 'index' },
+
+  // Exchange-Traded Funds / ETFs (10 instruments)
+  SPY: { tvSymbol: 'AMEX:SPY', name: 'SPDR S&P 500 ETF Trust', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  QQQ: { tvSymbol: 'NASDAQ:QQQ', name: 'Invesco QQQ Trust (Nasdaq-100)', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  IWM: { tvSymbol: 'AMEX:IWM', name: 'iShares Russell 2000 ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  DIA: { tvSymbol: 'AMEX:DIA', name: 'SPDR Dow Jones Industrial ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  VOO: { tvSymbol: 'AMEX:VOO', name: 'Vanguard S&P 500 ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  GLD: { tvSymbol: 'AMEX:GLD', name: 'SPDR Gold Shares ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  SLV: { tvSymbol: 'AMEX:SLV', name: 'iShares Silver Trust ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  USO: { tvSymbol: 'AMEX:USO', name: 'United States Oil Fund ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  TLT: { tvSymbol: 'NASDAQ:TLT', name: 'iShares 20+ Year Treasury Bond ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+  ARKK: { tvSymbol: 'AMEX:ARKK', name: 'ARK Innovation ETF', digits: 2, quoteDigits: 2, assetClass: 'etf' },
+
+  // Major US Stocks (14 instruments)
+  AAPL: { tvSymbol: 'NASDAQ:AAPL', name: 'Apple Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  MSFT: { tvSymbol: 'NASDAQ:MSFT', name: 'Microsoft Corporation', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  NVDA: { tvSymbol: 'NASDAQ:NVDA', name: 'NVIDIA Corporation', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  TSLA: { tvSymbol: 'NASDAQ:TSLA', name: 'Tesla Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  AMZN: { tvSymbol: 'NASDAQ:AMZN', name: 'Amazon.com Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  GOOGL: { tvSymbol: 'NASDAQ:GOOGL', name: 'Alphabet Inc. (Class A)', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  META: { tvSymbol: 'NASDAQ:META', name: 'Meta Platforms Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  NFLX: { tvSymbol: 'NASDAQ:NFLX', name: 'Netflix Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  AMD: { tvSymbol: 'NASDAQ:AMD', name: 'Advanced Micro Devices Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  PLTR: { tvSymbol: 'NASDAQ:PLTR', name: 'Palantir Technologies Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  COIN: { tvSymbol: 'NASDAQ:COIN', name: 'Coinbase Global Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  JPM: { tvSymbol: 'NYSE:JPM', name: 'JPMorgan Chase & Co.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  V: { tvSymbol: 'NYSE:V', name: 'Visa Inc.', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+  BA: { tvSymbol: 'NYSE:BA', name: 'The Boeing Company', digits: 2, quoteDigits: 2, assetClass: 'stock' },
+
+  // Crypto Currencies (12 instruments)
   BTCUSD: { tvSymbol: 'BITSTAMP:BTCUSD', name: 'Bitcoin / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
   ETHUSD: { tvSymbol: 'BITSTAMP:ETHUSD', name: 'Ethereum / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
+  SOLUSD: { tvSymbol: 'COINBASE:SOLUSD', name: 'Solana / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
+  XRPUSD: { tvSymbol: 'BITSTAMP:XRPUSD', name: 'XRP / US Dollar', digits: 4, quoteDigits: 4, assetClass: 'crypto' },
+  BNBUSD: { tvSymbol: 'BINANCE:BNBUSDT', name: 'BNB / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
+  ADAUSD: { tvSymbol: 'COINBASE:ADAUSD', name: 'Cardano / US Dollar', digits: 4, quoteDigits: 4, assetClass: 'crypto' },
+  DOGEUSD: { tvSymbol: 'COINBASE:DOGEUSD', name: 'Dogecoin / US Dollar', digits: 5, quoteDigits: 5, assetClass: 'crypto' },
+  AVAXUSD: { tvSymbol: 'COINBASE:AVAXUSD', name: 'Avalanche / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
+  LINKUSD: { tvSymbol: 'COINBASE:LINKUSD', name: 'Chainlink / US Dollar', digits: 3, quoteDigits: 3, assetClass: 'crypto' },
+  LTCUSD: { tvSymbol: 'BITSTAMP:LTCUSD', name: 'Litecoin / US Dollar', digits: 2, quoteDigits: 2, assetClass: 'crypto' },
+  DOTUSD: { tvSymbol: 'COINBASE:DOTUSD', name: 'Polkadot / US Dollar', digits: 3, quoteDigits: 3, assetClass: 'crypto' },
+  SUIUSD: { tvSymbol: 'COINBASE:SUIUSD', name: 'Sui / US Dollar', digits: 4, quoteDigits: 4, assetClass: 'crypto' },
 };
 
 export function resolveServerTvSymbol(rawSymbol: string): {
@@ -82,7 +160,7 @@ export function resolveServerTvSymbol(rawSymbol: string): {
   tvSymbol: string;
   digits: number;
   name: string;
-  assetClass: 'fx' | 'metal' | 'index' | 'crypto';
+  assetClass: ServerAssetClass;
 } {
   const upper = rawSymbol.trim().toUpperCase();
   const known = SYMBOL_METADATA[upper];
@@ -97,24 +175,45 @@ export function resolveServerTvSymbol(rawSymbol: string): {
   }
   if (upper.includes(':')) {
     const cleanSym = upper.split(':')[1] || upper;
+    const byClean = SYMBOL_METADATA[cleanSym];
+    if (byClean) {
+      return {
+        symbol: cleanSym,
+        tvSymbol: upper,
+        digits: byClean.digits,
+        name: byClean.name,
+        assetClass: byClean.assetClass,
+      };
+    }
     const isJpy = cleanSym.includes('JPY');
-    const isFx = cleanSym.length === 6 && !cleanSym.includes('USD') ? true : upper.startsWith('FX:');
+    const isFx = upper.startsWith('FX:');
+    const isEquity = upper.startsWith('NASDAQ:') || upper.startsWith('NYSE:') || upper.startsWith('AMEX:');
+    const isCrypto = upper.startsWith('BINANCE:') || upper.startsWith('COINBASE:') || upper.startsWith('BITSTAMP:');
     return {
       symbol: cleanSym,
       tvSymbol: upper,
       digits: isJpy ? 3 : isFx ? 5 : 2,
       name: cleanSym,
-      assetClass: isFx ? 'fx' : 'index',
+      assetClass: isFx ? 'fx' : isCrypto ? 'crypto' : isEquity ? 'stock' : 'index',
     };
-  }
-  if (upper === 'XAGUSD') {
-    return { symbol: upper, tvSymbol: 'OANDA:XAGUSD', digits: 3, name: 'Silver Spot / US Dollar', assetClass: 'metal' };
   }
   if (upper === 'US100') {
     return { symbol: 'NAS100', tvSymbol: 'CAPITALCOM:US100', digits: 2, name: 'US Tech 100 Index', assetClass: 'index' };
   }
-  if (upper === 'SPX500' || upper === 'US500') {
-    return { symbol: 'SPX500', tvSymbol: 'CAPITALCOM:US500', digits: 2, name: 'US 500 Index', assetClass: 'index' };
+  if (upper === 'US500') {
+    return { symbol: 'SPX500', tvSymbol: 'CAPITALCOM:US500', digits: 2, name: 'S&P 500 Index', assetClass: 'index' };
+  }
+  if (upper === 'WTI' || upper === 'CL') {
+    return { symbol: 'USOIL', tvSymbol: 'TVC:USOIL', digits: 2, name: 'WTI Crude Oil', assetClass: 'commodity' };
+  }
+  if (upper === 'BRENT') {
+    return { symbol: 'UKOIL', tvSymbol: 'TVC:UKOIL', digits: 2, name: 'Brent Crude Oil', assetClass: 'commodity' };
+  }
+  if (upper.endsWith('USDT')) {
+    return { symbol: upper, tvSymbol: `BINANCE:${upper}`, digits: 2, name: upper, assetClass: 'crypto' };
+  }
+  if (upper.length <= 5 && /^[A-Z]+$/.test(upper)) {
+    return { symbol: upper, tvSymbol: `NASDAQ:${upper}`, digits: 2, name: upper, assetClass: 'stock' };
   }
   return {
     symbol: upper,
@@ -339,9 +438,23 @@ async function fetchFallbackSeriesPayload(
   interval: TvInterval,
   digits: number
 ): Promise<TradingViewSeriesPayload | null> {
-  // 1. Binance public Klines fallback for Crypto pairs (BTCUSD / ETHUSD)
-  if (symbol === 'BTCUSD' || symbol === 'ETHUSD') {
-    const binanceSym = symbol === 'BTCUSD' ? 'BTCUSDT' : 'ETHUSDT';
+  // 1. Binance public Klines fallback for Crypto pairs
+  const binanceCryptoMap: Record<string, string> = {
+    BTCUSD: 'BTCUSDT',
+    ETHUSD: 'ETHUSDT',
+    SOLUSD: 'SOLUSDT',
+    XRPUSD: 'XRPUSDT',
+    BNBUSD: 'BNBUSDT',
+    ADAUSD: 'ADAUSDT',
+    DOGEUSD: 'DOGEUSDT',
+    AVAXUSD: 'AVAXUSDT',
+    LINKUSD: 'LINKUSDT',
+    LTCUSD: 'LTCUSDT',
+    DOTUSD: 'DOTUSDT',
+    SUIUSD: 'SUIUSDT',
+  };
+  const binanceSym = binanceCryptoMap[symbol];
+  if (binanceSym) {
     const binanceIntMap: Record<TvInterval, string> = {
       '1': '1m',
       '5': '5m',
@@ -391,20 +504,46 @@ async function fetchFallbackSeriesPayload(
     }
   }
 
-  // 2. Yahoo Finance public chart endpoint fallback for FX, Gold, Indices, & Crypto
+  // 2. Yahoo Finance public chart endpoint fallback for FX, Commodities, Indices, ETFs, Stocks & Crypto
   const yahooSymMap: Record<string, string> = {
-    EURUSD: 'EURUSD=X',
-    GBPUSD: 'GBPUSD=X',
     USDJPY: 'JPY=X',
+    USDCHF: 'CHF=X',
+    USDCAD: 'CAD=X',
+    USDMXN: 'MXN=X',
+    USDZAR: 'ZAR=X',
     XAUUSD: 'GC=F',
     XAGUSD: 'SI=F',
+    XPTUSD: 'PL=F',
+    XPDUSD: 'PA=F',
+    USOIL: 'CL=F',
+    UKOIL: 'BZ=F',
+    NATGAS: 'NG=F',
+    COPPER: 'HG=F',
+    CORN: 'ZC=F',
+    WHEAT: 'ZW=F',
     NAS100: 'NQ=F',
     US30: 'YM=F',
     SPX500: 'ES=F',
+    US2000: 'RTY=F',
+    GER40: '^GDAXI',
+    UK100: '^FTSE',
     BTCUSD: 'BTC-USD',
     ETHUSD: 'ETH-USD',
+    SOLUSD: 'SOL-USD',
+    XRPUSD: 'XRP-USD',
+    BNBUSD: 'BNB-USD',
+    ADAUSD: 'ADA-USD',
+    DOGEUSD: 'DOGE-USD',
+    AVAXUSD: 'AVAX-USD',
+    LINKUSD: 'LINK-USD',
+    LTCUSD: 'LTC-USD',
+    DOTUSD: 'DOT-USD',
+    SUIUSD: 'SUI20947-USD',
   };
-  const ySym = yahooSymMap[symbol] || (symbol.length === 6 ? `${symbol}=X` : symbol);
+  const meta = SYMBOL_METADATA[symbol];
+  const ySym =
+    yahooSymMap[symbol] ||
+    (meta?.assetClass === 'fx' ? `${symbol}=X` : meta?.assetClass === 'etf' || meta?.assetClass === 'stock' ? symbol : symbol.length === 6 ? `${symbol}=X` : symbol);
   const yahooIntMap: Record<TvInterval, { interval: string; range: string }> = {
     '1': { interval: '1m', range: '1d' },
     '5': { interval: '5m', range: '5d' },
@@ -597,13 +736,17 @@ export function summarizeTradingViewMarketStatus(
   };
 }
 
-async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
-  const entries = Object.entries(SYMBOL_METADATA);
-  const tvSymbols = entries.map(([, meta]) => meta.tvSymbol);
+const lastGoodQuotesBySymbol = new Map<string, TradingViewLiveQuote>();
+
+async function fetchQuoteBatchViaWebSocket(
+  batchEntries: Array<[string, (typeof SYMBOL_METADATA)[string]]>
+): Promise<TradingViewLiveQuote[]> {
+  const tvSymbols = batchEntries.map(([, meta]) => meta.tvSymbol);
 
   return new Promise((resolve, reject) => {
     const ws = openTvWebSocket();
     let settled = false;
+    let graceTimer: ReturnType<typeof setTimeout> | null = null;
     const bag: Record<
       string,
       {
@@ -623,11 +766,15 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
 
     const buildOutput = (): TradingViewLiveQuote[] => {
       const out: TradingViewLiveQuote[] = [];
-      for (const [sym, meta] of entries) {
+      for (const [sym, meta] of batchEntries) {
         const q = bag[meta.tvSymbol];
-        if (!q || typeof q.lp !== 'number' || !Number.isFinite(q.lp)) continue;
+        if (!q || typeof q.lp !== 'number' || !Number.isFinite(q.lp)) {
+          const cached = lastGoodQuotesBySymbol.get(sym);
+          if (cached) out.push(cached);
+          continue;
+        }
         const sessionState = mapTradingViewSessionState(q.currentSession);
-        out.push({
+        const quote: TradingViewLiveQuote = {
           symbol: sym,
           tvSymbol: meta.tvSymbol,
           name: meta.name,
@@ -649,7 +796,9 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
               : null,
           sessionSchedule: typeof q.sessionDisplay === 'string' ? q.sessionDisplay : null,
           exchangeTimezone: typeof q.timezone === 'string' ? q.timezone : null,
-        });
+        };
+        lastGoodQuotesBySymbol.set(sym, quote);
+        out.push(quote);
       }
       return out;
     };
@@ -658,31 +807,27 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      if (graceTimer) clearTimeout(graceTimer);
       try {
         ws.close();
       } catch {
         // ignore
       }
       if (err) {
+        const partial = buildOutput();
+        if (partial.length > 0) {
+          resolve(partial);
+          return;
+        }
         reject(err);
         return;
       }
-      const list = buildOutput();
-      if (list.length === 0) {
-        reject(new Error('TradingView returned no live quotes.'));
-        return;
-      }
-      resolve(list);
+      resolve(buildOutput());
     };
 
     const timer = setTimeout(() => {
-      const list = buildOutput();
-      if (list.length >= 4) {
-        finish();
-      } else {
-        finish(new Error('Timed out fetching live TradingView market quotes.'));
-      }
-    }, 5500);
+      finish();
+    }, 5200);
 
     ws.onopen = () => {
       const qs = `qs_${Math.random().toString(36).slice(2, 10)}`;
@@ -735,9 +880,13 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
             if (typeof item.v.timezone === 'string') cur.timezone = item.v.timezone;
             bag[item.n] = cur;
 
+            const readyCount = tvSymbols.filter((s) => typeof bag[s]?.lp === 'number').length;
             if (tvSymbols.every((s) => typeof bag[s]?.lp === 'number' && typeof bag[s]?.currentSession === 'string')) {
               finish();
               return;
+            }
+            if (!graceTimer && readyCount >= Math.ceil(tvSymbols.length * 0.85)) {
+              graceTimer = setTimeout(() => finish(), 900);
             }
           }
         }
@@ -750,6 +899,36 @@ async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
   });
 }
 
+async function fetchAllQuotesViaWebSocket(): Promise<TradingViewLiveQuote[]> {
+  const entries = Object.entries(SYMBOL_METADATA);
+  const chunkSize = 25;
+  const chunks: Array<Array<[string, (typeof SYMBOL_METADATA)[string]]>> = [];
+  for (let i = 0; i < entries.length; i += chunkSize) {
+    chunks.push(entries.slice(i, i + chunkSize));
+  }
+
+  const settled = await Promise.allSettled(chunks.map((chunk) => fetchQuoteBatchViaWebSocket(chunk)));
+  const bySymbol = new Map<string, TradingViewLiveQuote>();
+  for (const res of settled) {
+    if (res.status === 'fulfilled') {
+      for (const q of res.value) {
+        bySymbol.set(q.symbol, q);
+      }
+    }
+  }
+
+  const ordered: TradingViewLiveQuote[] = [];
+  for (const [sym] of entries) {
+    const q = bySymbol.get(sym) || lastGoodQuotesBySymbol.get(sym);
+    if (q) ordered.push(q);
+  }
+
+  if (ordered.length === 0) {
+    throw new Error('TradingView returned no live quotes.');
+  }
+  return ordered;
+}
+
 export async function getTradingViewLiveQuotes(): Promise<TradingViewLiveQuote[]> {
   if (quotesCache && quotesCache.expiresAt > Date.now()) {
     return quotesCache.quotes;
@@ -759,7 +938,7 @@ export async function getTradingViewLiveQuotes(): Promise<TradingViewLiveQuote[]
   quotesInFlight = (async () => {
     try {
       const quotes = await fetchAllQuotesViaWebSocket();
-      quotesCache = { quotes, expiresAt: Date.now() + 8000 };
+      quotesCache = { quotes, expiresAt: Date.now() + 12000 };
       return quotes;
     } finally {
       quotesInFlight = null;

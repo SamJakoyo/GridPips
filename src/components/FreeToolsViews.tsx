@@ -3,6 +3,9 @@ import { Trash2, Plus, RotateCcw, X, Activity, RefreshCw, ExternalLink, Calendar
 import { apiFetch, type MarketSymbolQuote } from '../lib/api';
 import {
   ANALYZER_TIMEFRAMES,
+  ASSET_CLASS_LABELS,
+  ASSET_CLASS_ORDER,
+  MARKET_CATALOG_GROUPS,
   normalizeAnalyzerTimeframe,
   type AnalyzerTimeframe,
 } from '../lib/tradingTimeframes';
@@ -101,24 +104,52 @@ export const TradingViewChartsView: React.FC<{
             })}
           </div>
 
-          <form onSubmit={handleAddSymbol} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newSym}
-              onChange={(e) => setNewSym(e.target.value)}
-              placeholder="Add pair (e.g. USDJPY)"
-              className="w-40 sm:w-44 px-3 py-1.5 text-xs bg-white border border-slate-300 focus:border-amber-500 focus:outline-none rounded-lg font-mono uppercase text-slate-950 placeholder:text-slate-400"
-            />
-            <button
-              type="submit"
-              className="px-3 py-1.5 bg-amber-50 border border-amber-300 hover:border-amber-500 text-amber-800 text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value=""
+              onChange={(e) => {
+                const picked = e.target.value;
+                if (!picked) return;
+                onSymbolChange(picked);
+                if (!list.includes(picked) && onUpdateWatchlist) {
+                  setSavingWl(true);
+                  void onUpdateWatchlist([...list, picked]).finally(() => setSavingWl(false));
+                }
+              }}
+              aria-label="Browse Forex, Commodities, Indices, ETFs, Stocks, and Crypto"
+              className="px-3 py-1.5 text-xs font-mono font-semibold bg-slate-50 border border-slate-300 focus:border-amber-500 focus:outline-none rounded-lg text-slate-900 max-w-[210px]"
             >
-              + Add
-            </button>
-            <span className="hidden sm:inline text-[11px] font-medium text-emerald-600 ml-1 whitespace-nowrap">
-              {savingWl ? 'Syncing...' : 'Free Chart'}
-            </span>
-          </form>
+              <option value="">Browse 70+ Markets...</option>
+              {MARKET_CATALOG_GROUPS.map((group) => (
+                <optgroup key={group.assetClass} label={group.label}>
+                  {group.items.map((item) => (
+                    <option key={item.sym} value={item.sym}>
+                      {item.sym} · {item.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+
+            <form onSubmit={handleAddSymbol} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newSym}
+                onChange={(e) => setNewSym(e.target.value)}
+                placeholder="Add ticker (e.g. NVDA)"
+                className="w-36 sm:w-40 px-3 py-1.5 text-xs bg-white border border-slate-300 focus:border-amber-500 focus:outline-none rounded-lg font-mono uppercase text-slate-950 placeholder:text-slate-400"
+              />
+              <button
+                type="submit"
+                className="px-3 py-1.5 bg-amber-50 border border-amber-300 hover:border-amber-500 text-amber-800 text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+              >
+                + Add
+              </button>
+              <span className="hidden sm:inline text-[11px] font-medium text-emerald-600 ml-1 whitespace-nowrap">
+                {savingWl ? 'Syncing...' : 'Free Chart'}
+              </span>
+            </form>
+          </div>
         </div>
       </div>
 
@@ -1168,11 +1199,19 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
               onChange={(e) => setSymbol(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
             >
-              {quotes.map((q) => (
-                <option key={q.sym} value={q.sym}>
-                  {q.sym} ({q.price.toFixed(q.digits)})
-                </option>
-              ))}
+              {ASSET_CLASS_ORDER.map((cls) => {
+                const groupQuotes = quotes.filter((q) => q.assetClass === cls);
+                if (!groupQuotes.length) return null;
+                return (
+                  <optgroup key={cls} label={ASSET_CLASS_LABELS[cls]}>
+                    {groupQuotes.map((q) => (
+                      <option key={q.sym} value={q.sym}>
+                        {q.sym} ({q.price.toFixed(q.digits)}) — {q.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
             </select>
             {selectedQuote && (
               <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono text-slate-500">

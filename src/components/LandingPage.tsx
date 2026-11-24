@@ -16,7 +16,11 @@ import {
 import { LANDING_IMAGES } from '../assets/landingImages';
 import { BrandLogo } from './BrandLogo';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
-import { ANALYZER_TIMEFRAMES, TRADING_SYMBOLS, type AnalyzerTimeframe } from '../lib/tradingTimeframes';
+import {
+  ANALYZER_TIMEFRAMES,
+  MARKET_CATALOG_GROUPS,
+  type AnalyzerTimeframe,
+} from '../lib/tradingTimeframes';
 import type { PublicConfig, User } from '../types';
 import type { MarketSymbolQuote, TradingViewMarketStatus } from '../lib/api';
 
@@ -134,7 +138,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   }, []);
 
   const featuredQuotes = useMemo(() => {
-    const targetSyms = ['XAUUSD', 'EURUSD', 'BTCUSD', 'NAS100', 'GBPUSD'];
+    const targetSyms = ['EURUSD', 'XAUUSD', 'USOIL', 'SPY', 'NVDA', 'BTCUSD'];
     return targetSyms
       .map((s, i) => quotes.find((q) => q.sym === s) || quotes[i % quotes.length])
       .filter(Boolean);
@@ -332,7 +336,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div
             className={`${
               marketStatus ? 'mt-3' : 'mt-12'
-            } pt-4 pb-3 border-t border-b border-emerald-500/20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4`}
+            } pt-4 pb-3 border-t border-b border-emerald-500/20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4`}
           >
             {featuredQuotes.map((q) => {
               const up = q.chgPct >= 0;
@@ -390,10 +394,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 aria-label="Free chart symbol"
                 className="px-3 py-2 text-xs font-mono font-semibold bg-[#0E1712] border border-emerald-500/25 text-white rounded-lg focus:outline-none focus:border-[#16E563]"
               >
-                {TRADING_SYMBOLS.map((sym) => (
-                  <option key={sym} value={sym} className="bg-[#0B120E] text-white">
-                    {sym}
-                  </option>
+                {MARKET_CATALOG_GROUPS.map((group) => (
+                  <optgroup key={group.assetClass} label={group.label} className="bg-[#080E0B] text-emerald-300">
+                    {group.items.map((item) => (
+                      <option key={item.sym} value={item.sym} className="bg-[#0B120E] text-white">
+                        {item.sym} — {item.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
 

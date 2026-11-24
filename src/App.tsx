@@ -39,7 +39,14 @@ import {
   type TradingViewMarketStatus,
 } from './lib/api';
 import { getSupabaseClient } from './lib/supabase';
-import type { AnalyzerTimeframe } from './lib/tradingTimeframes';
+import {
+  ASSET_CLASS_LABELS,
+  ASSET_CLASS_ORDER,
+  ASSET_CLASS_SHORT_LABELS,
+  MARKET_CATALOG_GROUPS,
+  type AnalyzerTimeframe,
+  type AssetClass,
+} from './lib/tradingTimeframes';
 import type { JournalTrade, Order, PublicConfig, User } from './types';
 import { LandingPage } from './components/LandingPage';
 import { AuthView, type PendingOAuthUser } from './components/AuthView';
@@ -291,10 +298,19 @@ export default function App() {
 
   const filteredSearchQuotes = useMemo(() => {
     const q = assetSearch.trim().toLowerCase();
-    if (!q) return quotes.slice(0, 6);
+    if (!q) return quotes.slice(0, 8);
     return quotes
-      .filter((item) => item.sym.toLowerCase().includes(q) || item.name.toLowerCase().includes(q))
-      .slice(0, 6);
+      .filter((item) => {
+        const catLabel = ASSET_CLASS_LABELS[item.assetClass]?.toLowerCase() || '';
+        const catShort = ASSET_CLASS_SHORT_LABELS[item.assetClass]?.toLowerCase() || '';
+        return (
+          item.sym.toLowerCase().includes(q) ||
+          item.name.toLowerCase().includes(q) ||
+          catLabel.includes(q) ||
+          catShort.includes(q)
+        );
+      })
+      .slice(0, 10);
   }, [assetSearch, quotes]);
 
   if (booting) {
@@ -668,12 +684,12 @@ export default function App() {
                     setSearchFocused(false);
                   }
                 }}
-                placeholder="Search assets, markets (XAUUSD, EURUSD, BTCUSD)..."
+                placeholder="Search 70+ markets (EURUSD, XAUUSD, USOIL, SPY, NVDA, BTCUSD)..."
                 aria-label="Search assets and markets"
                 className="w-full pl-9 pr-3 py-2 text-xs bg-[#0E1712] border border-emerald-500/20 focus:border-[#16E563] text-white placeholder:text-slate-500 rounded-xl focus:outline-none transition-colors"
               />
               {searchFocused && filteredSearchQuotes.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#0B120E] border border-emerald-500/30 rounded-xl shadow-2xl overflow-hidden z-40">
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#0B120E] border border-emerald-500/30 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto z-40">
                   {filteredSearchQuotes.map((item) => {
                     const up = item.chgPct >= 0;
                     return (
@@ -690,6 +706,9 @@ export default function App() {
                       >
                         <span className="flex items-center gap-2 min-w-0">
                           <span className="font-mono font-bold text-white">{item.sym}</span>
+                          <span className="text-[10px] font-mono text-[#16E563]/80 uppercase shrink-0">
+                            {ASSET_CLASS_SHORT_LABELS[item.assetClass] || item.assetClass}
+                          </span>
                           <span className="text-slate-400 truncate">{item.name}</span>
                         </span>
                         <span className="font-mono tabular-nums flex items-center gap-2 shrink-0">
@@ -980,11 +999,13 @@ const WorkspaceOverview: React.FC<{
   const [tickDirs, setTickDirs] = useState<Record<string, 'up' | 'down'>>({});
   const [tickSeq, setTickSeq] = useState(0);
 
-  // Market Overview interactive chart state matching the exact dashboard artwork
+  // Market Overview interactive chart & category filter state
   const [overviewSym, setOverviewSym] = useState<string>('XAUUSD');
   const [overviewTf, setOverviewTf] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1D');
   const [overviewBars, setOverviewBars] = useState<MarketMiniBar[]>([]);
   const [loadingBars, setLoadingBars] = useState(true);
+  const [assetCategoryFilter, setAssetCategoryFilter] = useState<'all' | AssetClass>('all');
+  const [tableSearch, setTableSearch] = useState('');
 
   useEffect(() => {
     const id = window.setInterval(() => setNyClock(new Date()), 1000);
@@ -1052,10 +1073,28 @@ const WorkspaceOverview: React.FC<{
   const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
 
   const topAssets = useMemo(() => {
-    const order = ['BTCUSD', 'XAUUSD', 'EURUSD', 'NAS100', 'GBPUSD'];
+    const order = ['BTCUSD', 'XAUUSD', 'EURUSD', 'NVDA', 'SPY', 'USOIL'];
     return order
       .map((s) => quotes.find((q) => q.sym === s))
       .filter((q): q is MarketSymbolQuote => Boolean(q));
+  }, [quotes]);
+
+  const filteredTableQuotes = useMemo(() => {
+    const q = tableSearch.trim().toLowerCase();
+    return quotes.filter((item) => {
+      if (assetCategoryFilter !== 'all' && item.assetClass !== assetCategoryFilter) return false;
+      if (!q) return true;
+      return item.sym.toLowerCase().includes(q) || item.name.toLowerCase().includes(q);
+    });
+  }, [quotes, assetCategoryFilter, tableSearch]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: quotes.length };
+    for (const c of ASSET_CLASS_ORDER) counts[c] = 0;
+    for (const item of quotes) {
+      counts[item.assetClass] = (counts[item.assetClass] || 0) + 1;
+    }
+    return counts;
   }, [quotes]);
 
   const chartGeometry = useMemo(() => {
@@ -1303,12 +1342,16 @@ const WorkspaceOverview: React.FC<{
                   value={overviewSym}
                   onChange={(e) => setOverviewSym(e.target.value)}
                   aria-label="Market overview chart symbol"
-                  className="px-2.5 py-1 text-xs font-mono font-bold bg-[#070D0A] border border-emerald-500/25 text-[#16E563] rounded-lg focus:outline-none focus:border-[#16E563]"
+                  className="px-2.5 py-1 text-xs font-mono font-bold bg-[#070D0A] border border-emerald-500/25 text-[#16E563] rounded-lg focus:outline-none focus:border-[#16E563] max-w-[200px]"
                 >
-                  {['XAUUSD', 'BTCUSD', 'EURUSD', 'NAS100', 'GBPUSD', 'USDJPY'].map((s) => (
-                    <option key={s} value={s} className="bg-[#0B120E] text-white">
-                      {s}
-                    </option>
+                  {MARKET_CATALOG_GROUPS.map((group) => (
+                    <optgroup key={group.assetClass} label={group.label} className="bg-[#080E0B] text-emerald-300">
+                      {group.items.map((item) => (
+                        <option key={item.sym} value={item.sym} className="bg-[#0B120E] text-white">
+                          {item.sym} · {item.name}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
                 {selectedQuote && (
@@ -1432,13 +1475,13 @@ const WorkspaceOverview: React.FC<{
               </svg>
             </div>
 
-            {/* Live Market Quotes Table */}
-            <div className="mt-5">
-              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+            {/* Live Market Quotes Table with Asset-Class Filters */}
+            <div className="mt-5 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-mono text-slate-400">
                   {marketStatus
                     ? `Live TradingView Feeds · ${marketStatus.openCount}/${marketStatus.totalCount} open`
-                    : 'Live TradingView Feeds'}
+                    : `Live TradingView Feeds · ${quotes.length} markets`}
                 </div>
                 <button
                   type="button"
@@ -1448,20 +1491,66 @@ const WorkspaceOverview: React.FC<{
                   Open full TradingView terminal →
                 </button>
               </div>
-              <div className="overflow-x-auto">
+
+              <div className="flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-1 p-1 bg-[#070D0A] border border-emerald-500/15 rounded-xl">
+                  {(
+                    [
+                      ['all', 'All'],
+                      ['fx', 'Forex'],
+                      ['commodity', 'Commodities'],
+                      ['index', 'Indices'],
+                      ['etf', 'ETFs'],
+                      ['stock', 'Stocks'],
+                      ['crypto', 'Crypto'],
+                    ] as const
+                  ).map(([catKey, catLabel]) => {
+                    const active = assetCategoryFilter === catKey;
+                    return (
+                      <button
+                        key={catKey}
+                        type="button"
+                        onClick={() => setAssetCategoryFilter(catKey)}
+                        className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
+                          active
+                            ? 'bg-[#16E563] text-[#041108]'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {catLabel}{' '}
+                        <span className={`font-mono text-[10px] ${active ? 'text-[#041108]/80' : 'text-slate-500'}`}>
+                          {categoryCounts[catKey] ?? 0}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <input
+                  type="text"
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  placeholder="Filter ticker..."
+                  aria-label="Filter market quotes table"
+                  className="w-36 sm:w-44 px-3 py-1.5 text-xs bg-[#070D0A] border border-emerald-500/20 focus:border-[#16E563] text-white placeholder:text-slate-500 rounded-lg focus:outline-none"
+                />
+              </div>
+
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-emerald-500/10">
                 <table className="w-full text-left text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-[#0B120E] z-10">
                     <tr className="border-b border-emerald-500/15 text-xs text-slate-500">
-                      <th className="py-2 pr-4 font-medium">Symbol</th>
-                      <th className="py-2 pr-4 font-medium">Instrument</th>
-                      <th className="py-2 pr-4 font-medium">Session</th>
-                      <th className="py-2 pr-4 text-right font-medium">Price</th>
-                      <th className="py-2 pr-4 text-right font-medium">24h</th>
-                      <th className="py-2 text-right font-medium">Trend</th>
+                      <th className="py-2.5 pl-3 pr-4 font-medium">Symbol</th>
+                      <th className="py-2.5 pr-4 font-medium">Instrument</th>
+                      <th className="py-2.5 pr-4 font-medium">Class</th>
+                      <th className="py-2.5 pr-4 font-medium">Session</th>
+                      <th className="py-2.5 pr-4 text-right font-medium">Price</th>
+                      <th className="py-2.5 pr-4 text-right font-medium">24h</th>
+                      <th className="py-2.5 pr-3 text-right font-medium">Trend</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-emerald-500/10">
-                    {quotes.map((q, idx) => {
+                    {filteredTableQuotes.map((q, idx) => {
                       const up = q.chgPct >= 0;
                       const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
                       const dir = tickDirs[q.sym];
@@ -1473,10 +1562,13 @@ const WorkspaceOverview: React.FC<{
                           onClick={() => onOpenSymbolChart(q.sym)}
                           className="group hover:bg-emerald-500/5 transition-colors cursor-pointer"
                         >
-                          <td className="py-2.5 pr-4 font-mono font-bold text-white group-hover:text-[#16E563] transition-colors whitespace-nowrap">
+                          <td className="py-2.5 pl-3 pr-4 font-mono font-bold text-white group-hover:text-[#16E563] transition-colors whitespace-nowrap">
                             {q.sym}
                           </td>
                           <td className="py-2.5 pr-4 text-slate-400 text-xs whitespace-nowrap">{q.name}</td>
+                          <td className="py-2.5 pr-4 font-mono text-[11px] text-emerald-300/80 whitespace-nowrap">
+                            {ASSET_CLASS_SHORT_LABELS[q.assetClass] || q.assetClass}
+                          </td>
                           <td
                             className={`py-2.5 pr-4 text-xs font-medium whitespace-nowrap ${
                               q.isMarketOpen === true ? 'text-[#16E563]' : 'text-slate-500'
@@ -1509,7 +1601,7 @@ const WorkspaceOverview: React.FC<{
                             {up ? '+' : ''}
                             {q.chgPct.toFixed(2)}%
                           </td>
-                          <td className="py-2 text-right">
+                          <td className="py-2.5 pr-3 text-right">
                             <svg
                               viewBox="0 0 76 20"
                               className="w-16 h-5 inline-block"
@@ -1528,6 +1620,13 @@ const WorkspaceOverview: React.FC<{
                         </tr>
                       );
                     })}
+                    {filteredTableQuotes.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="py-6 text-center text-xs text-slate-500">
+                          No instruments match &ldquo;{tableSearch}&rdquo;.
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
