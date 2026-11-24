@@ -17,7 +17,7 @@ const TV_WIDGET_HOSTS = [
 export const LiveTradingViewChart: React.FC<LiveTradingViewChartProps> = ({
   symbol,
   timeframe,
-  theme = 'light',
+  theme = 'dark',
   heightClass = 'h-[460px]',
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -95,20 +95,20 @@ export const LiveTradingViewChart: React.FC<LiveTradingViewChartProps> = ({
       className={
         expanded
           ? `fixed inset-3 sm:inset-5 z-50 rounded-xl overflow-hidden border shadow-2xl ${
-              theme === 'dark' ? 'border-slate-700 bg-slate-950' : 'border-slate-300 bg-white'
+              theme === 'dark' ? 'border-emerald-500/30 bg-[#050907]' : 'border-slate-300 bg-white'
             }`
           : `relative w-full ${heightClass} min-h-[360px] rounded-lg overflow-hidden border ${
-              theme === 'dark' ? 'border-slate-800 bg-slate-950' : 'border-slate-200 bg-white'
+              theme === 'dark' ? 'border-emerald-500/20 bg-[#050907]' : 'border-slate-200 bg-white'
             }`
       }
     >
       {!loaded && (
         <div
           className={`absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-xs ${
-            theme === 'dark' ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-600'
+            theme === 'dark' ? 'bg-[#070D0A] text-slate-300' : 'bg-slate-50 text-slate-600'
           }`}
         >
-          <RefreshCw className="w-4 h-4 animate-spin text-blue-500" />
+          <RefreshCw className="w-4 h-4 animate-spin text-[#16E563]" />
           <span>
             Connecting live TradingView chart ({tvSymbol} · {timeframe})...
           </span>

@@ -65,10 +65,10 @@ export const TradingViewChartsView: React.FC<{
   return (
     <div className="space-y-4">
       {/* Full-Width Landscape Watchlist & Pair Selector Strip */}
-      <div className="rounded-2xl bg-white border border-slate-200 p-4 space-y-3">
+      <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-4 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 mr-1">Watchlist</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1">Watchlist</span>
             {list.map((sym) => {
               const active = symbol === sym;
               return (
@@ -77,7 +77,7 @@ export const TradingViewChartsView: React.FC<{
                   className={`inline-flex items-center rounded-lg border text-xs font-mono font-semibold transition-colors ${
                     active
                       ? 'bg-[#E5A93C] border-[#E5A93C] text-[#090806]'
-                      : 'bg-slate-50 border-slate-200 text-slate-700 hover:border-amber-400 hover:text-slate-950'
+                      : 'bg-[#070D0A] border-emerald-500/20 text-slate-200 hover:border-[#16E563]/60 hover:text-white'
                   }`}
                 >
                   <button
@@ -117,7 +117,7 @@ export const TradingViewChartsView: React.FC<{
                 }
               }}
               aria-label="Browse Forex, Commodities, Indices, ETFs, Stocks, and Crypto"
-              className="px-3 py-1.5 text-xs font-mono font-semibold bg-slate-50 border border-slate-300 focus:border-amber-500 focus:outline-none rounded-lg text-slate-900 max-w-[210px]"
+              className="px-3 py-1.5 text-xs font-mono font-semibold bg-[#070D0A] border border-emerald-500/25 focus:border-[#16E563] focus:outline-none rounded-lg text-white max-w-[210px]"
             >
               <option value="">Browse 70+ Markets...</option>
               {MARKET_CATALOG_GROUPS.map((group) => (
@@ -137,15 +137,15 @@ export const TradingViewChartsView: React.FC<{
                 value={newSym}
                 onChange={(e) => setNewSym(e.target.value)}
                 placeholder="Add ticker (e.g. NVDA)"
-                className="w-36 sm:w-40 px-3 py-1.5 text-xs bg-white border border-slate-300 focus:border-amber-500 focus:outline-none rounded-lg font-mono uppercase text-slate-950 placeholder:text-slate-400"
+                className="w-36 sm:w-40 px-3 py-1.5 text-xs bg-[#0E1712] border border-emerald-500/25 text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none rounded-lg font-mono uppercase text-white placeholder:text-slate-400"
               />
               <button
                 type="submit"
-                className="px-3 py-1.5 bg-amber-50 border border-amber-300 hover:border-amber-500 text-amber-800 text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+                className="px-3 py-1.5 bg-[#F5B82E]/12 border border-[#F5B82E]/40 hover:border-[#16E563] text-[#F5B82E] text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
               >
                 + Add
               </button>
-              <span className="hidden sm:inline text-[11px] font-medium text-emerald-600 ml-1 whitespace-nowrap">
+              <span className="hidden sm:inline text-[11px] font-medium text-[#16E563] ml-1 whitespace-nowrap">
                 {savingWl ? 'Syncing...' : 'Free Chart'}
               </span>
             </form>
@@ -154,19 +154,19 @@ export const TradingViewChartsView: React.FC<{
       </div>
 
       {/* Full-Width 16:9 Landscape TradingView Chart Card */}
-      <div className="rounded-2xl bg-white border border-slate-200 p-4 sm:p-5 space-y-3.5">
+      <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-4 sm:p-5 space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-bold text-slate-950 font-mono">
+            <h3 className="text-base font-bold text-white font-mono">
               {symbol} ({activeTimeframe}) · Live Landscape Chart
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               Full-width widescreen TradingView chart synced directly with your ICT Analyzer
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
+            <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0E1712] border border-emerald-500/20 rounded-lg">
               {ANALYZER_TIMEFRAMES.map((tf) => (
                 <button
                   key={tf}
@@ -175,7 +175,7 @@ export const TradingViewChartsView: React.FC<{
                   className={`px-2.5 py-1 text-xs font-mono font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                     activeTimeframe === tf
                       ? 'bg-[#E5A93C] text-[#090806]'
-                      : 'text-slate-600 hover:text-slate-950'
+                      : 'text-slate-300 hover:text-white'
                   }`}
                 >
                   {tf}
@@ -283,19 +283,19 @@ export const JournalView: React.FC<{
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="grid grid-cols-3 gap-4 flex-1 max-w-xl">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Logged Trades</div>
-            <div className="text-xl font-bold font-mono tabular-nums text-slate-950">{trades.length}</div>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Logged Trades</div>
+            <div className="text-xl font-bold font-mono tabular-nums text-white">{trades.length}</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Win Rate</div>
-            <div className="text-xl font-bold font-mono tabular-nums text-slate-950">{winRate}%</div>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Win Rate</div>
+            <div className="text-xl font-bold font-mono tabular-nums text-white">{winRate}%</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Net P&amp;L</div>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Net P&amp;L</div>
             <div
               className={`text-xl font-bold font-mono tabular-nums ${
-                totalPnl >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                totalPnl >= 0 ? 'text-[#16E563]' : 'text-rose-400'
               }`}
             >
               {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
@@ -304,7 +304,7 @@ export const JournalView: React.FC<{
         </div>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="px-4 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 inline-flex items-center gap-2 cursor-pointer"
+          className="px-4 py-2.5 bg-[#16E563] text-[#041108] font-bold text-xs font-semibold rounded-lg hover:bg-[#2BF074] inline-flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           {showForm ? 'Cancel' : 'Log Trade'}
@@ -312,31 +312,31 @@ export const JournalView: React.FC<{
       </div>
 
       {showForm && (
-        <form onSubmit={handleAddTrade} className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
-          <h3 className="text-base font-bold text-slate-950">New Journal Entry</h3>
+        <form onSubmit={handleAddTrade} className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
+          <h3 className="text-base font-bold text-white">New Journal Entry</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Instrument</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Instrument</label>
               <input
                 required
                 value={instrument}
                 onChange={(e) => setInstrument(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Direction</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Direction</label>
               <select
                 value={side}
                 onChange={(e) => setSide(e.target.value as 'Buy' | 'Sell')}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none"
               >
                 <option value="Buy">Buy</option>
                 <option value="Sell">Sell</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Net P&amp;L ($)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Net P&amp;L ($)</label>
               <input
                 type="number"
                 step="any"
@@ -344,70 +344,70 @@ export const JournalView: React.FC<{
                 value={pnl}
                 onChange={(e) => setPnl(e.target.value)}
                 placeholder="e.g. 240.50 or -95"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Entry</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Entry</label>
               <input
                 type="number"
                 step="any"
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Stop Loss</label>
               <input
                 type="number"
                 step="any"
                 value={sl}
                 onChange={(e) => setSl(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Take Profit</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Take Profit</label>
               <input
                 type="number"
                 step="any"
                 value={tp}
                 onChange={(e) => setTp(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Lot Size</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Lot Size</label>
               <input
                 type="number"
                 step="any"
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Date</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Date</label>
               <input
                 type="date"
                 value={tradeDate}
                 onChange={(e) => setTradeDate(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Session</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Session</label>
               <select
                 value={session}
                 onChange={(e) => setSession(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none"
               >
                 <option>London</option>
                 <option>New York</option>
@@ -416,56 +416,56 @@ export const JournalView: React.FC<{
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Strategy</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Strategy</label>
               <input
                 value={strategy}
                 onChange={(e) => setStrategy(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">R:R Achieved</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">R:R Achieved</label>
               <input
                 type="number"
                 step="any"
                 value={rr}
                 onChange={(e) => setRr(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Entry Rationale</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Entry Rationale</label>
               <textarea
                 rows={2}
                 value={reasonEntry}
                 onChange={(e) => setReasonEntry(e.target.value)}
                 placeholder="Swept SSL, M15 MSS + FVG 50% CE..."
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Lessons / Psychology</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Lessons / Psychology</label>
               <textarea
                 rows={2}
                 value={lessons}
                 onChange={(e) => setLessons(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Chart Screenshot (Optional)</label>
+            <label className="block text-xs font-semibold text-slate-200 mb-1">Chart Screenshot (Optional)</label>
             <input type="file" accept="image/*" onChange={handleFileChange} className="text-xs" />
           </div>
 
           <button
             type="submit"
             disabled={saving}
-            className="px-5 py-2.5 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer"
+            className="px-5 py-2.5 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] cursor-pointer"
           >
             {saving ? 'Saving...' : 'Save Trade Entry'}
           </button>
@@ -473,14 +473,14 @@ export const JournalView: React.FC<{
       )}
 
       {trades.length === 0 ? (
-        <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
-          <h3 className="text-base font-bold text-slate-950 mb-1">No journal trades logged yet</h3>
-          <p className="text-sm text-slate-500 mb-4">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-10 text-center">
+          <h3 className="text-base font-bold text-white mb-1">No journal trades logged yet</h3>
+          <p className="text-sm text-slate-400 mb-4">
             Record your ICT and SMC executions to automatically compute equity curve and strategy analytics.
           </p>
           <button
             onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg cursor-pointer"
+            className="px-4 py-2 bg-[#16E563] text-[#041108] font-bold text-xs font-semibold rounded-lg cursor-pointer"
           >
             Log First Trade
           </button>
@@ -488,22 +488,22 @@ export const JournalView: React.FC<{
       ) : (
         <div className="space-y-3">
           {trades.map((t) => (
-            <div key={t.id} className="bg-white border border-slate-200 rounded-xl p-5">
+            <div key={t.id} className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 text-sm font-bold text-slate-950">
+                  <div className="flex items-center gap-2 text-sm font-bold text-white">
                     <span className="font-mono">{t.instrument}</span>
                     <span aria-hidden="true">·</span>
-                    <span className={t.side === 'Buy' ? 'text-emerald-700' : 'text-rose-700'}>{t.side}</span>
+                    <span className={t.side === 'Buy' ? 'text-[#16E563]' : 'text-rose-400'}>{t.side}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
+                  <div className="text-xs text-slate-400 mt-0.5">
                     {t.trade_date} · {t.session} · {t.strategy} · R:R {t.rr || '—'}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span
                     className={`text-base font-bold font-mono tabular-nums ${
-                      Number(t.pnl) >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                      Number(t.pnl) >= 0 ? 'text-[#16E563]' : 'text-rose-400'
                     }`}
                   >
                     {Number(t.pnl) >= 0 ? '+' : ''}${Number(t.pnl).toFixed(2)}
@@ -518,15 +518,15 @@ export const JournalView: React.FC<{
                 </div>
               </div>
               {(t.reason_entry || t.lessons) && (
-                <div className="mt-3 pt-3 border-t border-slate-100 text-xs text-slate-600 space-y-1">
+                <div className="mt-3 pt-3 border-t border-emerald-500/10 text-xs text-slate-300 space-y-1">
                   {t.reason_entry && (
                     <p>
-                      <strong className="text-slate-800">Entry:</strong> {t.reason_entry}
+                      <strong className="text-slate-100">Entry:</strong> {t.reason_entry}
                     </p>
                   )}
                   {t.lessons && (
                     <p>
-                      <strong className="text-slate-800">Notes:</strong> {t.lessons}
+                      <strong className="text-slate-100">Notes:</strong> {t.lessons}
                     </p>
                   )}
                 </div>
@@ -535,7 +535,7 @@ export const JournalView: React.FC<{
                 <img
                   src={t.image_data}
                   alt={`${t.instrument} setup screenshot`}
-                  className="mt-3 rounded-lg border border-slate-200 max-h-64 object-contain"
+                  className="mt-3 rounded-lg border border-emerald-500/20 max-h-64 object-contain"
                 />
               )}
             </div>
@@ -550,9 +550,9 @@ export const JournalView: React.FC<{
 export const AnalyticsView: React.FC<{ trades: JournalTrade[] }> = ({ trades }) => {
   if (trades.length === 0) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-10 text-center">
-        <h3 className="text-base font-bold text-slate-950 mb-1">No Analytics Data Yet</h3>
-        <p className="text-sm text-slate-500">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-10 text-center">
+        <h3 className="text-base font-bold text-white mb-1">No Analytics Data Yet</h3>
+        <p className="text-sm text-slate-400">
           Log trades in your Trading Journal to generate your equity curve, win/loss distribution, and strategy/session breakdowns.
         </p>
       </div>
@@ -606,28 +606,28 @@ export const AnalyticsView: React.FC<{ trades: JournalTrade[] }> = ({ trades }) 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500">Total Trades</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-slate-950">{trades.length}</div>
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+          <div className="text-xs text-slate-400">Total Trades</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-white">{trades.length}</div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500">Wins / Losses ({winPct}%)</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-slate-950">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+          <div className="text-xs text-slate-400">Wins / Losses ({winPct}%)</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-white">
             {wins.length} / {losses.length}
           </div>
-          <div className="mt-2 h-1.5 w-full bg-rose-100 rounded-full overflow-hidden">
+          <div className="mt-2 h-1.5 w-full bg-rose-500/18 rounded-full overflow-hidden">
             <div className="h-full bg-emerald-600" style={{ width: `${winPct}%` }} />
           </div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500">Profit Factor</div>
-          <div className="text-xl font-bold font-mono tabular-nums text-blue-600">{profitFactor}</div>
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+          <div className="text-xs text-slate-400">Profit Factor</div>
+          <div className="text-xl font-bold font-mono tabular-nums text-[#16E563]">{profitFactor}</div>
         </div>
-        <div className="bg-white border border-slate-200 rounded-xl p-4">
-          <div className="text-xs text-slate-500">Cumulative P&amp;L</div>
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+          <div className="text-xs text-slate-400">Cumulative P&amp;L</div>
           <div
             className={`text-xl font-bold font-mono tabular-nums ${
-              running >= 0 ? 'text-emerald-700' : 'text-rose-700'
+              running >= 0 ? 'text-[#16E563]' : 'text-rose-400'
             }`}
           >
             ${running.toFixed(2)}
@@ -635,21 +635,21 @@ export const AnalyticsView: React.FC<{ trades: JournalTrade[] }> = ({ trades }) 
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <h3 className="text-base font-bold text-slate-950 mb-4">Cumulative Equity Curve</h3>
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
+        <h3 className="text-base font-bold text-white mb-4">Cumulative Equity Curve</h3>
         <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-56">
           <polyline fill="none" stroke="#2563eb" strokeWidth="2.5" points={polyline} />
         </svg>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h4 className="text-sm font-bold text-slate-950 mb-3">Performance by Strategy</h4>
-          <div className="divide-y divide-slate-100 text-xs">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <h4 className="text-sm font-bold text-white mb-3">Performance by Strategy</h4>
+          <div className="divide-y divide-emerald-500/10 text-xs">
             {stratEntries.map(([name, val]) => (
               <div key={name} className="py-2 flex items-center justify-between gap-2">
-                <span className="text-slate-700 truncate">{name}</span>
-                <span className={`font-mono tabular-nums font-bold ${val >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                <span className="text-slate-200 truncate">{name}</span>
+                <span className={`font-mono tabular-nums font-bold ${val >= 0 ? 'text-[#16E563]' : 'text-rose-400'}`}>
                   {val >= 0 ? '+' : ''}${val.toFixed(2)}
                 </span>
               </div>
@@ -657,13 +657,13 @@ export const AnalyticsView: React.FC<{ trades: JournalTrade[] }> = ({ trades }) 
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h4 className="text-sm font-bold text-slate-950 mb-3">Performance by Session</h4>
-          <div className="divide-y divide-slate-100 text-xs">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <h4 className="text-sm font-bold text-white mb-3">Performance by Session</h4>
+          <div className="divide-y divide-emerald-500/10 text-xs">
             {sessEntries.map(([name, val]) => (
               <div key={name} className="py-2 flex items-center justify-between gap-2">
-                <span className="text-slate-700 truncate">{name}</span>
-                <span className={`font-mono tabular-nums font-bold ${val >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                <span className="text-slate-200 truncate">{name}</span>
+                <span className={`font-mono tabular-nums font-bold ${val >= 0 ? 'text-[#16E563]' : 'text-rose-400'}`}>
                   {val >= 0 ? '+' : ''}${val.toFixed(2)}
                 </span>
               </div>
@@ -671,24 +671,24 @@ export const AnalyticsView: React.FC<{ trades: JournalTrade[] }> = ({ trades }) 
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h4 className="text-sm font-bold text-slate-950 mb-3">Edge Summary</h4>
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <h4 className="text-sm font-bold text-white mb-3">Edge Summary</h4>
           <div className="space-y-2.5 text-xs">
-            <div className="flex justify-between py-1.5 border-b border-slate-100">
-              <span className="text-slate-500">Top Strategy</span>
-              <span className="font-semibold text-slate-950">{stratEntries[0]?.[0] || '—'}</span>
+            <div className="flex justify-between py-1.5 border-b border-emerald-500/10">
+              <span className="text-slate-400">Top Strategy</span>
+              <span className="font-semibold text-white">{stratEntries[0]?.[0] || '—'}</span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-100">
-              <span className="text-slate-500">Best Session</span>
-              <span className="font-semibold text-slate-950">{sessEntries[0]?.[0] || '—'}</span>
+            <div className="flex justify-between py-1.5 border-b border-emerald-500/10">
+              <span className="text-slate-400">Best Session</span>
+              <span className="font-semibold text-white">{sessEntries[0]?.[0] || '—'}</span>
             </div>
-            <div className="flex justify-between py-1.5 border-b border-slate-100">
-              <span className="text-slate-500">Best Instrument</span>
-              <span className="font-mono font-semibold text-slate-950">{instEntries[0]?.[0] || '—'}</span>
+            <div className="flex justify-between py-1.5 border-b border-emerald-500/10">
+              <span className="text-slate-400">Best Instrument</span>
+              <span className="font-mono font-semibold text-white">{instEntries[0]?.[0] || '—'}</span>
             </div>
             <div className="flex justify-between py-1.5">
-              <span className="text-slate-500">Worst Instrument</span>
-              <span className="font-mono font-semibold text-rose-700">
+              <span className="text-slate-400">Worst Instrument</span>
+              <span className="font-mono font-semibold text-rose-400">
                 {instEntries[instEntries.length - 1]?.[0] || '—'}
               </span>
             </div>
@@ -735,7 +735,7 @@ export const CalculatorsView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-1 p-1 bg-slate-200/70 rounded-lg w-fit">
+      <div className="flex flex-wrap gap-1 p-1 bg-[#070D0A] rounded-lg w-fit">
         {(
           [
             ['risk', '1. Risk'],
@@ -752,7 +752,7 @@ export const CalculatorsView: React.FC = () => {
             key={key}
             onClick={() => setTab(key)}
             className={`px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer ${
-              tab === key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+              tab === key ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300'
             }`}
           >
             {label}
@@ -761,25 +761,25 @@ export const CalculatorsView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Account Balance ($)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Account Balance ($)</label>
               <input
                 type="number"
                 value={balance}
                 onChange={(e) => setBalance(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Risk per Trade (%)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Risk per Trade (%)</label>
               <input
                 type="number"
                 step="0.1"
                 value={riskPct}
                 onChange={(e) => setRiskPct(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
@@ -787,33 +787,33 @@ export const CalculatorsView: React.FC = () => {
           {(tab === 'risk' || tab === 'rr' || tab === 'pl' || tab === 'margin') && (
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Entry</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Entry</label>
                 <input
                   type="number"
                   step="any"
                   value={entry}
                   onChange={(e) => setEntry(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Stop Loss</label>
                 <input
                   type="number"
                   step="any"
                   value={sl}
                   onChange={(e) => setSl(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Take Profit</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Take Profit</label>
                 <input
                   type="number"
                   step="any"
                   value={tp}
                   onChange={(e) => setTp(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -822,21 +822,21 @@ export const CalculatorsView: React.FC = () => {
           {tab === 'position' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss (Pips)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Stop Loss (Pips)</label>
                 <input
                   type="number"
                   value={slPips}
                   onChange={(e) => setSlPips(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Pip Value / Std Lot ($)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Pip Value / Std Lot ($)</label>
                 <input
                   type="number"
                   value={pipVal}
                   onChange={(e) => setPipVal(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -845,23 +845,23 @@ export const CalculatorsView: React.FC = () => {
           {(tab === 'pip' || tab === 'pl') && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Position Size (Lots)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Position Size (Lots)</label>
                 <input
                   type="number"
                   step="0.01"
                   value={lots}
                   onChange={(e) => setLots(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Pip Size (0.0001 or 0.01 JPY)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Pip Size (0.0001 or 0.01 JPY)</label>
                 <input
                   type="number"
                   step="any"
                   value={pipSize}
                   onChange={(e) => setPipSize(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -870,23 +870,23 @@ export const CalculatorsView: React.FC = () => {
           {tab === 'percent' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Starting Value ($)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Starting Value ($)</label>
                 <input
                   type="number"
                   step="any"
                   value={pctA}
                   onChange={(e) => setPctA(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Ending Value ($)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Ending Value ($)</label>
                 <input
                   type="number"
                   step="any"
                   value={pctB}
                   onChange={(e) => setPctB(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -895,21 +895,21 @@ export const CalculatorsView: React.FC = () => {
           {tab === 'compound' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Monthly Gain (%)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Monthly Gain (%)</label>
                 <input
                   type="number"
                   value={monthlyRet}
                   onChange={(e) => setMonthlyRet(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Months</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Months</label>
                 <input
                   type="number"
                   value={months}
                   onChange={(e) => setMonths(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -918,21 +918,21 @@ export const CalculatorsView: React.FC = () => {
           {tab === 'margin' && (
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Units (10,000 = 0.1 Lot)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Units (10,000 = 0.1 Lot)</label>
                 <input
                   type="number"
                   value={units}
                   onChange={(e) => setUnits(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Leverage (1:X)</label>
+                <label className="block text-xs font-semibold text-slate-200 mb-1">Leverage (1:X)</label>
                 <input
                   type="number"
                   value={leverage}
                   onChange={(e) => setLeverage(Number(e.target.value))}
-                  className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                  className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
                 />
               </div>
             </div>
@@ -1137,19 +1137,19 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="grid grid-cols-3 gap-4 flex-1 max-w-xl">
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Virtual Cash</div>
-            <div className="text-lg font-bold font-mono tabular-nums text-slate-950">${balance.toFixed(2)}</div>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Virtual Cash</div>
+            <div className="text-lg font-bold font-mono tabular-nums text-white">${balance.toFixed(2)}</div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Live Equity</div>
-            <div className={`text-lg font-bold font-mono tabular-nums ${equity >= balance ? 'text-emerald-700' : 'text-rose-700'}`}>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Live Equity</div>
+            <div className={`text-lg font-bold font-mono tabular-nums ${equity >= balance ? 'text-[#16E563]' : 'text-rose-400'}`}>
               ${equity.toFixed(2)}
             </div>
           </div>
-          <div className="bg-white border border-slate-200 rounded-xl p-4">
-            <div className="text-xs text-slate-500">Open Positions</div>
-            <div className="text-lg font-bold font-mono tabular-nums text-slate-950">{positions.length}</div>
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+            <div className="text-xs text-slate-400">Open Positions</div>
+            <div className="text-lg font-bold font-mono tabular-nums text-white">{positions.length}</div>
           </div>
         </div>
         <button
@@ -1158,7 +1158,7 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
             setPaperNotice('Virtual paper account reset to $10,000.00');
             savePaperState(10000, [], []);
           }}
-          className="px-4 py-2 border border-slate-300 bg-white text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer"
+          className="px-4 py-2 border border-emerald-500/25 bg-[#0B120E] text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           Reset $10k
@@ -1166,12 +1166,12 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
       </div>
 
       {paperNotice && (
-        <div className="px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-mono rounded-lg flex items-center justify-between gap-3">
+        <div className="px-4 py-2.5 bg-emerald-500/12 border border-emerald-500/30 text-emerald-300 text-xs font-mono rounded-lg flex items-center justify-between gap-3">
           <span>{paperNotice}</span>
           <button
             type="button"
             onClick={() => setPaperNotice('')}
-            className="text-emerald-700 hover:text-emerald-950 cursor-pointer"
+            className="text-[#16E563] hover:text-emerald-200 cursor-pointer"
           >
             Dismiss
           </button>
@@ -1179,13 +1179,13 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <form onSubmit={handleOpen} className="lg:col-span-4 bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <form onSubmit={handleOpen} className="lg:col-span-4 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-base font-bold text-slate-950">Open Virtual Trade</h3>
+            <h3 className="text-base font-bold text-white">Open Virtual Trade</h3>
             {selectedQuote && (
               <span
                 className={`text-[11px] font-mono font-semibold ${
-                  selectedQuote.isMarketOpen === false ? 'text-amber-700' : 'text-emerald-700'
+                  selectedQuote.isMarketOpen === false ? 'text-[#F5B82E]' : 'text-[#16E563]'
                 }`}
               >
                 {selectedQuote.marketStatusLabel || 'Live'}
@@ -1193,11 +1193,11 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
             )}
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">Symbol</label>
+            <label className="block text-xs font-semibold text-slate-200 mb-1">Symbol</label>
             <select
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
+              className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none font-mono"
             >
               {ASSET_CLASS_ORDER.map((cls) => {
                 const groupQuotes = quotes.filter((q) => q.assetClass === cls);
@@ -1214,12 +1214,12 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
               })}
             </select>
             {selectedQuote && (
-              <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono text-slate-500">
+              <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono text-slate-400">
                 <span>
                   Bid: {Number(selectedQuote.bid || selectedQuote.price).toFixed(selectedQuote.digits)} · Ask:{' '}
                   {Number(selectedQuote.ask || selectedQuote.price).toFixed(selectedQuote.digits)}
                 </span>
-                <span className="font-semibold text-slate-700">
+                <span className="font-semibold text-slate-200">
                   Fill @ {selectedFillPrice.toFixed(selectedQuote.digits)}
                 </span>
               </div>
@@ -1227,62 +1227,62 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Side</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Side</label>
               <select
                 value={side}
                 onChange={(e) => setSide(e.target.value as 'Buy' | 'Sell')}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none"
               >
                 <option value="Buy">Buy</option>
                 <option value="Sell">Sell</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Units</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Units</label>
               <input
                 type="number"
                 value={size}
                 onChange={(e) => setSize(Number(e.target.value))}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Stop Loss (Auto)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Stop Loss (Auto)</label>
               <input
                 type="number"
                 step="any"
                 value={slPrice}
                 onChange={(e) => setSlPrice(e.target.value)}
                 placeholder="Auto-trigger price"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Take Profit (Auto)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Take Profit (Auto)</label>
               <input
                 type="number"
                 step="any"
                 value={tpPrice}
                 onChange={(e) => setTpPrice(e.target.value)}
                 placeholder="Auto-trigger price"
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
           <button
             type="submit"
-            className="w-full py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer"
+            className="w-full py-2.5 bg-[#16E563] text-[#041108] font-bold text-xs font-semibold rounded-lg hover:bg-[#2BF074] cursor-pointer"
           >
             Execute {side} @ {selectedQuote ? selectedFillPrice.toFixed(selectedQuote.digits) : 'Market'}
           </button>
         </form>
 
-        <div className="lg:col-span-8 bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="text-base font-bold text-slate-950 mb-4">Active Paper Positions</h3>
+        <div className="lg:col-span-8 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <h3 className="text-base font-bold text-white mb-4">Active Paper Positions</h3>
           {positions.length === 0 ? (
-            <p className="text-sm text-slate-500">No open positions. Execute a practice order on the left.</p>
+            <p className="text-sm text-slate-400">No open positions. Execute a practice order on the left.</p>
           ) : (
             <div className="space-y-2.5">
               {positions.map((p) => {
@@ -1290,13 +1290,13 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
                 return (
                   <div
                     key={p.id}
-                    className="p-3.5 border border-slate-200 rounded-lg flex items-center justify-between gap-4"
+                    className="p-3.5 border border-emerald-500/20 rounded-lg flex items-center justify-between gap-4"
                   >
                     <div>
-                      <div className="text-sm font-bold font-mono text-slate-950">
-                        {p.symbol} · <span className={p.side === 'Buy' ? 'text-emerald-700' : 'text-rose-700'}>{p.side}</span>
+                      <div className="text-sm font-bold font-mono text-white">
+                        {p.symbol} · <span className={p.side === 'Buy' ? 'text-[#16E563]' : 'text-rose-400'}>{p.side}</span>
                       </div>
-                      <div className="text-xs text-slate-500 font-mono">
+                      <div className="text-xs text-slate-400 font-mono">
                         Entry {p.entry} · Units {p.size}
                         {p.sl ? ` · SL ${p.sl}` : ''}
                         {p.tp ? ` · TP ${p.tp}` : ''}
@@ -1305,14 +1305,14 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
                     <div className="flex items-center gap-4">
                       <span
                         className={`text-sm font-bold font-mono tabular-nums ${
-                          pnl >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                          pnl >= 0 ? 'text-[#16E563]' : 'text-rose-400'
                         }`}
                       >
                         {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
                       </span>
                       <button
                         onClick={() => handleClose(p)}
-                        className="px-3 py-1.5 bg-slate-950 text-white text-xs font-semibold rounded-md cursor-pointer"
+                        className="px-3 py-1.5 bg-[#16E563] text-[#041108] hover:bg-[#2BF074] text-xs font-bold rounded-md cursor-pointer transition-colors"
                       >
                         Close
                       </button>
@@ -1326,12 +1326,12 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
       </div>
 
       {history.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h3 className="text-base font-bold text-slate-950 mb-4">Closed Paper Trade History</h3>
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
+          <h3 className="text-base font-bold text-white mb-4">Closed Paper Trade History</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                <tr className="border-b border-emerald-500/20 text-xs text-slate-400">
                   <th className="py-2 pr-4">Symbol</th>
                   <th className="py-2 pr-4">Side</th>
                   <th className="py-2 pr-4">Entry</th>
@@ -1340,19 +1340,19 @@ export const PaperTradingView: React.FC<{ quotes: MarketSymbolQuote[] }> = ({ qu
                   <th className="py-2 text-right">Realized P&amp;L</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-xs">
+              <tbody className="divide-y divide-emerald-500/10 text-xs">
                 {history.slice(0, 20).map((h) => (
                   <tr key={h.id}>
-                    <td className="py-2.5 pr-4 font-mono font-bold text-slate-950">{h.symbol}</td>
-                    <td className={`py-2.5 pr-4 font-semibold ${h.side === 'Buy' ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    <td className="py-2.5 pr-4 font-mono font-bold text-white">{h.symbol}</td>
+                    <td className={`py-2.5 pr-4 font-semibold ${h.side === 'Buy' ? 'text-[#16E563]' : 'text-rose-400'}`}>
                       {h.side}
                     </td>
-                    <td className="py-2.5 pr-4 font-mono tabular-nums text-slate-700">{h.entry}</td>
-                    <td className="py-2.5 pr-4 font-mono tabular-nums text-slate-700">{h.exit}</td>
-                    <td className="py-2.5 pr-4 text-right text-slate-500">{h.closedAt}</td>
+                    <td className="py-2.5 pr-4 font-mono tabular-nums text-slate-200">{h.entry}</td>
+                    <td className="py-2.5 pr-4 font-mono tabular-nums text-slate-200">{h.exit}</td>
+                    <td className="py-2.5 pr-4 text-right text-slate-400">{h.closedAt}</td>
                     <td
                       className={`py-2.5 text-right font-mono tabular-nums font-bold ${
-                        h.pnl >= 0 ? 'text-emerald-700' : 'text-rose-700'
+                        h.pnl >= 0 ? 'text-[#16E563]' : 'text-rose-400'
                       }`}
                     >
                       {h.pnl >= 0 ? '+' : ''}${Number(h.pnl).toFixed(2)}
@@ -1406,53 +1406,53 @@ export const TradingPlanView: React.FC = () => {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-bold text-slate-950">Personal Trading Plan</h3>
-          {saved && <span className="text-xs font-semibold text-emerald-700">Saved</span>}
+          <h3 className="text-base font-bold text-white">Personal Trading Plan</h3>
+          {saved && <span className="text-xs font-semibold text-[#16E563]">Saved</span>}
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Primary Goals</label>
+          <label className="block text-xs font-semibold text-slate-200 mb-1">Primary Goals</label>
           <textarea
             rows={2}
             value={rules.goals}
             onChange={(e) => setRules({ ...rules, goals: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+            className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Entry Criteria</label>
+          <label className="block text-xs font-semibold text-slate-200 mb-1">Entry Criteria</label>
           <textarea
             rows={3}
             value={rules.entryRules}
             onChange={(e) => setRules({ ...rules, entryRules: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+            className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
           />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-slate-700 mb-1">Risk &amp; Drawdown Limits</label>
+          <label className="block text-xs font-semibold text-slate-200 mb-1">Risk &amp; Drawdown Limits</label>
           <textarea
             rows={2}
             value={rules.riskRules}
             onChange={(e) => setRules({ ...rules, riskRules: e.target.value })}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+            className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
           />
         </div>
         <button
           onClick={() => savePlan(rules)}
-          className="px-5 py-2.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 cursor-pointer"
+          className="px-5 py-2.5 bg-[#16E563] text-[#041108] font-bold text-xs font-semibold rounded-lg hover:bg-[#2BF074] cursor-pointer"
         >
           Save Trading Plan
         </button>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
-        <h3 className="text-base font-bold text-slate-950 mb-4">Pre-Session Execution Checklist</h3>
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
+        <h3 className="text-base font-bold text-white mb-4">Pre-Session Execution Checklist</h3>
         <div className="space-y-3">
           {CHECKLIST_ITEMS.map((item, idx) => (
             <label
               key={idx}
-              className="flex items-start gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:bg-slate-50"
+              className="flex items-start gap-3 p-3 border border-emerald-500/20 rounded-lg cursor-pointer hover:bg-emerald-500/10"
             >
               <input
                 type="checkbox"
@@ -1462,9 +1462,9 @@ export const TradingPlanView: React.FC = () => {
                   nextChecked[idx] = !nextChecked[idx];
                   savePlan({ ...rules, checked: nextChecked });
                 }}
-                className="mt-0.5 rounded text-blue-600"
+                className="mt-0.5 rounded text-[#16E563]"
               />
-              <span className="text-sm text-slate-800">{item}</span>
+              <span className="text-sm text-slate-100">{item}</span>
             </label>
           ))}
         </div>
@@ -1591,9 +1591,9 @@ export const CalendarAndNewsView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Feed Status & Direct Forex Factory Bar */}
-      <div className="bg-white border border-slate-200 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
-          <span className="font-semibold text-slate-950">Forex Factory Live Feed</span>
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-300">
+          <span className="font-semibold text-white">Forex Factory Live Feed</span>
           <span aria-hidden="true">·</span>
           <span className="font-mono tabular-nums">{feed?.nyNowLabel || 'NY EST'}</span>
           <span aria-hidden="true">·</span>
@@ -1601,7 +1601,7 @@ export const CalendarAndNewsView: React.FC = () => {
           {feed?.calendarFeedProvider && (
             <>
               <span aria-hidden="true">·</span>
-              <span className="text-slate-500">{feed.calendarFeedProvider}</span>
+              <span className="text-slate-400">{feed.calendarFeedProvider}</span>
             </>
           )}
         </div>
@@ -1611,7 +1611,7 @@ export const CalendarAndNewsView: React.FC = () => {
             href={feed?.ffCalendarUrl || 'https://www.forexfactory.com/calendar'}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/20 text-xs font-semibold text-slate-200 hover:bg-emerald-500/10 hover:text-white"
           >
             <Calendar className="w-3.5 h-3.5" />
             <span>ForexFactory.com Calendar</span>
@@ -1621,7 +1621,7 @@ export const CalendarAndNewsView: React.FC = () => {
             href={feed?.ffNewsUrl || 'https://www.forexfactory.com/news'}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-950"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-500/20 text-xs font-semibold text-slate-200 hover:bg-emerald-500/10 hover:text-white"
           >
             <Newspaper className="w-3.5 h-3.5" />
             <span>ForexFactory.com News</span>
@@ -1631,7 +1631,7 @@ export const CalendarAndNewsView: React.FC = () => {
             type="button"
             onClick={() => void fetchFeed(true)}
             disabled={refreshing}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 disabled:opacity-60 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16E563] text-[#041108] text-xs font-bold hover:bg-[#2BF074] disabled:opacity-60 cursor-pointer transition-colors"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
             <span>{refreshing ? 'Refreshing...' : 'Refresh Live'}</span>
@@ -1640,9 +1640,9 @@ export const CalendarAndNewsView: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 text-xs text-rose-800 font-medium">
-            <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+        <div className="bg-rose-500/12 border border-rose-500/30 rounded-xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 text-xs text-rose-300 font-medium">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
             <span>{error}</span>
           </div>
           <button
@@ -1656,24 +1656,24 @@ export const CalendarAndNewsView: React.FC = () => {
       )}
 
       {/* Live Economic Calendar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-950">Economic Calendar (NY EST · Forex Factory)</h3>
-            <p className="text-xs text-slate-500">
+            <h3 className="text-base font-bold text-white">Economic Calendar (NY EST · Forex Factory)</h3>
+            <p className="text-xs text-slate-400">
               Live weekly macro releases, actuals, forecasts, and high-volatility killzone windows
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="flex gap-1 p-1 bg-[#0E1712] rounded-lg">
               {(['Upcoming', 'Today', 'Week'] as const).map((scope) => (
                 <button
                   key={scope}
                   type="button"
                   onClick={() => setDayScope(scope)}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
-                    dayScope === scope ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                    dayScope === scope ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300'
                   }`}
                 >
                   {scope === 'Week' ? 'Full Week' : scope}
@@ -1681,7 +1681,7 @@ export const CalendarAndNewsView: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="flex gap-1 p-1 bg-[#0E1712] rounded-lg">
               {([
                 { key: 'All', label: 'All Impact' },
                 { key: 'MediumPlus', label: 'Med + High' },
@@ -1692,7 +1692,7 @@ export const CalendarAndNewsView: React.FC = () => {
                   type="button"
                   onClick={() => setImpactFilter(f.key)}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
-                    impactFilter === f.key ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                    impactFilter === f.key ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300'
                   }`}
                 >
                   {f.label}
@@ -1704,7 +1704,7 @@ export const CalendarAndNewsView: React.FC = () => {
               aria-label="Filter calendar by currency"
               value={currencyFilter}
               onChange={(e) => setCurrencyFilter(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-semibold bg-slate-100 border border-slate-200 rounded-lg text-slate-800 cursor-pointer"
+              className="px-2.5 py-1.5 text-xs font-semibold bg-[#0E1712] border border-emerald-500/20 rounded-lg text-slate-100 cursor-pointer"
             >
               {availableCurrencies.map((ccy) => (
                 <option key={ccy} value={ccy}>
@@ -1716,15 +1716,15 @@ export const CalendarAndNewsView: React.FC = () => {
         </div>
 
         {loading && !feed ? (
-          <div className="py-10 text-center text-xs text-slate-500">
+          <div className="py-10 text-center text-xs text-slate-400">
             Loading live Forex Factory economic calendar...
           </div>
         ) : filteredEvents.length === 0 ? (
           <div className="py-10 text-center space-y-2">
-            <p className="text-sm font-semibold text-slate-800">
+            <p className="text-sm font-semibold text-slate-100">
               No events match the current filter ({dayScope}, {currencyFilter}, {impactFilter}).
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-slate-400">
               Switch to Full Week or All Impact to view all scheduled Forex Factory releases.
             </p>
             {dayScope !== 'Week' && (
@@ -1735,7 +1735,7 @@ export const CalendarAndNewsView: React.FC = () => {
                   setImpactFilter('All');
                   setCurrencyFilter('ALL');
                 }}
-                className="mt-1 px-3 py-1.5 rounded-lg bg-slate-950 text-white text-xs font-semibold hover:bg-slate-800 cursor-pointer"
+                className="mt-1 px-3 py-1.5 rounded-lg bg-[#16E563] text-[#041108] text-xs font-bold hover:bg-[#2BF074] cursor-pointer transition-colors"
               >
                 Show Full Week Calendar
               </button>
@@ -1745,7 +1745,7 @@ export const CalendarAndNewsView: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
+                <tr className="border-b border-emerald-500/20 text-xs text-slate-400">
                   <th className="py-2.5 pr-4 whitespace-nowrap">Date · NY Time</th>
                   <th className="py-2.5 pr-4">CCY</th>
                   <th className="py-2.5 pr-4">Impact</th>
@@ -1755,44 +1755,44 @@ export const CalendarAndNewsView: React.FC = () => {
                   <th className="py-2.5 text-right">Previous</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-emerald-500/10">
                 {filteredEvents.slice(0, 80).map((ev) => {
                   const impactCls =
                     ev.impact === 'High'
-                      ? 'text-rose-600'
+                      ? 'text-rose-400'
                       : ev.impact === 'Medium'
-                      ? 'text-amber-600'
+                      ? 'text-[#F5B82E]'
                       : ev.impact === 'Holiday'
                       ? 'text-slate-400'
-                      : 'text-slate-500';
+                      : 'text-slate-400';
                   return (
-                    <tr key={ev.id} className="hover:bg-slate-50">
-                      <td className="py-3 pr-4 font-mono tabular-nums text-xs text-slate-700 whitespace-nowrap">
-                        <span className="text-slate-500">{ev.nyDateLabel}</span>
+                    <tr key={ev.id} className="hover:bg-emerald-500/10">
+                      <td className="py-3 pr-4 font-mono tabular-nums text-xs text-slate-200 whitespace-nowrap">
+                        <span className="text-slate-400">{ev.nyDateLabel}</span>
                         <span className="mx-1.5 text-slate-300">·</span>
-                        <span className="font-semibold text-slate-900">{ev.nyTimeLabel}</span>
+                        <span className="font-semibold text-white">{ev.nyTimeLabel}</span>
                       </td>
-                      <td className="py-3 pr-4 font-mono font-bold text-slate-950 whitespace-nowrap">{ev.currency}</td>
+                      <td className="py-3 pr-4 font-mono font-bold text-white whitespace-nowrap">{ev.currency}</td>
                       <td className={`py-3 pr-4 text-xs font-semibold whitespace-nowrap ${impactCls}`}>
                         {ev.impact}
                       </td>
-                      <td className="py-3 pr-4 text-slate-800">
+                      <td className="py-3 pr-4 text-slate-100">
                         <a
                           href={ev.ffUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:text-blue-600 hover:underline inline-flex items-center gap-1"
+                          className="hover:text-[#16E563] hover:underline inline-flex items-center gap-1"
                         >
                           <span>{ev.title}</span>
                         </a>
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950 whitespace-nowrap">
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-white whitespace-nowrap">
                         {ev.actual || '—'}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-700 whitespace-nowrap">
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-200 whitespace-nowrap">
                         {ev.forecast || '—'}
                       </td>
-                      <td className="py-3 text-right font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                      <td className="py-3 text-right font-mono tabular-nums text-slate-400 whitespace-nowrap">
                         {ev.previous || '—'}
                       </td>
                     </tr>
@@ -1805,22 +1805,22 @@ export const CalendarAndNewsView: React.FC = () => {
       </div>
 
       {/* Live Market & Forex Factory News Desk */}
-      <div className="bg-white border border-slate-200 rounded-xl p-6">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-950">Live Forex Factory &amp; Institutional News Wire</h3>
-            <p className="text-xs text-slate-500">
+            <h3 className="text-base font-bold text-white">Live Forex Factory &amp; Institutional News Wire</h3>
+            <p className="text-xs text-slate-400">
               Real-time FX, central bank, gold, indices, and Forex Factory market headlines
             </p>
           </div>
-          <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="flex flex-wrap gap-1 p-1 bg-[#0E1712] rounded-lg">
             {['All', 'Forex Factory', 'Central Banks', 'Forex', 'Gold', 'Indices', 'Crypto'].map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setNewsCategory(cat)}
                 className={`px-2.5 py-1 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap ${
-                  newsCategory === cat ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600'
+                  newsCategory === cat ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300'
                 }`}
               >
                 {cat}
@@ -1830,21 +1830,21 @@ export const CalendarAndNewsView: React.FC = () => {
         </div>
 
         {loading && !feed ? (
-          <div className="py-8 text-center text-xs text-slate-500">
+          <div className="py-8 text-center text-xs text-slate-400">
             Loading live market news wire...
           </div>
         ) : filteredNews.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-500">
+          <div className="py-8 text-center text-xs text-slate-400">
             No live headlines in {newsCategory} right now. Select All or refresh the live feed.
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-emerald-500/10">
             {filteredNews.map((item) => (
               <div key={item.id} className="py-3.5">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mb-1">
-                  <span className="font-semibold text-blue-600">{item.category}</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-1">
+                  <span className="font-semibold text-[#16E563]">{item.category}</span>
                   <span aria-hidden="true">·</span>
-                  <span className="font-medium text-slate-700">{item.source}</span>
+                  <span className="font-medium text-slate-200">{item.source}</span>
                   <span aria-hidden="true">·</span>
                   <span className="font-mono tabular-nums">{item.timeAgo}</span>
                 </div>
@@ -1852,12 +1852,12 @@ export const CalendarAndNewsView: React.FC = () => {
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm font-bold text-slate-950 hover:text-blue-600 inline-flex items-start gap-1.5"
+                  className="text-sm font-bold text-white hover:text-[#16E563] inline-flex items-start gap-1.5"
                 >
                   <span>{item.title}</span>
                   <ExternalLink className="w-3.5 h-3.5 mt-0.5 shrink-0 text-slate-400" />
                 </a>
-                {item.summary && <p className="text-xs text-slate-600 mt-1">{item.summary}</p>}
+                {item.summary && <p className="text-xs text-slate-300 mt-1">{item.summary}</p>}
               </div>
             ))}
           </div>

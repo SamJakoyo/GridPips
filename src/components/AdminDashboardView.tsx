@@ -326,8 +326,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
   if (!data) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-8 flex items-center gap-3 text-sm text-slate-600">
-        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-8 flex items-center gap-3 text-sm text-slate-300">
+        <Loader2 className="w-4 h-4 animate-spin text-[#F5B82E]" />
         <span>Syncing Admin Command Center &amp; Cloud Directory...</span>
       </div>
     );
@@ -631,22 +631,22 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
         <div
           className={`px-4 py-3 rounded-xl border text-xs font-medium flex items-center justify-between gap-3 ${
             adminNotice.type === 'success'
-              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-              : 'bg-rose-50 border-rose-200 text-rose-800'
+              ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-200'
+              : 'bg-rose-500/12 border-rose-500/30 text-rose-300'
           }`}
         >
           <span className="inline-flex items-center gap-2">
             {adminNotice.type === 'success' ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
             ) : (
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
             )}
             <span>{adminNotice.text}</span>
           </span>
           <button
             type="button"
             onClick={() => setAdminNotice(null)}
-            className="text-slate-500 hover:text-slate-900 cursor-pointer"
+            className="text-slate-400 hover:text-white cursor-pointer"
             aria-label="Dismiss notice"
           >
             <X className="w-4 h-4" />
@@ -656,7 +656,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-1 p-1 bg-slate-200/70 rounded-lg">
+        <div className="flex flex-wrap gap-1 p-1 bg-[#070D0A] rounded-lg">
           {(
             [
               ['analytics', 'Analytics & Checkups'],
@@ -674,7 +674,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               type="button"
               onClick={() => setTab(key)}
               className={`px-3.5 py-1.5 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
-                tab === key ? 'bg-[#0B0F19] text-[#E5A93C] shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                tab === key ? 'bg-[#0B0F19] text-[#E5A93C] shadow-xs' : 'text-slate-300 hover:text-white'
               }`}
             >
               {label}
@@ -689,49 +689,49 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           {/* Funnel & Engagement KPIs */}
           {data.websiteAnalytics && (
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <div className="text-xs text-slate-500">Active Accounts (24h / 7d)</div>
-                <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+                <div className="text-xs text-slate-400">Active Accounts (24h / 7d)</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-white mt-1">
                   {data.websiteAnalytics.users.active24hUsers}{' '}
-                  <span className="text-sm font-normal text-slate-500">
+                  <span className="text-sm font-normal text-slate-400">
                     / {data.websiteAnalytics.users.active7dUsers}
                   </span>
                 </div>
-                <div className="text-xs text-slate-500 mt-1 tabular-nums">
+                <div className="text-xs text-slate-400 mt-1 tabular-nums">
                   {data.websiteAnalytics.users.exnessVerifiedUsers} Exness verified ·{' '}
                   {data.websiteAnalytics.users.mt5ConnectedUsers} MT5 linked
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <div className="text-xs text-slate-500">Checkout Conversion Rate</div>
-                <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 mt-1">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+                <div className="text-xs text-slate-400">Checkout Conversion Rate</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-[#16E563] mt-1">
                   {data.websiteAnalytics.orderFunnel.conversionPct.toFixed(1)}%
                 </div>
-                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                <div className="text-xs text-slate-400 mt-1 font-mono tabular-nums">
                   {data.websiteAnalytics.orderFunnel.paidOrders} paid / {data.websiteAnalytics.orderFunnel.totalOrders}{' '}
                   orders
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <div className="text-xs text-slate-500">M-Pesa STK Completion</div>
-                <div className="text-2xl font-bold font-mono tabular-nums text-blue-700 mt-1">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+                <div className="text-xs text-slate-400">M-Pesa STK Completion</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-sky-400 mt-1">
                   {data.websiteAnalytics.mpesaFunnel.successRatePct.toFixed(1)}%
                 </div>
-                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                <div className="text-xs text-slate-400 mt-1 font-mono tabular-nums">
                   {data.websiteAnalytics.mpesaFunnel.completedCount} ok ·{' '}
                   {data.websiteAnalytics.mpesaFunnel.pendingCount} pending ·{' '}
                   {data.websiteAnalytics.mpesaFunnel.failedOrCancelledCount} failed
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <div className="text-xs text-slate-500">Confirmed Wallet Liability</div>
-                <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-1">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+                <div className="text-xs text-slate-400">Confirmed Wallet Liability</div>
+                <div className="text-2xl font-bold font-mono tabular-nums text-white mt-1">
                   KES {Number(data.websiteAnalytics.users.totalWalletLiabilityKes || 0).toLocaleString()}
                 </div>
-                <div className="text-xs text-slate-500 mt-1 font-mono tabular-nums">
+                <div className="text-xs text-slate-400 mt-1 font-mono tabular-nums">
                   {data.websiteAnalytics.engagement.totalReferralClicks} ref clicks ({data.websiteAnalytics.engagement.clicks7d}{' '}
                   in 7d)
                 </div>
@@ -740,14 +740,14 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           )}
 
           {/* Live Website Checkups & System Diagnostics */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-600" />
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-[#16E563]" />
                   Live Website Checkups &amp; Endpoint Diagnostics
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-400 mt-0.5">
                   Probes live HTTPS availability, M-Pesa Daraja callback and OAuth auth, Supabase Cloud Postgres, market data feeds, SEO files, and session security.
                 </p>
               </div>
@@ -763,32 +763,32 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             </div>
 
             {checkupError && (
-              <div className="p-3 rounded-lg border border-rose-200 bg-rose-50 text-xs text-rose-700">
+              <div className="p-3 rounded-lg border border-rose-500/30 bg-rose-500/12 text-xs text-rose-400">
                 {checkupError}
               </div>
             )}
 
             {checkupResult && (
               <div className="space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 px-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-3 py-2.5 px-3.5 bg-[#070D0A] border border-emerald-500/20 rounded-lg text-xs">
                   <div className="flex flex-wrap items-center gap-3 font-mono tabular-nums">
-                    <span className="font-semibold text-emerald-700">
+                    <span className="font-semibold text-[#16E563]">
                       {checkupResult.summary.passed} PASSED
                     </span>
                     <span aria-hidden="true" className="text-slate-300">
                       ·
                     </span>
-                    <span className="font-semibold text-amber-700">
+                    <span className="font-semibold text-[#F5B82E]">
                       {checkupResult.summary.warnings} WARNINGS
                     </span>
                     <span aria-hidden="true" className="text-slate-300">
                       ·
                     </span>
-                    <span className="font-semibold text-rose-700">
+                    <span className="font-semibold text-rose-400">
                       {checkupResult.summary.failed} FAILED
                     </span>
                   </div>
-                  <div className="font-mono tabular-nums text-[11px] text-slate-500">
+                  <div className="font-mono tabular-nums text-[11px] text-slate-400">
                     Target: {checkupResult.targetOrigin} · Checked {new Date(checkupResult.checkedAt).toLocaleTimeString()}
                   </div>
                 </div>
@@ -796,7 +796,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-slate-400">
                         <th className="py-2 pr-4">Category</th>
                         <th className="py-2 pr-4">System Check</th>
                         <th className="py-2 pr-4">Status</th>
@@ -805,25 +805,25 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         <th className="py-2">Diagnostic Detail</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-emerald-500/10">
                       {checkupResult.checks.map((chk) => (
                         <tr key={chk.id} className="align-top">
-                          <td className="py-2.5 pr-4 text-slate-500 whitespace-nowrap">{chk.category}</td>
-                          <td className="py-2.5 pr-4 font-semibold text-slate-950 whitespace-nowrap">{chk.name}</td>
+                          <td className="py-2.5 pr-4 text-slate-400 whitespace-nowrap">{chk.category}</td>
+                          <td className="py-2.5 pr-4 font-semibold text-white whitespace-nowrap">{chk.name}</td>
                           <td className="py-2.5 pr-4 whitespace-nowrap font-mono font-bold">
                             {chk.status === 'pass' ? (
-                              <span className="text-emerald-700">PASS</span>
+                              <span className="text-[#16E563]">PASS</span>
                             ) : chk.status === 'warn' ? (
-                              <span className="text-amber-700">WARN</span>
+                              <span className="text-[#F5B82E]">WARN</span>
                             ) : (
-                              <span className="text-rose-700">FAIL</span>
+                              <span className="text-rose-400">FAIL</span>
                             )}
                           </td>
-                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-slate-500 whitespace-nowrap">
+                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums text-slate-400 whitespace-nowrap">
                             {chk.latencyMs > 0 ? `${chk.latencyMs} ms` : '—'}
                           </td>
-                          <td className="py-2.5 pr-4 font-mono text-slate-900 whitespace-nowrap">{chk.summary}</td>
-                          <td className="py-2.5 text-slate-600">{chk.detail}</td>
+                          <td className="py-2.5 pr-4 font-mono text-white whitespace-nowrap">{chk.summary}</td>
+                          <td className="py-2.5 text-slate-300">{chk.detail}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -833,7 +833,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             )}
 
             {!checkupResult && checkupRunning && (
-              <div className="py-8 text-center text-xs text-slate-500">
+              <div className="py-8 text-center text-xs text-slate-400">
                 Running live diagnostics across domain, Daraja OAuth, Supabase, and market feeds...
               </div>
             )}
@@ -842,17 +842,17 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           {/* 7-Day Trend + Product & Feature Engagement */}
           {data.websiteAnalytics && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-slate-950">7-Day Signup &amp; Revenue Activity</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <h3 className="text-base font-bold text-white">7-Day Signup &amp; Revenue Activity</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Daily registrations, completed checkouts, and verified M-Pesa inflows (UTC).
                   </p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-slate-400">
                         <th className="py-2 pr-3">Date</th>
                         <th className="py-2 pr-3 text-right">Signups</th>
                         <th className="py-2 pr-3 text-right">Paid / Orders</th>
@@ -860,18 +860,18 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         <th className="py-2 text-right">M-Pesa KES</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
+                    <tbody className="divide-y divide-emerald-500/10 font-mono tabular-nums">
                       {data.websiteAnalytics.dailySeries.map((row) => (
                         <tr key={row.day}>
-                          <td className="py-2.5 pr-3 text-slate-700">{row.day}</td>
-                          <td className="py-2.5 pr-3 text-right font-semibold text-slate-950">{row.signups}</td>
-                          <td className="py-2.5 pr-3 text-right text-slate-700">
+                          <td className="py-2.5 pr-3 text-slate-200">{row.day}</td>
+                          <td className="py-2.5 pr-3 text-right font-semibold text-white">{row.signups}</td>
+                          <td className="py-2.5 pr-3 text-right text-slate-200">
                             {row.paidOrders} / {row.totalOrders}
                           </td>
-                          <td className="py-2.5 pr-3 text-right font-semibold text-emerald-700">
+                          <td className="py-2.5 pr-3 text-right font-semibold text-[#16E563]">
                             ${row.revenueUsd.toFixed(2)}
                           </td>
-                          <td className="py-2.5 text-right text-slate-900">
+                          <td className="py-2.5 text-right text-white">
                             {row.mpesaCompletedKes > 0 ? `KES ${row.mpesaCompletedKes.toLocaleString()}` : '—'}
                           </td>
                         </tr>
@@ -881,38 +881,38 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 </div>
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-5">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-5">
                 <div>
-                  <h3 className="text-base font-bold text-slate-950">Product Sales &amp; Platform Engagement</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <h3 className="text-base font-bold text-white">Product Sales &amp; Platform Engagement</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
                     License distribution and trader tool usage recorded across the platform.
                   </p>
                 </div>
 
                 {data.websiteAnalytics.productBreakdown.length === 0 ? (
-                  <p className="text-xs text-slate-500 py-3">No product checkouts initiated yet.</p>
+                  <p className="text-xs text-slate-400 py-3">No product checkouts initiated yet.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-slate-200 text-slate-500">
+                        <tr className="border-b border-emerald-500/20 text-slate-400">
                           <th className="py-2 pr-3">Product</th>
                           <th className="py-2 pr-3 text-right">Paid / Attempts</th>
                           <th className="py-2 pr-3 text-right">USD</th>
                           <th className="py-2 text-right">KES</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100 font-mono tabular-nums">
+                      <tbody className="divide-y divide-emerald-500/10 font-mono tabular-nums">
                         {data.websiteAnalytics.productBreakdown.map((prod) => (
                           <tr key={prod.productKey}>
-                            <td className="py-2.5 pr-3 font-sans font-semibold text-slate-950">{prod.productName}</td>
-                            <td className="py-2.5 pr-3 text-right text-slate-700">
+                            <td className="py-2.5 pr-3 font-sans font-semibold text-white">{prod.productName}</td>
+                            <td className="py-2.5 pr-3 text-right text-slate-200">
                               {prod.paidCount} / {prod.totalAttempts}
                             </td>
-                            <td className="py-2.5 pr-3 text-right font-semibold text-emerald-700">
+                            <td className="py-2.5 pr-3 text-right font-semibold text-[#16E563]">
                               ${Number(prod.revenueUsd || 0).toFixed(2)}
                             </td>
-                            <td className="py-2.5 text-right text-slate-700">
+                            <td className="py-2.5 text-right text-slate-200">
                               KES {Number(prod.revenueKes || 0).toLocaleString()}
                             </td>
                           </tr>
@@ -922,40 +922,40 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   </div>
                 )}
 
-                <div className="pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="pt-3 border-t border-emerald-500/20 grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div>
-                    <div className="text-slate-500">Analyzer Licenses</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">Analyzer Licenses</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.users.analyzerHolders}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">EA Bot Licenses</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">EA Bot Licenses</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.users.eaBotHolders}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Journal Trades Logged</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">Journal Trades Logged</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.engagement.journalTradesCount}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Saved ICT Setups</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">Saved ICT Setups</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.engagement.savedSetupsCount}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">MT5 Bridge Commands</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">MT5 Bridge Commands</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.engagement.mt5CommandsCount}
                     </div>
                   </div>
                   <div>
-                    <div className="text-slate-500">Automated Emails</div>
-                    <div className="font-mono tabular-nums font-bold text-slate-950 mt-0.5">
+                    <div className="text-slate-400">Automated Emails</div>
+                    <div className="font-mono tabular-nums font-bold text-white mt-0.5">
                       {data.websiteAnalytics.engagement.emailsSentCount}
                     </div>
                   </div>
@@ -968,16 +968,16 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 1: Orders & Revenue */}
       {tab === 'orders' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6 overflow-x-auto">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 overflow-x-auto">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <h3 className="text-base font-bold text-slate-950">All Customer Orders &amp; Verification Queue</h3>
-            <span className="text-xs font-mono text-slate-500">
+            <h3 className="text-base font-bold text-white">All Customer Orders &amp; Verification Queue</h3>
+            <span className="text-xs font-mono text-slate-400">
               {data.orders.filter((o) => o.payment_status === 'processing').length} awaiting settlement check
             </span>
           </div>
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs text-slate-500">
+              <tr className="border-b border-emerald-500/20 text-xs text-slate-400">
                 <th className="py-2 pr-4">Order</th>
                 <th className="py-2 pr-4">Customer</th>
                 <th className="py-2 pr-4">Product</th>
@@ -987,22 +987,22 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 <th className="py-2 text-right">Controls</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-emerald-500/10">
               {data.orders.map((o) => (
                 <tr key={o.id}>
                   <td className="py-3 pr-4 font-mono text-xs font-semibold">{o.order_number}</td>
                   <td className="py-3 pr-4 text-xs">
-                    <div className="font-semibold text-slate-900">{o.user_name}</div>
-                    <div className="text-slate-500">{o.user_email}</div>
+                    <div className="font-semibold text-white">{o.user_name}</div>
+                    <div className="text-slate-400">{o.user_email}</div>
                   </td>
-                  <td className="py-3 pr-4 text-xs text-slate-700">
-                    <div className="font-medium text-slate-900">{o.product_name}</div>
-                    <div className="text-[11px] font-mono text-slate-500 capitalize">
+                  <td className="py-3 pr-4 text-xs text-slate-200">
+                    <div className="font-medium text-white">{o.product_name}</div>
+                    <div className="text-[11px] font-mono text-slate-400 capitalize">
                       {o.billing_cycle || 'monthly'} ({o.duration_days || 30}d)
                       {o.subscription_ends_at ? ` · thru ${o.subscription_ends_at.slice(0, 10)}` : ''}
                     </div>
                   </td>
-                  <td className="py-3 pr-4 text-xs font-mono text-slate-600">
+                  <td className="py-3 pr-4 text-xs font-mono text-slate-300">
                     <div className="uppercase font-semibold">
                       {o.payment_method}{' '}
                       {o.mpesa_receipt
@@ -1022,7 +1022,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold">
                     <div>${Number(o.amount_usd).toFixed(2)}</div>
                     {Number(o.amount_kes) > 0 && (
-                      <div className="text-[11px] font-normal text-slate-500">
+                      <div className="text-[11px] font-normal text-slate-400">
                         KES {Number(o.amount_kes).toLocaleString()}
                       </div>
                     )}
@@ -1031,12 +1031,12 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     <span
                       className={
                         o.payment_status === 'paid'
-                          ? 'text-emerald-700'
+                          ? 'text-[#16E563]'
                           : o.payment_status === 'processing'
-                          ? 'text-amber-700'
+                          ? 'text-[#F5B82E]'
                           : o.payment_status === 'failed' || o.payment_status === 'refunded'
-                          ? 'text-rose-700'
-                          : 'text-slate-600'
+                          ? 'text-rose-400'
+                          : 'text-slate-300'
                       }
                     >
                       {o.payment_status}
@@ -1054,7 +1054,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     {o.payment_status === 'processing' && (
                       <button
                         onClick={() => updateOrderStatus(o.id, 'failed')}
-                        className="px-2.5 py-1 border border-rose-300 text-rose-700 text-xs font-semibold rounded cursor-pointer"
+                        className="px-2.5 py-1 border border-rose-500/40 text-rose-400 text-xs font-semibold rounded cursor-pointer"
                       >
                         Reject
                       </button>
@@ -1062,7 +1062,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     {o.payment_status === 'paid' && (
                       <button
                         onClick={() => updateOrderStatus(o.id, 'refunded')}
-                        className="px-2.5 py-1 border border-slate-300 text-slate-700 text-xs font-semibold rounded cursor-pointer"
+                        className="px-2.5 py-1 border border-emerald-500/25 text-slate-200 text-xs font-semibold rounded cursor-pointer"
                       >
                         Refund
                       </button>
@@ -1088,34 +1088,34 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 Wallet Top-ups: KES {Number(data.mpesaMetrics?.walletDepositedKes || 0).toLocaleString()}
               </div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Completed STK Payments</div>
-              <div className="text-xl font-bold font-mono tabular-nums text-emerald-700 mt-1">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Completed STK Payments</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-[#16E563] mt-1">
                 {data.mpesaMetrics?.completedCount ?? 0}
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">Verified ResultCode 0</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Verified ResultCode 0</div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Pending STK Prompts</div>
-              <div className="text-xl font-bold font-mono tabular-nums text-amber-700 mt-1">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Pending STK Prompts</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-[#F5B82E] mt-1">
                 {data.mpesaMetrics?.pendingCount ?? 0}
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">Awaiting customer PIN</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Awaiting customer PIN</div>
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Cancelled / Failed</div>
-              <div className="text-xl font-bold font-mono tabular-nums text-rose-700 mt-1">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Cancelled / Failed</div>
+              <div className="text-xl font-bold font-mono tabular-nums text-rose-400 mt-1">
                 {data.mpesaMetrics?.failedOrCancelledCount ?? 0}
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">No balance credited</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">No balance credited</div>
             </div>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950">Safaricom Daraja STK Push &amp; Callback Ledger</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <h3 className="text-base font-bold text-white">Safaricom Daraja STK Push &amp; Callback Ledger</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
                   All customer wallet deposits and license checkouts with CheckoutRequestID, MerchantRequestID, Receipt, and callback audit trail.
                 </p>
               </div>
@@ -1128,10 +1128,10 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     value={mpesaSearch}
                     onChange={(e) => setMpesaSearch(e.target.value)}
                     placeholder="Search receipt, phone, ID..."
-                    className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-52"
+                    className="pl-8 pr-3 py-1.5 text-xs border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563] w-52"
                   />
                 </div>
-                <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+                <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
                   {(['all', 'completed', 'pending', 'cancelled', 'failed'] as const).map((statusKey) => (
                     <button
                       key={statusKey}
@@ -1139,8 +1139,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       onClick={() => setMpesaFilter(statusKey)}
                       className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer ${
                         mpesaFilter === statusKey
-                          ? 'bg-white text-slate-950 shadow-xs'
-                          : 'text-slate-600 hover:text-slate-950'
+                          ? 'bg-[#16E563] text-[#041108] font-bold'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       {statusKey}
@@ -1174,10 +1174,10 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
               if (filteredTxs.length === 0) {
                 return (
-                  <div className="py-10 text-center border border-dashed border-slate-200 rounded-xl space-y-2">
+                  <div className="py-10 text-center border border-dashed border-emerald-500/20 rounded-xl space-y-2">
                     <Smartphone className="w-6 h-6 text-slate-300 mx-auto" />
-                    <div className="text-sm font-semibold text-slate-700">No M-Pesa Daraja transactions recorded</div>
-                    <p className="text-xs text-slate-500">
+                    <div className="text-sm font-semibold text-slate-200">No M-Pesa Daraja transactions recorded</div>
+                    <p className="text-xs text-slate-400">
                       Customer STK Push deposits and checkouts will appear here automatically in real time.
                     </p>
                   </div>
@@ -1188,7 +1188,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-slate-400">
                         <th className="py-2 pr-4">Tx Ref &amp; Date</th>
                         <th className="py-2 pr-4">Customer &amp; Phone</th>
                         <th className="py-2 pr-4">Routing (Shortcode / Till)</th>
@@ -1197,41 +1197,41 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         <th className="py-2">Status &amp; Callback</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-emerald-500/10">
                       {filteredTxs.map((tx) => (
                         <tr key={tx.id} className="align-top">
                           <td className="py-3 pr-4">
-                            <div className="font-mono font-semibold text-slate-950">{tx.tx_reference}</div>
-                            <div className="text-[11px] text-slate-500 mt-0.5">
+                            <div className="font-mono font-semibold text-white">{tx.tx_reference}</div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
                               {tx.purpose === 'wallet_deposit' ? 'Wallet Deposit' : 'Order Checkout'}
                             </div>
                             <div className="font-mono text-[11px] text-slate-400">{tx.created_at}</div>
                           </td>
                           <td className="py-3 pr-4">
-                            <div className="font-semibold text-slate-900">{tx.user_name || 'Customer'}</div>
-                            <div className="text-slate-500">{tx.user_email}</div>
-                            <div className="font-mono text-slate-700 mt-0.5">+{tx.phone_number}</div>
+                            <div className="font-semibold text-white">{tx.user_name || 'Customer'}</div>
+                            <div className="text-slate-400">{tx.user_email}</div>
+                            <div className="font-mono text-slate-200 mt-0.5">+{tx.phone_number}</div>
                           </td>
                           <td className="py-3 pr-4 font-mono">
-                            <div className="text-slate-900 font-semibold">
+                            <div className="text-white font-semibold">
                               SC {tx.business_short_code} → Till {tx.party_b}
                             </div>
-                            <div className="text-[11px] text-slate-500">{tx.transaction_type}</div>
+                            <div className="text-[11px] text-slate-400">{tx.transaction_type}</div>
                           </td>
-                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950">
+                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-white">
                             KES {Number(tx.amount_kes).toLocaleString()}
                             {tx.purpose === 'wallet_deposit' && tx.credited_to_wallet === 1 && (
-                              <div className="text-[11px] font-sans font-normal text-emerald-700 mt-0.5">
+                              <div className="text-[11px] font-sans font-normal text-[#16E563] mt-0.5">
                                 Wallet Credited
                               </div>
                             )}
                           </td>
                           <td className="py-3 pr-4 font-mono max-w-[240px]">
-                            <div className="font-semibold text-emerald-700">
+                            <div className="font-semibold text-[#16E563]">
                               {tx.mpesa_receipt_number || 'Awaiting receipt'}
                             </div>
                             {tx.checkout_request_id && (
-                              <div className="text-[11px] text-slate-500 truncate" title={tx.checkout_request_id}>
+                              <div className="text-[11px] text-slate-400 truncate" title={tx.checkout_request_id}>
                                 CID: {tx.checkout_request_id}
                               </div>
                             )}
@@ -1245,17 +1245,17 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                             <div
                               className={`font-semibold uppercase ${
                                 tx.status === 'completed'
-                                  ? 'text-emerald-700'
+                                  ? 'text-[#16E563]'
                                   : tx.status === 'pending'
-                                  ? 'text-amber-700'
-                                  : 'text-rose-700'
+                                  ? 'text-[#F5B82E]'
+                                  : 'text-rose-400'
                               }`}
                             >
                               {tx.status}
                               {tx.result_code ? ` (${tx.result_code})` : ''}
                             </div>
                             {tx.result_desc && (
-                              <div className="text-[11px] text-slate-600 mt-0.5">{tx.result_desc}</div>
+                              <div className="text-[11px] text-slate-300 mt-0.5">{tx.result_desc}</div>
                             )}
                             {tx.source_ip && (
                               <div className="font-mono text-[11px] text-slate-400 mt-0.5">
@@ -1276,13 +1276,13 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 3: Users & Logins */}
       {tab === 'users' && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-base font-bold text-slate-950">
+              <h3 className="text-base font-bold text-white">
                 Website User Directory, Exness IDs &amp; Account Editor
               </h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5">
                 Synced from Supabase Auth, profiles &amp; Cloud state. Edit any user&apos;s profile, role, wallet, commission %, or licenses.
               </p>
             </div>
@@ -1295,10 +1295,10 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   placeholder="Search name, email, Exness, ref..."
-                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-56"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563] w-56"
                 />
               </div>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
                 {(['all', 'user', 'influencer', 'admin'] as const).map((rf) => (
                   <button
                     key={rf}
@@ -1306,8 +1306,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     onClick={() => setUserRoleFilter(rf)}
                     className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer whitespace-nowrap shrink-0 ${
                       userRoleFilter === rf
-                        ? 'bg-white text-slate-950 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-[#16E563] text-[#041108] font-bold'
+                        : 'text-slate-300 hover:text-white'
                     }`}
                   >
                     {rf}
@@ -1332,7 +1332,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
               if (filteredUsers.length === 0) {
                 return (
-                  <p className="text-sm text-slate-500 py-6 text-center">
+                  <p className="text-sm text-slate-400 py-6 text-center">
                     No users match your current search or role filter.
                   </p>
                 );
@@ -1341,7 +1341,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
               return (
                 <table className="w-full text-left text-sm">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                       <th className="py-2.5 pr-4">User</th>
                       <th className="py-2.5 pr-4">Exness ID</th>
                       <th className="py-2.5 pr-4">Referral / Wallet</th>
@@ -1351,38 +1351,38 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       <th className="py-2.5 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-emerald-500/10">
                     {filteredUsers.map((u) => (
-                      <tr key={u.id} className="hover:bg-slate-50/70">
+                      <tr key={u.id} className="hover:bg-emerald-500/10">
                         <td className="py-3 pr-4 text-xs">
-                          <div className="font-semibold text-slate-950 flex items-center gap-1.5">
+                          <div className="font-semibold text-white flex items-center gap-1.5">
                             <span>{u.name}</span>
                             {u.is_suspended ? (
-                              <span className="text-[10px] font-bold uppercase text-rose-700">
+                              <span className="text-[10px] font-bold uppercase text-rose-400">
                                 [Suspended]
                               </span>
                             ) : null}
                           </div>
-                          <div className="text-slate-500">{u.email}</div>
+                          <div className="text-slate-400">{u.email}</div>
                           {u.referrer_code && (
-                            <div className="text-[11px] text-amber-700 font-mono mt-0.5">
+                            <div className="text-[11px] text-[#F5B82E] font-mono mt-0.5">
                               Ref by: {u.referrer_code}
                             </div>
                           )}
                         </td>
-                        <td className="py-3 pr-4 font-mono text-xs text-slate-700">
+                        <td className="py-3 pr-4 font-mono text-xs text-slate-200">
                           <div>{u.exness_account_id}</div>
                           <div
                             className={`text-[11px] font-sans font-semibold mt-0.5 ${
-                              u.exness_verified ? 'text-emerald-700' : 'text-amber-700'
+                              u.exness_verified ? 'text-[#16E563]' : 'text-[#F5B82E]'
                             }`}
                           >
                             {u.exness_verified ? 'Verified IB' : 'Pending IB'}
                           </div>
                         </td>
                         <td className="py-3 pr-4 font-mono text-xs">
-                          <div className="font-semibold text-slate-900">{u.referral_code}</div>
-                          <div className="text-[11px] text-slate-500 tabular-nums">
+                          <div className="font-semibold text-white">{u.referral_code}</div>
+                          <div className="text-[11px] text-slate-400 tabular-nums">
                             KES {Number(u.wallet_balance_kes || 0).toLocaleString()}
                             {typeof u.commission_pct === 'number' ? ` · ${u.commission_pct}% comm` : ''}
                           </div>
@@ -1395,7 +1395,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                                 role: e.target.value as 'user' | 'influencer' | 'admin',
                               })
                             }
-                            className="px-2 py-1 text-xs border border-slate-300 rounded-md bg-white font-semibold"
+                            className="px-2 py-1 text-xs border border-emerald-500/25 rounded-md bg-[#0B120E] font-semibold"
                           >
                             <option value="user">user</option>
                             <option value="influencer">influencer</option>
@@ -1409,8 +1409,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                               onClick={() => void updateUser(u.id, { exnessVerified: !u.exness_verified })}
                               className={`px-2 py-1 rounded border cursor-pointer ${
                                 u.exness_verified
-                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/60'
-                                  : 'border-amber-500 text-amber-800 bg-amber-50'
+                                  ? 'border-emerald-600 text-[#16E563] bg-emerald-500/10'
+                                  : 'border-amber-500 text-[#F5B82E] bg-[#F5B82E]/12'
                               }`}
                             >
                               {u.exness_verified ? 'IB OK' : 'Verify IB'}
@@ -1420,8 +1420,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                               onClick={() => void updateUser(u.id, { hasAnalyzer: !u.has_analyzer })}
                               className={`px-2 py-1 rounded border cursor-pointer ${
                                 u.has_analyzer
-                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                                  : 'border-slate-300 text-slate-500'
+                                  ? 'border-emerald-600 text-[#16E563] bg-emerald-500/10'
+                                  : 'border-emerald-500/25 text-slate-400'
                               }`}
                             >
                               Analyzer {u.has_analyzer ? 'ON' : 'OFF'}
@@ -1431,22 +1431,22 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                               onClick={() => void updateUser(u.id, { hasEaBots: !u.has_ea_bots })}
                               className={`px-2 py-1 rounded border cursor-pointer ${
                                 u.has_ea_bots
-                                  ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50'
-                                  : 'border-slate-300 text-slate-500'
+                                  ? 'border-emerald-600 text-[#16E563] bg-emerald-500/10'
+                                  : 'border-emerald-500/25 text-slate-400'
                               }`}
                             >
                               DRT {u.has_ea_bots ? 'ON' : 'OFF'}
                             </button>
                           </div>
                           {(u.analyzer_expires_at || u.ea_bots_expires_at) && (
-                            <div className="text-[10px] font-mono text-slate-500">
+                            <div className="text-[10px] font-mono text-slate-400">
                               {u.analyzer_expires_at ? `ICT exp ${u.analyzer_expires_at.slice(0, 10)}` : ''}
                               {u.analyzer_expires_at && u.ea_bots_expires_at ? ' · ' : ''}
                               {u.ea_bots_expires_at ? `DRT exp ${u.ea_bots_expires_at.slice(0, 10)}` : ''}
                             </div>
                           )}
                         </td>
-                        <td className="py-3 pr-4 font-mono text-xs text-slate-500 whitespace-nowrap">
+                        <td className="py-3 pr-4 font-mono text-xs text-slate-400 whitespace-nowrap">
                           {u.last_login_at ? u.last_login_at.slice(0, 16) : '—'}
                         </td>
                         <td className="py-3 text-right whitespace-nowrap space-x-1.5">
@@ -1463,8 +1463,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                             onClick={() => void updateUser(u.id, { isSuspended: !u.is_suspended })}
                             className={`px-2.5 py-1 text-xs font-semibold rounded cursor-pointer ${
                               u.is_suspended
-                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
+                                ? 'bg-emerald-500/12 text-[#16E563] border border-emerald-500/30'
+                                : 'bg-rose-500/12 text-rose-400 border border-rose-500/30'
                             }`}
                           >
                             {u.is_suspended ? 'Restore' : 'Suspend'}
@@ -1484,31 +1484,31 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       {tab === 'security' && (
         <div className="space-y-6">
           {/* Live Environment, Security & Cloud DB Readiness */}
-          <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="w-5 h-5 text-blue-600" />
-                <h3 className="text-base font-bold text-slate-950">
+                <ShieldAlert className="w-5 h-5 text-[#16E563]" />
+                <h3 className="text-base font-bold text-white">
                   Live Environment, Security &amp; Cloud DB Readiness
                 </h3>
               </div>
-              <span className="text-xs font-mono text-slate-500">
+              <span className="text-xs font-mono text-slate-400">
                 Source: /api/health/supabase
               </span>
             </div>
 
             {!health ? (
-              <p className="text-xs text-slate-500">Health telemetry unavailable.</p>
+              <p className="text-xs text-slate-400">Health telemetry unavailable.</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">1. SUPABASE_URL / VITE_SUPABASE_URL</span>
+                    <span className="font-semibold text-white">1. SUPABASE_URL / VITE_SUPABASE_URL</span>
                     <span
                       className={`font-semibold ${
                         health.envDiagnostics?.supabaseUrlValid && !health.envDiagnostics?.hasSecretKeyMisplacedInUrl
-                          ? 'text-emerald-700'
-                          : 'text-rose-700'
+                          ? 'text-[#16E563]'
+                          : 'text-rose-400'
                       }`}
                     >
                       {health.envDiagnostics?.hasSecretKeyMisplacedInUrl
@@ -1518,17 +1518,17 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         : 'Action Required'}
                     </span>
                   </div>
-                  <p className="text-slate-600">
+                  <p className="text-slate-300">
                     Must be your <span className="font-mono">https://&lt;project-ref&gt;.supabase.co</span> URL — never paste an <span className="font-mono">sb_secret_</span> or <span className="font-mono">service_role</span> key into the URL variable.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">2. SESSION_SECRET</span>
+                    <span className="font-semibold text-white">2. SESSION_SECRET</span>
                     <span
                       className={`font-semibold ${
-                        health.envDiagnostics?.sessionSecretStrong ? 'text-emerald-700' : 'text-amber-700'
+                        health.envDiagnostics?.sessionSecretStrong ? 'text-[#16E563]' : 'text-[#F5B82E]'
                       }`}
                     >
                       {health.envDiagnostics?.sessionSecretStrong
@@ -1538,19 +1538,19 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         : 'Too Short (<32 chars)'}
                     </span>
                   </div>
-                  <p className="text-slate-600">
+                  <p className="text-slate-300">
                     Set a 32+ character cryptographic random secret on the server to harden signed login session cookies.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">3. MetaApi Cloud MT5 Keys</span>
+                    <span className="font-semibold text-white">3. MetaApi Cloud MT5 Keys</span>
                     <span
                       className={`font-semibold ${
                         health.envDiagnostics?.metaApiConfigured && health.envDiagnostics?.metaApiProfileConfigured
-                          ? 'text-emerald-700'
-                          : 'text-amber-700'
+                          ? 'text-[#16E563]'
+                          : 'text-[#F5B82E]'
                       }`}
                     >
                       {health.envDiagnostics?.metaApiConfigured && health.envDiagnostics?.metaApiProfileConfigured
@@ -1558,35 +1558,35 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         : `Missing: ${(health.envDiagnostics?.missingMetaApiEnvVars || ['METAAPI_TOKEN', 'METAAPI_PROVISIONING_PROFILE_ID']).join(', ')}`}
                     </span>
                   </div>
-                  <p className="text-slate-600">
+                  <p className="text-slate-300">
                     Server-only credentials (<span className="font-mono">METAAPI_TOKEN</span> &amp; <span className="font-mono">METAAPI_PROVISIONING_PROFILE_ID</span>) required for automated cloud MT5 provisioning and trading.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-1">
+                <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-1">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">4. Cloud DB Sync Tables (Supabase)</span>
+                    <span className="font-semibold text-white">4. Cloud DB Sync Tables (Supabase)</span>
                     <span
                       className={`font-semibold ${
-                        health.cloudSync?.tablesReady ? 'text-emerald-700' : 'text-amber-700'
+                        health.cloudSync?.tablesReady ? 'text-[#16E563]' : 'text-[#F5B82E]'
                       }`}
                     >
                       {health.cloudSync?.tablesReady ? 'Tables Ready' : 'Run SQL Migration'}
                     </span>
                   </div>
-                  <p className="text-slate-600">
+                  <p className="text-slate-300">
                     {health.cloudSync?.tablesReady
                       ? 'Orders, journal trades, paper state, trading plans, and MT5 links are persisting to Supabase Cloud Postgres.'
                       : `Run supabase/gridpips_cloud_tables.sql in Supabase SQL Editor (${(health.cloudSync?.missingTables || ['gridpips_user_state', 'gridpips_orders']).join(', ')}).`}
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-3 md:col-span-2">
+                <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-3 md:col-span-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">5. Safaricom M-Pesa Daraja API (Server Env Audit)</span>
+                    <span className="font-semibold text-white">5. Safaricom M-Pesa Daraja API (Server Env Audit)</span>
                     <span
                       className={`font-semibold ${
-                        health.envDiagnostics?.mpesaDarajaConfigured ? 'text-emerald-700' : 'text-amber-700'
+                        health.envDiagnostics?.mpesaDarajaConfigured ? 'text-[#16E563]' : 'text-[#F5B82E]'
                       }`}
                     >
                       {health.envDiagnostics?.mpesaDarajaConfigured
@@ -1596,46 +1596,46 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   </div>
 
                   {data.mpesaConfigAudit && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-[#0B120E] border border-emerald-500/20 rounded-lg p-3">
                       <div>
                         <div className="text-slate-400">MPESA_ENV</div>
-                        <div className={data.mpesaConfigAudit.env === 'production' ? 'font-bold text-emerald-700' : 'font-bold text-amber-700'}>
+                        <div className={data.mpesaConfigAudit.env === 'production' ? 'font-bold text-[#16E563]' : 'font-bold text-[#F5B82E]'}>
                           {data.mpesaConfigAudit.env} {data.mpesaConfigAudit.rawEnvSet ? '' : '(default)'}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_SHORTCODE</div>
-                        <div className="font-bold text-slate-900">{data.mpesaConfigAudit.shortCode || 'MISSING'}</div>
+                        <div className="font-bold text-white">{data.mpesaConfigAudit.shortCode || 'MISSING'}</div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_PARTY_B</div>
-                        <div className="font-bold text-slate-900">{data.mpesaConfigAudit.partyB || 'MISSING'}</div>
+                        <div className="font-bold text-white">{data.mpesaConfigAudit.partyB || 'MISSING'}</div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_TRANSACTION_TYPE</div>
-                        <div className="font-bold text-slate-900 truncate">{data.mpesaConfigAudit.transactionType}</div>
+                        <div className="font-bold text-white truncate">{data.mpesaConfigAudit.transactionType}</div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_CONSUMER_KEY</div>
-                        <div className={data.mpesaConfigAudit.consumerKeySet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                        <div className={data.mpesaConfigAudit.consumerKeySet ? 'font-bold text-[#16E563]' : 'font-bold text-rose-400'}>
                           {data.mpesaConfigAudit.consumerKeySet ? 'SET (Server)' : 'MISSING'}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_CONSUMER_SECRET</div>
-                        <div className={data.mpesaConfigAudit.consumerSecretSet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                        <div className={data.mpesaConfigAudit.consumerSecretSet ? 'font-bold text-[#16E563]' : 'font-bold text-rose-400'}>
                           {data.mpesaConfigAudit.consumerSecretSet ? 'SET (Server)' : 'MISSING'}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_PASSKEY</div>
-                        <div className={data.mpesaConfigAudit.passkeySet ? 'font-bold text-emerald-700' : 'font-bold text-rose-700'}>
+                        <div className={data.mpesaConfigAudit.passkeySet ? 'font-bold text-[#16E563]' : 'font-bold text-rose-400'}>
                           {data.mpesaConfigAudit.passkeySet ? 'SET (Server)' : 'MISSING'}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">MPESA_CALLBACK_URL</div>
-                        <div className={data.mpesaConfigAudit.callbackUrl ? 'font-bold text-emerald-700 truncate' : 'font-bold text-amber-700'}>
+                        <div className={data.mpesaConfigAudit.callbackUrl ? 'font-bold text-[#16E563] truncate' : 'font-bold text-[#F5B82E]'}>
                           {data.mpesaConfigAudit.callbackUrl ? 'SET' : 'NOT SET'}
                         </div>
                       </div>
@@ -1643,17 +1643,17 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   )}
 
                   {data.mpesaConfigAudit?.mismatchWarnings && data.mpesaConfigAudit.mismatchWarnings.length > 0 && (
-                    <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-900 space-y-1">
+                    <div className="p-2.5 bg-[#F5B82E]/12 border border-[#F5B82E]/30 rounded-md text-xs text-amber-200 space-y-1">
                       {data.mpesaConfigAudit.mismatchWarnings.map((warn, idx) => (
                         <div key={idx}>{warn}</div>
                       ))}
                     </div>
                   )}
 
-                  <p className="text-slate-600">
+                  <p className="text-slate-300">
                     For security, Daraja Consumer Key, Consumer Secret, and Passkey must be entered in your hosting <strong>Environment Variables / Secrets</strong> panel (Google AI Studio Secrets &amp; Vercel Project Settings → Environment Variables) — never stored in browser code.
                     {data.mpesaConfigAudit?.callbackUrl && (
-                      <span className="block mt-1 font-mono text-[11px] text-slate-800 break-all">
+                      <span className="block mt-1 font-mono text-[11px] text-slate-100 break-all">
                         Active MPESA_CALLBACK_URL: {data.mpesaConfigAudit.callbackUrl}
                       </span>
                     )}
@@ -1671,7 +1671,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       type="button"
                       disabled={darajaTesting}
                       onClick={() => void handleResetStaleStk()}
-                      className="px-3 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
+                      className="px-3 py-1.5 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-100 text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
                     >
                       Restart STK State &amp; Clear Cache
                     </button>
@@ -1680,16 +1680,16 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     <div
                       className={`p-2.5 rounded-md border text-xs ${
                         darajaTestResult.ok
-                          ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                          : 'bg-rose-50 border-rose-200 text-rose-700'
+                          ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-300'
+                          : 'bg-rose-500/12 border-rose-500/30 text-rose-400'
                       }`}
                     >
                       {darajaTestResult.message}
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-slate-200 space-y-2">
-                    <div className="font-semibold text-slate-900">
+                  <div className="pt-2 border-t border-emerald-500/20 space-y-2">
+                    <div className="font-semibold text-white">
                       Test Custom Domain (Namecheap DNS) &amp; Callback URL
                     </div>
                     <form onSubmit={handleCheckDomain} className="flex flex-wrap items-center gap-2">
@@ -1698,18 +1698,18 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         value={domainInput}
                         onChange={(e) => setDomainInput(e.target.value)}
                         placeholder="gridpips.com or app.yourdomain.com"
-                        className="flex-1 min-w-[220px] px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-md focus:outline-none focus:border-slate-900 font-mono"
+                        className="flex-1 min-w-[220px] px-3 py-1.5 text-xs bg-[#0E1712] border border-emerald-500/25 text-white placeholder:text-slate-500 rounded-md focus:outline-none focus:border-[#16E563] font-mono"
                       />
                       <button
                         type="submit"
                         disabled={domainChecking || !domainInput.trim()}
-                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-md cursor-pointer disabled:opacity-60"
+                        className="px-3 py-1.5 bg-[#16E563] text-[#041108] font-bold hover:bg-[#2BF074] text-xs rounded-md cursor-pointer disabled:opacity-60"
                       >
                         {domainChecking ? 'Checking DNS & HTTPS...' : 'Check Domain'}
                       </button>
                     </form>
                     {domainCheckError && (
-                      <div className="p-2.5 rounded-md border bg-rose-50 border-rose-200 text-rose-700 text-xs">
+                      <div className="p-2.5 rounded-md border bg-rose-500/12 border-rose-500/30 text-rose-400 text-xs">
                         {domainCheckError}
                       </div>
                     )}
@@ -1717,8 +1717,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                       <div
                         className={`p-3 rounded-md border text-xs space-y-1.5 ${
                           domainCheckResult.readyForCallbacks
-                            ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                            : 'bg-amber-50 border-amber-200 text-amber-900'
+                            ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-200'
+                            : 'bg-[#F5B82E]/12 border-[#F5B82E]/30 text-amber-200'
                         }`}
                       >
                         <div className="font-semibold flex flex-wrap items-center justify-between gap-2">
@@ -1734,13 +1734,13 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                             {domainCheckResult.callbackStatus ?? 'ERR'}
                           </span>
                         </div>
-                        <div className="font-mono text-[11px] text-slate-700">
+                        <div className="font-mono text-[11px] text-slate-200">
                           A: {domainCheckResult.dnsRecords.a.join(', ') || 'none'} · CNAME:{' '}
                           {domainCheckResult.dnsRecords.cname.join(', ') || 'none'}
                           {domainCheckResult.healthEnv ? ` · Live Env: ${domainCheckResult.healthEnv}` : ''}
                         </div>
                         {domainCheckResult.recommendedCallbackUrl && (
-                          <div className="font-mono text-[11px] bg-white/80 border border-emerald-300 rounded px-2 py-1 text-emerald-900 break-all">
+                          <div className="font-mono text-[11px] bg-[#0B120E]/90 border border-emerald-500/40 rounded px-2 py-1 text-emerald-200 break-all">
                             MPESA_CALLBACK_URL={domainCheckResult.recommendedCallbackUrl}
                           </div>
                         )}
@@ -1757,16 +1757,16 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 </div>
 
                 {data.firewallStatus && (
-                  <div className="p-3.5 rounded-lg border border-slate-200 bg-slate-50/70 space-y-2.5 md:col-span-2">
+                  <div className="p-3.5 rounded-lg border border-emerald-500/20 bg-[#070D0A]/80 space-y-2.5 md:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-semibold text-slate-900">
+                      <span className="font-semibold text-white">
                         6. Application Firewall (WAF), Payload Caps &amp; STK Throttling
                       </span>
                       <span
                         className={`font-semibold ${
                           data.firewallStatus.callbackSecretConfigured && data.firewallStatus.sessionSecretStrong
-                            ? 'text-emerald-700'
-                            : 'text-amber-700'
+                            ? 'text-[#16E563]'
+                            : 'text-[#F5B82E]'
                         }`}
                       >
                         {data.firewallStatus.callbackSecretConfigured
@@ -1774,36 +1774,36 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                           : 'Active · Add MPESA_CALLBACK_SECRET on Vercel'}
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-white border border-slate-200 rounded-lg p-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-[#0B120E] border border-emerald-500/20 rounded-lg p-3">
                       <div>
                         <div className="text-slate-400">L7 WAF FILTER</div>
-                        <div className="font-bold text-emerald-700">
+                        <div className="font-bold text-[#16E563]">
                           {data.firewallStatus.wafEnabled ? 'ENABLED' : 'OFF'}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">JSON BODY CAPS</div>
-                        <div className="font-bold text-slate-900">
+                        <div className="font-bold text-white">
                           {data.firewallStatus.jsonLimitDefault} · {data.firewallStatus.jsonLimitJournal} journal
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">STK / ADMIN LIMITS</div>
-                        <div className="font-bold text-slate-900 truncate">
+                        <div className="font-bold text-white truncate">
                           {data.firewallStatus.stkRateLimit}
                         </div>
                       </div>
                       <div>
                         <div className="text-slate-400">24H BLOCKS / BANS</div>
-                        <div className="font-bold text-slate-900 tabular-nums">
+                        <div className="font-bold text-white tabular-nums">
                           {data.firewallStatus.wafBlocks24h} blocks · {data.firewallStatus.activeTempBlockedIps} temp bans
                         </div>
                       </div>
                     </div>
-                    <p className="text-slate-600">
+                    <p className="text-slate-300">
                       Blocks automated <span className="font-mono">.env/.git/wp-admin/.php</span> scanners, path traversal, and XSS/SQLi query probes with automatic 15-minute IP cooldowns, enforces 256KB JSON limits on auth/payment routes, and throttles M-Pesa STK Push ({data.firewallStatus.stkRateLimit}) &amp; Admin ({data.firewallStatus.adminRateLimit}).
                       {!data.firewallStatus.callbackSecretConfigured && (
-                        <span className="block mt-1 text-amber-800">
+                        <span className="block mt-1 text-[#F5B82E]">
                           Action required on Vercel: add <span className="font-mono font-semibold">MPESA_CALLBACK_SECRET</span> (32+ chars) and append <span className="font-mono font-semibold">?token=&lt;secret&gt;</span> to <span className="font-mono font-semibold">MPESA_CALLBACK_URL</span> so unauthorized callback POSTs receive HTTP 403 immediately.
                         </span>
                       )}
@@ -1814,15 +1814,15 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             )}
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
             <div className="flex items-center gap-2 mb-4">
-              <ShieldAlert className="w-5 h-5 text-blue-600" />
-              <h3 className="text-base font-bold text-slate-950">Intrusion &amp; Authentication Audit Log</h3>
+              <ShieldAlert className="w-5 h-5 text-[#16E563]" />
+              <h3 className="text-base font-bold text-white">Intrusion &amp; Authentication Audit Log</h3>
             </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-slate-500">
+                <tr className="border-b border-emerald-500/20 text-slate-400">
                   <th className="py-2 pr-4">Timestamp</th>
                   <th className="py-2 pr-4">Severity</th>
                   <th className="py-2 pr-4">Event</th>
@@ -1831,25 +1831,25 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   <th className="py-2">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-mono">
+              <tbody className="divide-y divide-emerald-500/10 font-mono">
                 {data.securityLogs.map((log) => (
                   <tr key={log.id}>
-                    <td className="py-2.5 pr-4 text-slate-500">{log.created_at}</td>
+                    <td className="py-2.5 pr-4 text-slate-400">{log.created_at}</td>
                     <td
                       className={`py-2.5 pr-4 font-semibold uppercase ${
                         log.severity === 'critical'
-                          ? 'text-rose-700'
+                          ? 'text-rose-400'
                           : log.severity === 'warning'
-                          ? 'text-amber-700'
-                          : 'text-emerald-700'
+                          ? 'text-[#F5B82E]'
+                          : 'text-[#16E563]'
                       }`}
                     >
                       {log.severity}
                     </td>
-                    <td className="py-2.5 pr-4 text-slate-900">{log.event_type}</td>
-                    <td className="py-2.5 pr-4 text-slate-600">{log.ip_address}</td>
-                    <td className="py-2.5 pr-4 text-slate-600">{log.user_email || '—'}</td>
-                    <td className="py-2.5 text-slate-600 font-sans">{log.details}</td>
+                    <td className="py-2.5 pr-4 text-white">{log.event_type}</td>
+                    <td className="py-2.5 pr-4 text-slate-300">{log.ip_address}</td>
+                    <td className="py-2.5 pr-4 text-slate-300">{log.user_email || '—'}</td>
+                    <td className="py-2.5 text-slate-300 font-sans">{log.details}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1864,71 +1864,71 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
         <div className="space-y-6">
           {/* Influencer Summary KPI Row */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>Influencers &amp; Referrers</span>
                 <Users className="w-4 h-4 text-slate-400" />
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+              <div className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
                 {data.influencerSummary?.totalInfluencers ?? 0}
-                <span className="text-xs font-normal text-slate-500 ml-1.5">
+                <span className="text-xs font-normal text-slate-400 ml-1.5">
                   ({data.influencerSummary?.activeReferrersCount ?? data.influencers?.length ?? 0} active)
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1">
+              <div className="text-[11px] text-slate-400 mt-1">
                 Global rate: {data.settings.influencer_commission_pct || '35'}% (recurring)
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>Total Clicks &amp; Signups</span>
                 <Activity className="w-4 h-4 text-slate-400" />
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+              <div className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
                 {(data.influencerSummary?.totalClicks ?? 0).toLocaleString()}
-                <span className="text-xs font-normal text-slate-500 ml-1.5">
+                <span className="text-xs font-normal text-slate-400 ml-1.5">
                   / {(data.influencerSummary?.totalSignups ?? 0).toLocaleString()} signups
                 </span>
               </div>
-              <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+              <div className="text-[11px] text-slate-400 mt-1 tabular-nums">
                 {data.influencerSummary?.totalPaidConversions ?? 0} paid license conversions
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>Total Commissions Earned</span>
-                <DollarSign className="w-4 h-4 text-emerald-600" />
+                <DollarSign className="w-4 h-4 text-[#16E563]" />
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 mt-2">
+              <div className="text-2xl font-bold font-mono tabular-nums text-[#16E563] mt-2">
                 ${(data.influencerSummary?.totalCommissionsUsd ?? 0).toFixed(2)}
               </div>
-              <div className="text-[11px] font-mono text-slate-500 mt-1 tabular-nums">
+              <div className="text-[11px] font-mono text-slate-400 mt-1 tabular-nums">
                 Disbursed: ${(data.influencerSummary?.totalPaidOutUsd ?? 0).toFixed(2)}
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-500">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+              <div className="flex items-center justify-between text-xs text-slate-400">
                 <span>Pending Payout Queue</span>
-                <DollarSign className="w-4 h-4 text-amber-600" />
+                <DollarSign className="w-4 h-4 text-[#F5B82E]" />
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-amber-700 mt-2">
+              <div className="text-2xl font-bold font-mono tabular-nums text-[#F5B82E] mt-2">
                 ${(data.influencerSummary?.pendingPayoutsUsd ?? 0).toFixed(2)}
               </div>
-              <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+              <div className="text-[11px] text-slate-400 mt-1 tabular-nums">
                 {data.payouts.filter((p) => p.status === 'pending').length} request(s) awaiting action
               </div>
             </div>
           </div>
 
           {/* Influencer Partner Directory */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950">Influencer Partner Directory</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <h3 className="text-base font-bold text-white">Influencer Partner Directory</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
                   Every user with the Influencer role or active referral traffic. Click Edit Partner to adjust their code, role, or custom commission %.
                 </p>
               </div>
@@ -1939,7 +1939,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   value={influencerSearch}
                   onChange={(e) => setInfluencerSearch(e.target.value)}
                   placeholder="Search partner or ref code..."
-                  className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-56"
+                  className="pl-8 pr-3 py-1.5 text-xs border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563] w-56"
                 />
               </div>
             </div>
@@ -1960,10 +1960,10 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 if (filteredInf.length === 0) {
                   return (
                     <div className="py-8 text-center space-y-2">
-                      <p className="text-sm font-semibold text-slate-800">
+                      <p className="text-sm font-semibold text-slate-100">
                         No influencer partners or active referrers found yet.
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-400">
                         Promote any registered user to the <span className="font-mono font-semibold">influencer</span> role in the Users tab to manage them here.
                       </p>
                     </div>
@@ -1973,7 +1973,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 return (
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                         <th className="py-2.5 pr-3">Partner</th>
                         <th className="py-2.5 pr-3">Ref Code</th>
                         <th className="py-2.5 pr-3 text-right">Rate</th>
@@ -1986,43 +1986,43 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         <th className="py-2.5 text-right">Manage</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-emerald-500/10">
                       {filteredInf.map((inf) => {
                         const matchingUser = data.users.find((u) => u.id === inf.id);
                         return (
-                          <tr key={inf.id} className="hover:bg-slate-50/70">
+                          <tr key={inf.id} className="hover:bg-emerald-500/10">
                             <td className="py-3 pr-3">
-                              <div className="font-semibold text-slate-950">
+                              <div className="font-semibold text-white">
                                 {inf.name}{' '}
-                                <span className="text-[10px] font-mono uppercase text-amber-700">
+                                <span className="text-[10px] font-mono uppercase text-[#F5B82E]">
                                   ({inf.role})
                                 </span>
                               </div>
-                              <div className="text-slate-500">{inf.email}</div>
+                              <div className="text-slate-400">{inf.email}</div>
                             </td>
-                            <td className="py-3 pr-3 font-mono font-semibold text-slate-900">
+                            <td className="py-3 pr-3 font-mono font-semibold text-white">
                               {inf.referral_code}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-200">
                               {inf.effective_commission_pct}%
                               {inf.commission_pct !== null ? ' *' : ''}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-200">
                               {inf.clicks}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-700">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-200">
                               {inf.signups}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-slate-900">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-white">
                               {inf.paid_conversions}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-emerald-700">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-[#16E563]">
                               ${inf.total_earned_usd.toFixed(2)}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-600">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums text-slate-300">
                               ${inf.paid_out_usd.toFixed(2)}
                             </td>
-                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-bold text-slate-950">
+                            <td className="py-3 pr-3 text-right font-mono tabular-nums font-bold text-white">
                               ${inf.available_balance_usd.toFixed(2)}
                             </td>
                             <td className="py-3 text-right whitespace-nowrap">
@@ -2048,15 +2048,15 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
           </div>
 
           {/* Payout Requests Queue */}
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950">Influencer Commission Payout Queue</h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <h3 className="text-base font-bold text-white">Influencer Commission Payout Queue</h3>
+                <p className="text-xs text-slate-400 mt-0.5">
                   Approving or rejecting a payout persists to Cloud DB and emails the influencer automatically.
                 </p>
               </div>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
                 {(['all', 'pending', 'paid', 'rejected'] as const).map((pf) => (
                   <button
                     key={pf}
@@ -2064,8 +2064,8 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     onClick={() => setPayoutStatusFilter(pf)}
                     className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer whitespace-nowrap shrink-0 ${
                       payoutStatusFilter === pf
-                        ? 'bg-white text-slate-950 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900'
+                        ? 'bg-[#16E563] text-[#041108] font-bold'
+                        : 'text-slate-300 hover:text-white'
                     }`}
                   >
                     {pf}
@@ -2081,7 +2081,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 );
                 if (filteredPayouts.length === 0) {
                   return (
-                    <p className="text-sm text-slate-500 py-6 text-center">
+                    <p className="text-sm text-slate-400 py-6 text-center">
                       No payout requests match this filter.
                     </p>
                   );
@@ -2089,7 +2089,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 return (
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                         <th className="py-2.5 pr-4">Influencer</th>
                         <th className="py-2.5 pr-4">Date</th>
                         <th className="py-2.5 pr-4">Method</th>
@@ -2099,38 +2099,38 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         <th className="py-2.5 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-emerald-500/10">
                       {filteredPayouts.map((p) => (
-                        <tr key={p.id} className="hover:bg-slate-50/70">
+                        <tr key={p.id} className="hover:bg-emerald-500/10">
                           <td className="py-3 pr-4 text-xs">
-                            <div className="font-semibold text-slate-950">
+                            <div className="font-semibold text-white">
                               {p.user_name}{' '}
                               {p.referral_code ? (
-                                <span className="font-mono text-[11px] text-slate-500">
+                                <span className="font-mono text-[11px] text-slate-400">
                                   ({p.referral_code})
                                 </span>
                               ) : null}
                             </div>
-                            <div className="text-slate-500">{p.user_email}</div>
+                            <div className="text-slate-400">{p.user_email}</div>
                           </td>
-                          <td className="py-3 pr-4 font-mono text-xs text-slate-500">
+                          <td className="py-3 pr-4 font-mono text-xs text-slate-400">
                             {p.created_at.slice(0, 10)}
                           </td>
-                          <td className="py-3 pr-4 font-mono text-xs uppercase text-slate-700">
+                          <td className="py-3 pr-4 font-mono text-xs uppercase text-slate-200">
                             {p.method}
                           </td>
-                          <td className="py-3 pr-4 font-mono text-xs text-slate-700">{p.destination}</td>
-                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-slate-950">
+                          <td className="py-3 pr-4 font-mono text-xs text-slate-200">{p.destination}</td>
+                          <td className="py-3 pr-4 text-right font-mono tabular-nums font-bold text-white">
                             ${Number(p.amount_usd).toFixed(2)}
                           </td>
                           <td className="py-3 pr-4 text-xs font-semibold capitalize">
                             <span
                               className={
                                 p.status === 'paid'
-                                  ? 'text-emerald-700'
+                                  ? 'text-[#16E563]'
                                   : p.status === 'rejected'
-                                  ? 'text-rose-700'
-                                  : 'text-amber-700'
+                                  ? 'text-rose-400'
+                                  : 'text-[#F5B82E]'
                               }
                             >
                               {p.status}
@@ -2149,7 +2149,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                                 <button
                                   type="button"
                                   onClick={() => void updatePayoutStatus(p.id, 'rejected')}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-300 hover:bg-rose-50 text-rose-700 text-xs font-semibold rounded cursor-pointer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-500/40 hover:bg-rose-500/15 text-rose-400 text-xs font-semibold rounded cursor-pointer"
                                 >
                                   <XCircle className="w-3 h-3" /> Reject
                                 </button>
@@ -2173,20 +2173,20 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 5: Automated Email Dispatch Logs */}
       {tab === 'emails' && (
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h3 className="text-base font-bold text-slate-950 mb-4">System Automated Email Dispatch Audit</h3>
-          <div className="divide-y divide-slate-100">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6">
+          <h3 className="text-base font-bold text-white mb-4">System Automated Email Dispatch Audit</h3>
+          <div className="divide-y divide-emerald-500/10">
             {data.emailLogs.map((em) => (
               <div key={em.id} className="py-3 text-xs">
                 <div className="flex flex-wrap justify-between gap-2">
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-white">
                     To: {em.recipient_email} — {em.subject}
                   </span>
-                  <span className="font-mono text-slate-500">
+                  <span className="font-mono text-slate-400">
                     {em.delivery_status} · {em.created_at}
                   </span>
                 </div>
-                <p className="text-slate-600 mt-1">{em.body_preview}</p>
+                <p className="text-slate-300 mt-1">{em.body_preview}</p>
               </div>
             ))}
           </div>
@@ -2195,37 +2195,37 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
 
       {/* Tab 6: Live Platform Settings */}
       {tab === 'settings' && (
-        <form onSubmit={handleSaveSettings} className="bg-white border border-slate-200 rounded-xl p-6 space-y-4 max-w-3xl">
-          <h3 className="text-base font-bold text-slate-950">Global Platform Configuration</h3>
+        <form onSubmit={handleSaveSettings} className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-6 space-y-4 max-w-3xl">
+          <h3 className="text-base font-bold text-white">Global Platform Configuration</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Exness Partner IB Link</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Exness Partner IB Link</label>
               <input
                 value={settingsForm.exness_ib_url || ''}
                 onChange={(e) => setSettingsForm({ ...settingsForm, exness_ib_url: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Telegram Community Link</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Telegram Community Link</label>
               <input
                 value={settingsForm.telegram_url || ''}
                 onChange={(e) => setSettingsForm({ ...settingsForm, telegram_url: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">ICT YouTube Channel ID</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">ICT YouTube Channel ID</label>
               <input
                 value={settingsForm.ict_youtube_channel_id || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, ict_youtube_channel_id: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-200 mb-1">
                 DRT Strategy YouTube Channel URL
               </label>
               <input
@@ -2233,11 +2233,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, drt_youtube_channel_url: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-200 mb-1">
                 Influencer Payout Commission (%)
               </label>
               <input
@@ -2245,11 +2245,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, influencer_commission_pct: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-200 mb-1">
                 ICT Analyzer Monthly Price (USD)
               </label>
               <input
@@ -2257,11 +2257,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, analyzer_price_usd: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-200 mb-1">
                 DRT Analyzer Monthly Price (USD)
               </label>
               <input
@@ -2269,100 +2269,100 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, ea_bots_price_usd: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Till / Paybill Display Number</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">M-Pesa Till / Paybill Display Number</label>
               <input
                 value={settingsForm.mpesa_till_number || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, mpesa_till_number: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Daraja PartyB (Till / Paybill Shortcode)</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Daraja PartyB (Till / Paybill Shortcode)</label>
               <input
                 value={settingsForm.mpesa_party_b || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, mpesa_party_b: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Daraja Transaction Type</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Daraja Transaction Type</label>
               <select
                 value={settingsForm.mpesa_transaction_type || 'CustomerBuyGoodsOnline'}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, mpesa_transaction_type: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none font-mono"
               >
                 <option value="CustomerBuyGoodsOnline">CustomerBuyGoodsOnline (Till)</option>
                 <option value="CustomerPayBillOnline">CustomerPayBillOnline (Paybill)</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Merchant Name</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">M-Pesa Merchant Name</label>
               <input
                 value={settingsForm.mpesa_merchant_name || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, mpesa_merchant_name: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">USD to KES Exchange Rate</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">USD to KES Exchange Rate</label>
               <input
                 value={settingsForm.usd_kes_rate || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, usd_kes_rate: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">USDT TRC20 Deposit Address</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">USDT TRC20 Deposit Address</label>
               <input
                 value={settingsForm.usdt_trc20_address || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, usdt_trc20_address: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">USDT ERC20 Deposit Address</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">USDT ERC20 Deposit Address</label>
               <input
                 value={settingsForm.usdt_erc20_address || ''}
                 onChange={(e) =>
                   setSettingsForm({ ...settingsForm, usdt_erc20_address: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">Bitcoin (BTC) Deposit Address</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1">Bitcoin (BTC) Deposit Address</label>
               <input
                 value={settingsForm.btc_address || ''}
                 onChange={(e) => setSettingsForm({ ...settingsForm, btc_address: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono"
+                className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none"
               />
             </div>
           </div>
 
           {settingsError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+            <div className="p-3 bg-rose-500/12 border border-rose-500/30 text-rose-400 text-xs rounded-lg">
               {settingsError}
             </div>
           )}
 
           {feedback && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg">
+            <div className="p-3 bg-emerald-500/12 border border-emerald-500/30 text-emerald-300 text-xs rounded-lg">
               {feedback}
             </div>
           )}
@@ -2380,7 +2380,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
       {/* Full Edit User & Influencer Partner Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl max-w-2xl w-full shadow-2xl overflow-hidden max-h-[92vh] flex flex-col">
             <div className="px-6 py-4 bg-[#0B0F19] text-white flex items-center justify-between gap-3">
               <div>
                 <div className="text-[11px] font-mono uppercase tracking-[0.14em] text-[#E5A93C]">
@@ -2401,27 +2401,27 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
             <form onSubmit={handleSaveEditedUser} className="p-6 space-y-5 overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Name</label>
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">Full Name</label>
                   <input
                     required
                     value={editForm.name}
                     onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">
                     Exness Account ID
                   </label>
                   <input
                     required
                     value={editForm.exnessAccountId}
                     onChange={(e) => setEditForm({ ...editForm, exnessAccountId: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">Account Role</label>
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">Account Role</label>
                   <select
                     value={editForm.role}
                     onChange={(e) =>
@@ -2430,7 +2430,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         role: e.target.value as 'user' | 'influencer' | 'admin',
                       })
                     }
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white font-semibold"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none font-semibold"
                   >
                     <option value="user">User (Trader)</option>
                     <option value="influencer">Influencer Partner</option>
@@ -2438,7 +2438,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">
                     Referral Code (Unique)
                   </label>
                   <input
@@ -2447,11 +2447,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     onChange={(e) =>
                       setEditForm({ ...editForm, referralCode: e.target.value.toUpperCase() })
                     }
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono uppercase focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none uppercase focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">
                     KES Wallet Balance
                   </label>
                   <input
@@ -2460,11 +2460,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     min="0"
                     value={editForm.walletBalanceKes}
                     onChange={(e) => setEditForm({ ...editForm, walletBalanceKes: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none tabular-nums focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">
                     Custom Commission % (blank = site default {data.settings.influencer_commission_pct || 35}%)
                   </label>
                   <input
@@ -2475,11 +2475,11 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     placeholder={`Default (${data.settings.influencer_commission_pct || 35}%)`}
                     value={editForm.commissionPct}
                     onChange={(e) => setEditForm({ ...editForm, commissionPct: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none tabular-nums focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  <label className="block text-xs font-semibold text-slate-200 mb-1">
                     Referred By Partner Code (optional)
                   </label>
                   <input
@@ -2488,12 +2488,12 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     onChange={(e) =>
                       setEditForm({ ...editForm, referredByCode: e.target.value.toUpperCase() })
                     }
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono uppercase focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none uppercase focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
+                    <label className="block text-xs font-semibold text-slate-200">
                       ICT Analyzer Expiry Date
                     </label>
                     <button
@@ -2505,7 +2505,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         const next = new Date(base + 30 * 86400000).toISOString().slice(0, 10);
                         setEditForm({ ...editForm, hasAnalyzer: true, analyzerExpiresAt: next });
                       }}
-                      className="text-[11px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                      className="text-[11px] font-semibold text-[#F5B82E] hover:underline cursor-pointer"
                     >
                       +30 days
                     </button>
@@ -2514,12 +2514,12 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     type="date"
                     value={editForm.analyzerExpiresAt}
                     onChange={(e) => setEditForm({ ...editForm, analyzerExpiresAt: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-slate-700">
+                    <label className="block text-xs font-semibold text-slate-200">
                       DRT Analyzer Expiry Date
                     </label>
                     <button
@@ -2531,7 +2531,7 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                         const next = new Date(base + 30 * 86400000).toISOString().slice(0, 10);
                         setEditForm({ ...editForm, hasEaBots: true, eaBotsExpiresAt: next });
                       }}
-                      className="text-[11px] font-semibold text-amber-700 hover:underline cursor-pointer"
+                      className="text-[11px] font-semibold text-[#F5B82E] hover:underline cursor-pointer"
                     >
                       +30 days
                     </button>
@@ -2540,62 +2540,62 @@ export const AdminDashboardView: React.FC<{ onConfigSaved: () => Promise<void> }
                     type="date"
                     value={editForm.eaBotsExpiresAt}
                     onChange={(e) => setEditForm({ ...editForm, eaBotsExpiresAt: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                    className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-slate-200 text-xs">
-                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-500/20 text-xs">
+                <label className="flex items-center gap-2 font-semibold text-slate-100 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editForm.exnessVerified}
                     onChange={(e) => setEditForm({ ...editForm, exnessVerified: e.target.checked })}
-                    className="rounded border-slate-300"
+                    className="rounded border-emerald-500/25"
                   />
                   <span>Exness IB Verified</span>
                 </label>
-                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <label className="flex items-center gap-2 font-semibold text-slate-100 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editForm.hasAnalyzer}
                     onChange={(e) => setEditForm({ ...editForm, hasAnalyzer: e.target.checked })}
-                    className="rounded border-slate-300"
+                    className="rounded border-emerald-500/25"
                   />
                   <span>ICT Analyzer</span>
                 </label>
-                <label className="flex items-center gap-2 font-semibold text-slate-800 cursor-pointer">
+                <label className="flex items-center gap-2 font-semibold text-slate-100 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editForm.hasEaBots}
                     onChange={(e) => setEditForm({ ...editForm, hasEaBots: e.target.checked })}
-                    className="rounded border-slate-300"
+                    className="rounded border-emerald-500/25"
                   />
                   <span>DRT Analyzer</span>
                 </label>
-                <label className="flex items-center gap-2 font-semibold text-rose-700 cursor-pointer">
+                <label className="flex items-center gap-2 font-semibold text-rose-400 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={editForm.isSuspended}
                     onChange={(e) => setEditForm({ ...editForm, isSuspended: e.target.checked })}
-                    className="rounded border-slate-300"
+                    className="rounded border-emerald-500/25"
                   />
                   <span>Suspended</span>
                 </label>
               </div>
 
               {editUserError && (
-                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-start gap-2">
+                <div className="p-3 bg-rose-500/12 border border-rose-500/30 text-rose-400 text-xs rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{editUserError}</span>
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-emerald-500/20">
                 <button
                   type="button"
                   onClick={() => setEditingUser(null)}
-                  className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer"
+                  className="px-4 py-2 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-200 text-xs font-semibold rounded-lg cursor-pointer"
                 >
                   Cancel
                 </button>

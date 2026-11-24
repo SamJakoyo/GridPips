@@ -48,6 +48,30 @@
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
+
+  select,
+  input,
+  textarea {
+    color-scheme: dark;
+  }
+
+  select,
+  textarea,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']) {
+    background-color: #0e1712;
+    color: #f8fafc;
+  }
+
+  select option,
+  select optgroup {
+    background-color: #0b120e;
+    color: #f1f5f9;
+  }
+
+  select optgroup {
+    color: #16e563;
+    font-weight: 700;
+  }
 }
 
 .tabular-nums {

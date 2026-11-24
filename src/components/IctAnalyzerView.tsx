@@ -341,42 +341,42 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">Included in Your ICT Analyzer Subscription</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-sm font-bold text-white">Included in Your ICT Analyzer Subscription</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
                 Calibrated to ICT methodology ({config.ictYoutubeChannelId}) with flexible Monthly, Quarterly (-10%), and Annual (-20%) billing.
               </p>
             </div>
-            <span className="text-xs font-mono text-slate-500">12 Major FX, Gold, Indices &amp; Crypto Pairs</span>
+            <span className="text-xs font-mono text-slate-400">12 Major FX, Gold, Indices &amp; Crypto Pairs</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-emerald-500/15">
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-amber-700">01 · DEALING RANGE</div>
-              <div className="text-sm font-bold text-slate-950">Premium &amp; Discount Matrix</div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">01 · DEALING RANGE</div>
+              <div className="text-sm font-bold text-white">Premium &amp; Discount Matrix</div>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Automatic 50% equilibrium, deep discount longs, and premium short zones mapped across every timeframe.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-amber-700">02 · PD ARRAYS</div>
-              <div className="text-sm font-bold text-slate-950">Order Blocks &amp; FVG Detection</div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">02 · PD ARRAYS</div>
+              <div className="text-sm font-bold text-white">Order Blocks &amp; FVG Detection</div>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Identifies unmitigated Bullish/Bearish Order Blocks, Fair Value Gaps, Breaker/Mitigation blocks, and Voids.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-amber-700">03 · LIQUIDITY</div>
-              <div className="text-sm font-bold text-slate-950">BSL / SSL &amp; Structure Shifts</div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">03 · LIQUIDITY</div>
+              <div className="text-sm font-bold text-white">BSL / SSL &amp; Structure Shifts</div>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Plots Buy-Side and Sell-Side Liquidity pools, equal highs/lows, displacement candles, and MSS confirmations.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-amber-700">04 · EXECUTION</div>
-              <div className="text-sm font-bold text-slate-950">OTE Entry, SL &amp; TP Targets</div>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">04 · EXECUTION</div>
+              <div className="text-sm font-bold text-white">OTE Entry, SL &amp; TP Targets</div>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Generates exact 0.618–0.786 OTE entry coordinates, invalidation stops, multi-target take profits, and cloud setups.
               </p>
             </div>
@@ -402,13 +402,13 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Synchronized Live Chart + ICT Analyzer Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={symbol}
             onChange={(e) => onSymbolChange(e.target.value)}
             aria-label="Select trading pair"
-            className="px-3 py-2 text-sm font-mono font-semibold border border-slate-300 rounded-lg bg-white max-w-[230px]"
+            className="px-3 py-2 text-sm font-mono font-semibold border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none max-w-[230px]"
           >
             {isCustomSymbol && (
               <optgroup label="Custom">
@@ -426,14 +426,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             ))}
           </select>
 
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
             {ANALYZER_TIMEFRAMES.map((tf) => (
               <button
                 key={tf}
                 type="button"
                 onClick={() => onTimeframeChange(tf)}
                 className={`px-2.5 py-1.5 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTimeframe === tf ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                  activeTimeframe === tf ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
                 }`}
               >
                 {tf}
@@ -441,7 +441,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
             {(
               [
                 ['split', 'Dual Charts'],
@@ -454,7 +454,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 type="button"
                 onClick={() => setChartViewMode(mode)}
                 className={`px-2.5 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  chartViewMode === mode ? 'bg-slate-950 text-white' : 'text-slate-600 hover:text-slate-950'
+                  chartViewMode === mode ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
                 }`}
               >
                 {label}
@@ -467,9 +467,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <button
             type="button"
             onClick={onOpenFreeChart}
-            className="px-3 py-2 border border-slate-200 text-slate-700 text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+            className="px-3 py-2 border border-emerald-500/20 text-slate-200 text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <CandlestickChart className="w-3.5 h-3.5 text-blue-600" />
+            <CandlestickChart className="w-3.5 h-3.5 text-[#16E563]" />
             Free Full Chart
           </button>
           <button
@@ -477,8 +477,8 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             onClick={() => setAutoSync((v) => !v)}
             className={`px-3 py-2 border text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 ${
               autoSync
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-                : 'border-slate-200 bg-white text-slate-600'
+                ? 'border-emerald-500/40 bg-emerald-500/12 text-emerald-300'
+                : 'border-emerald-500/20 bg-[#0B120E] text-slate-300'
             }`}
           >
             {autoSync ? 'Live Sync On' : 'Live Sync Off'}
@@ -487,9 +487,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             <button
               type="button"
               onClick={handleSaveSetup}
-              className="px-3.5 py-2 border border-slate-300 text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="px-3.5 py-2 border border-emerald-500/25 text-slate-100 text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
-              <BookmarkPlus className="w-3.5 h-3.5 text-blue-600" />
+              <BookmarkPlus className="w-3.5 h-3.5 text-[#16E563]" />
               Save Setup
             </button>
           )}
@@ -497,7 +497,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             type="button"
             onClick={runScan}
             disabled={loading}
-            className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+            className="px-4 py-2 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Scan {activeTimeframe}
@@ -506,7 +506,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex flex-wrap items-center justify-between gap-2">
+        <div className="p-3 bg-rose-500/12 border border-rose-500/30 text-rose-400 text-xs rounded-lg flex flex-wrap items-center justify-between gap-2">
           <span>{error}</span>
           <button
             type="button"
@@ -518,14 +518,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         </div>
       )}
       {cloudNotice && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg">
+        <div className="p-3 bg-emerald-500/12 border border-emerald-500/30 text-[#16E563] text-xs rounded-lg">
           {cloudNotice}
         </div>
       )}
 
       {!analysis && (
         <div className="space-y-5">
-          <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
+          <div className="bg-[#070D0A] border border-emerald-500/20 rounded-xl p-4 text-white">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div>
                 <h3 className="text-sm font-bold text-white">
@@ -561,78 +561,78 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         <>
           {/* Summary Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Bias &amp; Execution ({analysis.timeframe})</div>
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Bias &amp; Execution ({analysis.timeframe})</div>
               <div
                 className={`text-lg font-bold mt-1 ${
-                  analysis.dailyBias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'
+                  analysis.dailyBias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'
                 }`}
               >
                 {analysis.dailyBias} · {analysis.setup.direction}
               </div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">{analysis.structureShift}</div>
+              <div className="text-xs text-slate-400 mt-0.5 truncate">{analysis.structureShift}</div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Dealing Range Position</div>
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Dealing Range Position</div>
               <div
                 className={`text-lg font-bold font-mono tabular-nums mt-1 ${
                   pd?.currentZone === 'Premium'
-                    ? 'text-rose-700'
+                    ? 'text-rose-400'
                     : pd?.currentZone === 'Discount'
-                    ? 'text-emerald-700'
-                    : 'text-amber-700'
+                    ? 'text-[#16E563]'
+                    : 'text-[#F5B82E]'
                 }`}
               >
                 {pd ? `${pd.currentZone} (${pd.currentPositionPct}%)` : 'Equilibrium'}
               </div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">
+              <div className="text-xs text-slate-400 mt-0.5 truncate">
                 {pd?.quadrant || '50% Equilibrium'}
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">50% Equilibrium &amp; Draw</div>
-              <div className="text-sm font-mono tabular-nums font-bold text-slate-950 mt-1">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">50% Equilibrium &amp; Draw</div>
+              <div className="text-sm font-mono tabular-nums font-bold text-white mt-1">
                 EQ {pd ? pd.equilibrium : '-'} · DOL {analysis.drawOnLiquidity?.price ?? analysis.bslLevel}
               </div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">
+              <div className="text-xs text-slate-400 mt-0.5 truncate">
                 {analysis.drawOnLiquidity
                   ? `${analysis.drawOnLiquidity.side}: ${analysis.drawOnLiquidity.label}`
                   : `BSL ${analysis.bslLevel} / SSL ${analysis.sslLevel}`}
               </div>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <div className="text-xs text-slate-500">Projected Risk : Reward</div>
-              <div className="text-lg font-bold font-mono tabular-nums text-blue-600 mt-1">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
+              <div className="text-xs text-slate-400">Projected Risk : Reward</div>
+              <div className="text-lg font-bold font-mono tabular-nums text-[#16E563] mt-1">
                 1 : {analysis.setup.rrRatio}
               </div>
-              <div className="text-xs text-slate-500 mt-0.5 truncate">{analysis.activeKillzone}</div>
+              <div className="text-xs text-slate-400 mt-0.5 truncate">{analysis.activeKillzone}</div>
             </div>
           </div>
 
           {/* Premium vs. Discount Dealing Range Gauge */}
           {pd && (
-            <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3">
+            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-slate-950">
+                  <h3 className="text-sm font-bold text-white">
                     ICT Premium vs. Discount Dealing Range (50% Equilibrium)
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="text-xs text-slate-400 mt-0.5">
                     Institutional delivery buys Bullish PD Arrays below 50% Equilibrium (Discount) and sells Bearish PD Arrays above 50% Equilibrium (Premium).
                   </p>
                 </div>
                 <div
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                    pd.alignedWithBias ? 'text-emerald-700' : 'text-amber-700'
+                    pd.alignedWithBias ? 'text-[#16E563]' : 'text-[#F5B82E]'
                   }`}
                 >
                   {pd.alignedWithBias ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
                   ) : (
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-[#F5B82E] shrink-0" />
                   )}
                   <span>
                     {pd.alignedWithBias
@@ -644,21 +644,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
               {/* Dealing Range Horizontal Bar */}
               <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-600">
+                <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-300">
                   <span>0% Discount Low · {pd.rangeLow}</span>
-                  <span className="font-bold text-slate-950">50% Equilibrium · {pd.equilibrium}</span>
+                  <span className="font-bold text-white">50% Equilibrium · {pd.equilibrium}</span>
                   <span>100% Premium High · {pd.rangeHigh}</span>
                 </div>
 
-                <div className="relative h-6 w-full rounded-md overflow-hidden border border-slate-200 flex">
+                <div className="relative h-6 w-full rounded-md overflow-hidden border border-emerald-500/20 flex">
                   <div
-                    className="w-1/2 h-full bg-emerald-50 border-r border-dashed border-slate-400 flex items-center pl-3 text-xs font-semibold text-emerald-800"
+                    className="w-1/2 h-full bg-emerald-500/12 border-r border-dashed border-emerald-500/35 flex items-center pl-3 text-xs font-semibold text-emerald-300"
                     title="Discount Zone (0% - 50%)"
                   >
                     Discount Zone (Buy PD Arrays)
                   </div>
                   <div
-                    className="w-1/2 h-full bg-rose-50 flex items-center justify-end pr-3 text-xs font-semibold text-rose-800"
+                    className="w-1/2 h-full bg-rose-500/12 flex items-center justify-end pr-3 text-xs font-semibold text-rose-300"
                     title="Premium Zone (50% - 100%)"
                   >
                     Premium Zone (Sell PD Arrays)
@@ -677,14 +677,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
                   {/* Current Price Marker */}
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-slate-950 z-10 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-0.5 bg-[#0B120E] shadow-[0_0_8px_rgba(255,255,255,0.9)] z-10 pointer-events-none"
                     style={{ left: `${Math.min(99, Math.max(1, pd.currentPositionPct))}%` }}
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
                   <span>{pd.guidance}</span>
-                  <span className="font-mono tabular-nums text-slate-500">
+                  <span className="font-mono tabular-nums text-slate-400">
                     OTE 0.618–0.786 ({analysis.oteLevels.zone || (analysis.dailyBias === 'Bullish' ? 'Discount' : 'Premium')}):{' '}
                     {Math.min(analysis.oteLevels.fib618, analysis.oteLevels.fib786)} –{' '}
                     {Math.max(analysis.oteLevels.fib618, analysis.oteLevels.fib786)}
@@ -698,7 +698,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             {/* Dual TradingView Charts: Fresh TradingView Chart + ICT Mapped Chart */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
-                <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 text-white">
+                <div className="bg-[#070D0A] border border-emerald-500/20 rounded-xl p-4 text-white">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div>
                       <h3 className="text-sm font-bold text-white">
@@ -737,9 +737,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
             {/* Actionable ICT Setup Card */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-4' : 'lg:col-span-4 space-y-4'}>
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
                 <div className="flex items-center justify-between gap-2 mb-4">
-                  <h3 className="text-base font-bold text-slate-950">Execution Parameters</h3>
+                  <h3 className="text-base font-bold text-white">Execution Parameters</h3>
                   <a
                     href={
                       analysis.tradingViewUrl ||
@@ -747,21 +747,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-mono font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+                    className="text-xs font-mono font-semibold text-[#16E563] hover:underline inline-flex items-center gap-1"
                   >
                     <span>{analysis.tvSymbol || 'TradingView'}</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
                 <div className="space-y-2.5 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Live Price</span>
-                    <span className="font-mono tabular-nums font-bold text-slate-950">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">Live Price</span>
+                    <span className="font-mono tabular-nums font-bold text-white">
                       {analysis.currentPrice}
                       {typeof analysis.changePct === 'number' && (
                         <span
                           className={`ml-1.5 text-xs font-semibold ${
-                            analysis.changePct >= 0 ? 'text-emerald-700' : 'text-rose-600'
+                            analysis.changePct >= 0 ? 'text-[#16E563]' : 'text-rose-400'
                           }`}
                         >
                           ({analysis.changePct >= 0 ? '+' : ''}
@@ -771,62 +771,62 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </span>
                   </div>
                   {typeof analysis.bid === 'number' && typeof analysis.ask === 'number' && (
-                    <div className="flex justify-between py-2 border-b border-slate-100">
-                      <span className="text-slate-500">Bid / Ask</span>
-                      <span className="font-mono tabular-nums text-xs font-semibold text-slate-700">
+                    <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                      <span className="text-slate-400">Bid / Ask</span>
+                      <span className="font-mono tabular-nums text-xs font-semibold text-slate-200">
                         {analysis.bid} / {analysis.ask}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Setup Bias</span>
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">Setup Bias</span>
                     <span
                       className={`font-semibold ${
-                        analysis.dailyBias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'
+                        analysis.dailyBias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'
                       }`}
                     >
                       {analysis.setup.direction}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
-                    <span className="text-slate-500 shrink-0">Anchor PD Array</span>
-                    <span className="font-semibold text-slate-950 text-right truncate">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
+                    <span className="text-slate-400 shrink-0">Anchor PD Array</span>
+                    <span className="font-semibold text-white text-right truncate">
                       {analysis.setup.entryArrayName || `${analysis.oteLevels.zone || ''} PD Array`}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Entry Zone</span>
-                    <span className="font-mono tabular-nums font-semibold text-slate-950">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">Entry Zone</span>
+                    <span className="font-mono tabular-nums font-semibold text-white">
                       {analysis.setup.entryZone}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">50% Equilibrium</span>
-                    <span className="font-mono tabular-nums font-semibold text-slate-700">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">50% Equilibrium</span>
+                    <span className="font-mono tabular-nums font-semibold text-slate-200">
                       {pd ? pd.equilibrium : '-'}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">Stop Loss</span>
-                    <span className="font-mono tabular-nums font-semibold text-rose-600">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">Stop Loss</span>
+                    <span className="font-mono tabular-nums font-semibold text-rose-400">
                       {analysis.setup.stopLoss}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">TP1 (2R / Equilibrium)</span>
-                    <span className="font-mono tabular-nums font-semibold text-emerald-700">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">TP1 (2R / Equilibrium)</span>
+                    <span className="font-mono tabular-nums font-semibold text-[#16E563]">
                       {analysis.setup.tp1}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-500">TP2 (Liquidity Draw)</span>
-                    <span className="font-mono tabular-nums font-semibold text-emerald-700">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                    <span className="text-slate-400">TP2 (Liquidity Draw)</span>
+                    <span className="font-mono tabular-nums font-semibold text-[#16E563]">
                       {analysis.setup.tp2}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
-                    <span className="text-slate-500 shrink-0">Power of 3 / Sweep</span>
-                    <span className="text-xs font-medium text-slate-700 text-right">
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
+                    <span className="text-slate-400 shrink-0">Power of 3 / Sweep</span>
+                    <span className="text-xs font-medium text-slate-200 text-right">
                       {analysis.po3Phase}
                     </span>
                   </div>
@@ -846,12 +846,12 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-slate-950 mb-3">ICT Confluence Checklist</h3>
-                <ul className="space-y-2.5 text-xs text-slate-700">
+              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+                <h3 className="text-sm font-bold text-white mb-3">ICT Confluence Checklist</h3>
+                <ul className="space-y-2.5 text-xs text-slate-200">
                   {analysis.setup.confluences.map((item, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0 mt-0.5" />
                       <span>{item}</span>
                     </li>
                   ))}
@@ -861,22 +861,22 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </div>
 
           {/* ICT PD Array Matrix (Premium vs Discount Hierarchy) */}
-          <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950">
+                <h3 className="text-base font-bold text-white">
                   ICT PD Array Matrix — Premium vs. Discount Hierarchy
                 </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-400 mt-0.5">
                   Derived directly from live {analysis.symbol} ({analysis.timeframe}) OHLC price delivery: Old High/Low (BSL/SSL), Equal Highs/Lows, Rejection Blocks, Order Blocks, FVGs (50% CE), Liquidity Voids, Breaker Blocks &amp; Mitigation Blocks.
                 </p>
               </div>
-              <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
                 <button
                   type="button"
                   onClick={() => setPdFilter('active')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                    pdFilter === 'active' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                    pdFilter === 'active' ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
                   }`}
                 >
                   Unmitigated &amp; Active
@@ -885,7 +885,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   type="button"
                   onClick={() => setPdFilter('all')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                    pdFilter === 'all' ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-950'
+                    pdFilter === 'all' ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
                   }`}
                 >
                   All Arrays ({allPdArrays.length})
@@ -913,27 +913,27 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
       {/* Supabase Synced Setups & Strategy Playbooks */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5">
+        <div className="lg:col-span-6 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
-              <BookmarkPlus className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <BookmarkPlus className="w-4 h-4 text-[#16E563]" />
               Saved ICT Setups
             </h3>
           </div>
           {savedSetups.length === 0 ? (
-            <p className="text-xs text-slate-500 py-4">
+            <p className="text-xs text-slate-400 py-4">
               No saved setups yet. Click &quot;Save Setup&quot; on any scan to save it to your account.
             </p>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-emerald-500/10">
               {savedSetups.map((s) => (
                 <div key={s.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <div className="font-mono font-bold text-slate-950">
+                    <div className="font-mono font-bold text-white">
                       {s.symbol} · {s.timeframe} ·{' '}
-                      <span className={s.bias === 'Bullish' ? 'text-emerald-700' : 'text-rose-700'}>{s.bias}</span>
+                      <span className={s.bias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'}>{s.bias}</span>
                     </div>
-                    <div className="text-slate-600 font-mono tabular-nums">
+                    <div className="text-slate-300 font-mono tabular-nums">
                       Entry {s.entryZone} · SL {s.stopLoss} · TP1 {s.tp1}
                     </div>
                   </div>
@@ -951,10 +951,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           )}
         </div>
 
-        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 space-y-4">
+        <div className="lg:col-span-6 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
-              <BookMarked className="w-4 h-4 text-blue-600" />
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <BookMarked className="w-4 h-4 text-[#16E563]" />
               Strategy Playbooks
             </h3>
           </div>
@@ -965,7 +965,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               placeholder={`Playbook title (e.g. ${symbol} ${activeTimeframe} Discount OTE + FVG)`}
               value={playbookTitle}
               onChange={(e) => setPlaybookTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+              className="w-full px-3 py-2 text-xs border border-emerald-500/25 rounded-lg focus:outline-none focus:border-[#16E563]"
             />
             <div className="flex gap-2">
               <input
@@ -973,11 +973,11 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 placeholder="PD Array trigger, Equilibrium filter, & Killzone rules..."
                 value={playbookRules}
                 onChange={(e) => setPlaybookRules(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:border-blue-600"
+                className="flex-1 px-3 py-2 text-xs border border-emerald-500/25 rounded-lg focus:outline-none focus:border-[#16E563]"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-slate-950 text-white text-xs font-semibold rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap shrink-0"
+                className="px-4 py-2 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] cursor-pointer whitespace-nowrap shrink-0"
               >
                 Save Playbook
               </button>
@@ -985,17 +985,17 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </form>
 
           {playbooks.length > 0 && (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-emerald-500/10">
               {playbooks.map((p) => (
                 <div key={p.id} className="py-2 flex items-start justify-between gap-3 text-xs">
                   <div>
-                    <div className="font-semibold text-slate-950">
+                    <div className="font-semibold text-white">
                       {p.title}{' '}
-                      <span className="font-mono text-slate-500">
+                      <span className="font-mono text-slate-400">
                         ({p.pair} · {p.timeframe})
                       </span>
                     </div>
-                    <div className="text-slate-600">{p.rulesSummary}</div>
+                    <div className="text-slate-300">{p.rulesSummary}</div>
                   </div>
                   <button
                     type="button"
@@ -1022,53 +1022,53 @@ const PdArrayColumn: React.FC<{
   items: PdArrayItem[];
 }> = ({ title, subtitle, tone, items }) => {
   return (
-    <div className="border border-slate-200 rounded-lg overflow-hidden">
+    <div className="border border-emerald-500/20 rounded-lg overflow-hidden">
       <div
-        className={`px-4 py-3 border-b border-slate-200 ${
-          tone === 'premium' ? 'bg-rose-50/60' : 'bg-emerald-50/60'
+        className={`px-4 py-3 border-b border-emerald-500/20 ${
+          tone === 'premium' ? 'bg-rose-500/10' : 'bg-emerald-500/10'
         }`}
       >
         <div
           className={`text-sm font-bold ${
-            tone === 'premium' ? 'text-rose-800' : 'text-emerald-800'
+            tone === 'premium' ? 'text-rose-300' : 'text-emerald-300'
           }`}
         >
           {title}
         </div>
-        <div className="text-xs text-slate-600">{subtitle}</div>
+        <div className="text-xs text-slate-300">{subtitle}</div>
       </div>
 
       {items.length === 0 ? (
-        <div className="px-4 py-6 text-xs text-slate-500">
+        <div className="px-4 py-6 text-xs text-slate-400">
           No active {tone === 'premium' ? 'Premium' : 'Discount'} PD arrays detected in this filter view.
         </div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-emerald-500/10">
           {items.map((item) => {
             const statusColor =
               item.status === 'In Zone'
-                ? 'text-blue-700 font-bold'
+                ? 'text-sky-400 font-bold'
                 : item.status === 'Target Liquidity'
-                ? 'text-amber-700 font-semibold'
+                ? 'text-[#F5B82E] font-semibold'
                 : item.status === 'Mitigated'
                 ? 'text-slate-400'
-                : 'text-emerald-700 font-semibold';
+                : 'text-[#16E563] font-semibold';
             const bandLabel =
               item.top === item.bottom
                 ? `${item.midpoint}`
                 : `${item.bottom} – ${item.top} (Mid ${item.midpoint})`;
             return (
-              <div key={item.id} className="px-4 py-3 hover:bg-slate-50/70 transition-colors">
+              <div key={item.id} className="px-4 py-3 hover:bg-emerald-500/10 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-slate-950 truncate">
-                      <span className="font-mono text-slate-500 mr-1.5">P{item.priority}</span>
+                    <div className="text-xs font-semibold text-white truncate">
+                      <span className="font-mono text-slate-400 mr-1.5">P{item.priority}</span>
                       {item.name}
                     </div>
-                    <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>
+                    <div className="text-xs text-slate-400 mt-0.5">{item.description}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-mono tabular-nums font-semibold text-slate-900">
+                    <div className="text-xs font-mono tabular-nums font-semibold text-white">
                       {bandLabel}
                     </div>
                     <div className="text-xs font-mono tabular-nums mt-0.5 flex items-center justify-end gap-1.5">

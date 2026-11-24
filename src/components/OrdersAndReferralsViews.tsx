@@ -323,18 +323,18 @@ export const OrdersDashboardView: React.FC<{
       </div>
 
       {/* Active Subscriptions & Renewal Desk */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h3 className="text-sm font-bold text-slate-950">Active Subscriptions &amp; Renewal Plans</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h3 className="text-sm font-bold text-white">Active Subscriptions &amp; Renewal Plans</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
               Flexible 30-day Monthly, 90-day Quarterly (-10%), or 365-day Annual (-20%) plans. Early renewals automatically extend your current expiry date.
             </p>
           </div>
-          <span className="text-xs font-mono text-slate-500">Account: {user?.exnessAccountId || 'Linked'}</span>
+          <span className="text-xs font-mono text-slate-400">Account: {user?.exnessAccountId || 'Linked'}</span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-slate-200">
+        <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x divide-emerald-500/15">
           {/* ICT Analyzer Subscription Card */}
           <div className="p-6 flex flex-col justify-between gap-4">
             <div className="space-y-1.5 min-w-0">
@@ -342,36 +342,36 @@ export const OrdersDashboardView: React.FC<{
                 <span
                   className={`inline-flex items-center gap-1.5 ${
                     analyzerSubInfo.tone === 'emerald'
-                      ? 'text-emerald-700'
+                      ? 'text-[#16E563]'
                       : analyzerSubInfo.tone === 'rose'
-                      ? 'text-rose-700'
-                      : 'text-amber-700'
+                      ? 'text-rose-400'
+                      : 'text-[#F5B82E]'
                   }`}
                 >
                   {user?.hasAnalyzer ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   <span>{analyzerSubInfo.label}</span>
                 </span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
-                <span className="font-mono tabular-nums text-slate-600">
+                <span className="font-mono tabular-nums text-slate-300">
                   From ${(config?.analyzerPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.analyzerPriceKes ?? 683).toLocaleString()}/mo)
                 </span>
               </div>
-              <h4 className="text-base font-bold text-slate-950">ICT Strategy Market Analyzer</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h4 className="text-base font-bold text-white">ICT Strategy Market Analyzer</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Dual TradingView charts, Premium/Discount dealing ranges, full PD Array matrix, and OTE trade setups.
               </p>
-              <div className="text-[11px] font-mono text-slate-500 pt-1">
+              <div className="text-[11px] font-mono text-slate-400 pt-1">
                 {analyzerSubInfo.detail}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-500/10">
               {user?.hasAnalyzer ? (
                 <>
                   <button
                     type="button"
                     onClick={() => onLaunchProduct?.('analyzer')}
-                    className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    className="px-4 py-2 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-white text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Open Analyzer
                   </button>
@@ -395,7 +395,7 @@ export const OrdersDashboardView: React.FC<{
                   <button
                     type="button"
                     onClick={() => onBuyNew('analyzer', 'annual')}
-                    className="px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    className="px-3.5 py-2 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-100 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Annual (-20%)
                   </button>
@@ -411,36 +411,36 @@ export const OrdersDashboardView: React.FC<{
                 <span
                   className={`inline-flex items-center gap-1.5 ${
                     drtSubInfo.tone === 'emerald'
-                      ? 'text-emerald-700'
+                      ? 'text-[#16E563]'
                       : drtSubInfo.tone === 'rose'
-                      ? 'text-rose-700'
-                      : 'text-amber-700'
+                      ? 'text-rose-400'
+                      : 'text-[#F5B82E]'
                   }`}
                 >
                   {hasDrtActive ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
                   <span>{drtSubInfo.label}</span>
                 </span>
                 <span aria-hidden="true" className="text-slate-300">·</span>
-                <span className="font-mono tabular-nums text-slate-600">
+                <span className="font-mono tabular-nums text-slate-300">
                   From ${(config?.drtAnalyzerPriceUsd ?? config?.eaBotsPriceUsd ?? 5.25).toFixed(2)}/mo (KES {(config?.drtAnalyzerPriceKes ?? config?.eaBotsPriceKes ?? 683).toLocaleString()}/mo)
                 </span>
               </div>
-              <h4 className="text-base font-bold text-slate-950">DRT Strategy Market Analyzer</h4>
-              <p className="text-xs text-slate-600 leading-relaxed">
+              <h4 className="text-base font-bold text-white">DRT Strategy Market Analyzer</h4>
+              <p className="text-xs text-slate-300 leading-relaxed">
                 Ali Khan Dealing Range Theory (0.25/0.50/0.75 DRT), Type 1/2/3 ranges, live SMT divergence, and Premium/Discount PD Arrays.
               </p>
-              <div className="text-[11px] font-mono text-slate-500 pt-1">
+              <div className="text-[11px] font-mono text-slate-400 pt-1">
                 {drtSubInfo.detail}
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100">
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-emerald-500/10">
               {hasDrtActive ? (
                 <>
                   <button
                     type="button"
                     onClick={() => onLaunchProduct?.('drt_analyzer')}
-                    className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    className="px-4 py-2 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-white text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Open DRT Analyzer
                   </button>
@@ -466,7 +466,7 @@ export const OrdersDashboardView: React.FC<{
                   <button
                     type="button"
                     onClick={() => onBuyNew('drt_analyzer', 'annual')}
-                    className="px-3.5 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                    className="px-3.5 py-2 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-100 text-xs font-semibold rounded-lg whitespace-nowrap shrink-0 cursor-pointer transition-colors"
                   >
                     Annual (-20%)
                   </button>
@@ -479,35 +479,35 @@ export const OrdersDashboardView: React.FC<{
 
       {/* Safaricom M-Pesa Wallet Deposit & STK Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-5 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
+        <div className="lg:col-span-5 bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex items-center justify-between gap-2">
             <div>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-700">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#16E563]">
                 <Wallet className="w-3.5 h-3.5" />
                 <span>Safaricom M-Pesa Daraja</span>
               </div>
-              <h3 className="text-base font-bold text-slate-950 mt-0.5">Top Up KES Wallet</h3>
+              <h3 className="text-base font-bold text-white mt-0.5">Top Up KES Wallet</h3>
             </div>
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-wider text-slate-400">Buy Goods Till</div>
-              <div className="text-xs font-mono font-bold text-slate-950">{tillDisplay}</div>
+              <div className="text-xs font-mono font-bold text-white">{tillDisplay}</div>
             </div>
           </div>
 
           <div className="p-6 space-y-4 flex-1 flex flex-col justify-between">
             <div className="space-y-4">
-              <p className="text-xs text-slate-600 leading-relaxed">
-                Merchant: <strong className="text-slate-900">{merchantName}</strong>. Enter your Safaricom number to receive an instant M-Pesa PIN prompt; your wallet credits automatically upon confirmed callback.
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Merchant: <strong className="text-white">{merchantName}</strong>. Enter your Safaricom number to receive an instant M-Pesa PIN prompt; your wallet credits automatically upon confirmed callback.
               </p>
 
               {!config?.mpesaConfigured && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 leading-relaxed">
+                <div className="p-3 bg-[#F5B82E]/12 border border-[#F5B82E]/30 rounded-lg text-xs text-amber-200 leading-relaxed">
                   Daraja STK Push awaits live credentials (<span className="font-mono">MPESA_CONSUMER_KEY</span>, <span className="font-mono">MPESA_CONSUMER_SECRET</span>, <span className="font-mono">MPESA_PASSKEY</span>, <span className="font-mono">MPESA_SHORTCODE</span>).
                 </div>
               )}
 
               <div>
-                <div className="text-[11px] font-semibold text-slate-500 mb-1.5">Quick Amount (KES)</div>
+                <div className="text-[11px] font-semibold text-slate-400 mb-1.5">Quick Amount (KES)</div>
                 <div className="grid grid-cols-4 gap-2">
                   {DEPOSIT_PRESETS_KES.map((preset) => {
                     const active = Number(depositAmountKes) === preset;
@@ -519,7 +519,7 @@ export const OrdersDashboardView: React.FC<{
                         className={`py-1.5 px-2 text-xs font-mono tabular-nums font-semibold rounded-lg border cursor-pointer transition-colors ${
                           active
                             ? 'bg-[#0B0F19] border-[#0B0F19] text-[#E5A93C]'
-                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-400'
+                            : 'bg-[#0B120E] border-emerald-500/20 text-slate-200 hover:border-emerald-500/45'
                         }`}
                       >
                         {preset.toLocaleString()}
@@ -532,7 +532,7 @@ export const OrdersDashboardView: React.FC<{
               <form onSubmit={handleDepositSubmit} className="space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Amount (KES)</label>
+                    <label className="block text-xs font-semibold text-slate-200 mb-1">Amount (KES)</label>
                     <input
                       type="number"
                       min={10}
@@ -540,25 +540,25 @@ export const OrdersDashboardView: React.FC<{
                       required
                       value={depositAmountKes}
                       onChange={(e) => setDepositAmountKes(e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                      className="w-full px-3 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none tabular-nums focus:outline-none focus:border-[#16E563]"
                       placeholder="500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">M-Pesa Number</label>
+                    <label className="block text-xs font-semibold text-slate-200 mb-1">M-Pesa Number</label>
                     <input
                       type="tel"
                       required
                       value={depositPhone}
                       onChange={(e) => setDepositPhone(e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                      className="w-full px-3 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
                       placeholder="0712345678"
                     />
                   </div>
                 </div>
 
                 {depositError && (
-                  <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700 flex items-start gap-2">
+                  <div className="p-3 bg-rose-500/12 border border-rose-500/30 rounded-lg text-xs text-rose-400 flex items-start gap-2">
                     <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                     <span>{depositError}</span>
                   </div>
@@ -568,20 +568,20 @@ export const OrdersDashboardView: React.FC<{
                   <div
                     className={`p-3 rounded-lg border text-xs space-y-1.5 ${
                       activeTx.status === 'completed'
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-200'
                         : activeTx.status === 'pending'
-                        ? 'bg-slate-50 border-slate-200 text-slate-800'
-                        : 'bg-amber-50 border-amber-200 text-amber-900'
+                        ? 'bg-[#070D0A] border-emerald-500/20 text-slate-100'
+                        : 'bg-[#F5B82E]/12 border-[#F5B82E]/30 text-amber-200'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 font-semibold">
                       <span className="inline-flex items-center gap-1.5">
                         {activeTx.status === 'pending' ? (
-                          <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-600" />
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#16E563]" />
                         ) : activeTx.status === 'completed' ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#16E563]" />
                         ) : (
-                          <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
+                          <AlertCircle className="w-3.5 h-3.5 text-[#F5B82E]" />
                         )}
                         <span className="capitalize">
                           {activeTx.tx_reference} · {activeTx.status}
@@ -632,25 +632,25 @@ export const OrdersDashboardView: React.FC<{
               </form>
             </div>
 
-            <div className="pt-3 border-t border-slate-100 flex items-center gap-2 text-[11px] text-slate-500">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <div className="pt-3 border-t border-emerald-500/10 flex items-center gap-2 text-[11px] text-slate-400">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#16E563] shrink-0" />
               <span>Encrypted Safaricom Daraja API · Instant receipt reconciliation</span>
             </div>
           </div>
         </div>
 
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
+        <div className="lg:col-span-7 bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">M-Pesa STK Transaction Feed</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-sm font-bold text-white">M-Pesa STK Transaction Feed</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
                 Real-time Daraja wallet deposits &amp; checkout confirmations
               </p>
             </div>
             <button
               type="button"
               onClick={() => void loadWalletSummary()}
-              className="px-3 py-1.5 border border-slate-300 bg-white hover:bg-slate-50 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
               <span>Sync</span>
@@ -660,11 +660,11 @@ export const OrdersDashboardView: React.FC<{
           <div className="p-6 flex-1 flex flex-col">
             {mpesaTxs.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-                <div className="w-11 h-11 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center mb-3">
+                <div className="w-11 h-11 rounded-lg bg-[#0E1712] text-slate-400 flex items-center justify-center mb-3">
                   <Smartphone className="w-5 h-5" />
                 </div>
-                <div className="text-sm font-semibold text-slate-900">No M-Pesa STK activity yet</div>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm">
+                <div className="text-sm font-semibold text-white">No M-Pesa STK activity yet</div>
+                <p className="text-xs text-slate-400 mt-1 max-w-sm">
                   Initiate a KES wallet deposit on the left or start a subscription via M-Pesa Daraja to track live callbacks and receipts here.
                 </p>
               </div>
@@ -672,7 +672,7 @@ export const OrdersDashboardView: React.FC<{
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                       <th className="py-2.5 pr-3">Reference</th>
                       <th className="py-2.5 pr-3">Phone</th>
                       <th className="py-2.5 pr-3 text-right">Amount</th>
@@ -681,31 +681,31 @@ export const OrdersDashboardView: React.FC<{
                       <th className="py-2.5 text-right">Check</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-emerald-500/10">
                     {mpesaTxs.slice(0, 8).map((tx) => (
-                      <tr key={tx.id} className="hover:bg-slate-50/70">
+                      <tr key={tx.id} className="hover:bg-emerald-500/10">
                         <td className="py-3 pr-3">
-                          <div className="font-mono font-semibold text-slate-900">{tx.tx_reference}</div>
+                          <div className="font-mono font-semibold text-white">{tx.tx_reference}</div>
                           <div className="text-[11px] text-slate-400">
                             {tx.purpose === 'wallet_deposit' ? 'Wallet Deposit' : 'Subscription Checkout'} ·{' '}
                             {tx.created_at.slice(0, 16)}
                           </div>
                         </td>
-                        <td className="py-3 pr-3 font-mono text-slate-600">+{tx.phone_number}</td>
-                        <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-slate-950">
+                        <td className="py-3 pr-3 font-mono text-slate-300">+{tx.phone_number}</td>
+                        <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-white">
                           KES {Number(tx.amount_kes).toLocaleString()}
                         </td>
-                        <td className="py-3 pr-3 font-mono text-slate-600">
+                        <td className="py-3 pr-3 font-mono text-slate-300">
                           {tx.mpesa_receipt_number || '—'}
                         </td>
                         <td className="py-3 pr-3 font-semibold capitalize">
                           <span
                             className={
                               tx.status === 'completed'
-                                ? 'text-emerald-700'
+                                ? 'text-[#16E563]'
                                 : tx.status === 'pending'
-                                ? 'text-amber-700'
-                                : 'text-rose-700'
+                                ? 'text-[#F5B82E]'
+                                : 'text-rose-400'
                             }
                           >
                             {tx.status}
@@ -736,11 +736,11 @@ export const OrdersDashboardView: React.FC<{
       </div>
 
       {/* Billing Ledger & Invoice History */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="text-base font-bold text-slate-950">Subscription Invoices &amp; Official Receipts</h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <h3 className="text-base font-bold text-white">Subscription Invoices &amp; Official Receipts</h3>
+            <p className="text-xs text-slate-400 mt-0.5">
               Complete billing ledger of Monthly, Quarterly, and Annual subscription invoices and renewals.
             </p>
           </div>
@@ -753,18 +753,18 @@ export const OrdersDashboardView: React.FC<{
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search invoice # or receipt..."
-                className="pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg bg-white focus:outline-none focus:border-slate-900 w-48"
+                className="pl-8 pr-3 py-1.5 text-xs border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563] w-48"
               />
             </div>
 
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
               {(['all', 'paid', 'processing', 'failed'] as const).map((f) => (
                 <button
                   key={f}
                   type="button"
                   onClick={() => setFilter(f)}
                   className={`px-2.5 py-1 text-xs font-semibold rounded-md capitalize cursor-pointer whitespace-nowrap shrink-0 ${
-                    filter === f ? 'bg-white text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    filter === f ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
                   }`}
                 >
                   {f}
@@ -777,13 +777,13 @@ export const OrdersDashboardView: React.FC<{
         <div className="p-6">
           {filtered.length === 0 ? (
             <div className="py-10 text-center space-y-3">
-              <div className="w-11 h-11 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <div className="w-11 h-11 rounded-lg bg-[#0E1712] text-slate-400 flex items-center justify-center mx-auto">
                 <Receipt className="w-5 h-5" />
               </div>
-              <div className="text-sm font-semibold text-slate-900">
+              <div className="text-sm font-semibold text-white">
                 {orders.length === 0 ? 'No subscription invoices yet' : 'No invoices match your filter'}
               </div>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
+              <p className="text-xs text-slate-400 max-w-md mx-auto">
                 {orders.length === 0
                   ? 'Subscribe to the ICT Market Analyzer or DRT Strategy Analyzer above to generate your first M-Pesa Daraja or Crypto subscription invoice.'
                   : 'Try clearing your search term or switching status tabs.'}
@@ -802,7 +802,7 @@ export const OrdersDashboardView: React.FC<{
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                  <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                     <th className="py-2.5 pr-4">Invoice &amp; Date</th>
                     <th className="py-2.5 pr-4">Subscription Plan &amp; Coverage</th>
                     <th className="py-2.5 pr-4">Method</th>
@@ -812,29 +812,29 @@ export const OrdersDashboardView: React.FC<{
                     <th className="py-2.5 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-emerald-500/10">
                   {filtered.map((o) => {
                     const planSpec = getPlanSpec(o.billing_cycle);
                     return (
-                    <tr key={o.id} className="hover:bg-slate-50/80">
+                    <tr key={o.id} className="hover:bg-emerald-500/10">
                       <td className="py-3 pr-4">
-                        <div className="font-mono text-xs font-semibold text-slate-950">
+                        <div className="font-mono text-xs font-semibold text-white">
                           {o.order_number}
                         </div>
-                        <div className="text-[11px] font-mono text-slate-500">
+                        <div className="text-[11px] font-mono text-slate-400">
                           {o.created_at.slice(0, 16).replace('T', ' ')}
                         </div>
                       </td>
                       <td className="py-3 pr-4 text-xs">
-                        <div className="font-semibold text-slate-900">{o.product_name}</div>
-                        <div className="text-[11px] font-mono text-slate-500 mt-0.5">
+                        <div className="font-semibold text-white">{o.product_name}</div>
+                        <div className="text-[11px] font-mono text-slate-400 mt-0.5">
                           {planSpec.label} ({o.duration_days || planSpec.durationDays}d)
                           {o.subscription_ends_at
                             ? ` · Valid thru ${formatShortDate(o.subscription_ends_at)}`
                             : ''}
                         </div>
                       </td>
-                      <td className="py-3 pr-4 text-xs uppercase font-mono text-slate-600">
+                      <td className="py-3 pr-4 text-xs uppercase font-mono text-slate-300">
                         <div>
                           {o.payment_method === 'mpesa'
                             ? 'M-Pesa Daraja'
@@ -844,7 +844,7 @@ export const OrdersDashboardView: React.FC<{
                           <div className="text-[11px] text-slate-400">+{o.mpesa_phone}</div>
                         )}
                       </td>
-                      <td className="py-3 pr-4 font-mono text-xs text-slate-600 max-w-[190px]">
+                      <td className="py-3 pr-4 font-mono text-xs text-slate-300 max-w-[190px]">
                         <div className="truncate">
                           {o.mpesa_receipt ||
                             o.crypto_tx_hash ||
@@ -852,37 +852,37 @@ export const OrdersDashboardView: React.FC<{
                             'Awaiting checkout'}
                         </div>
                         {o.mpesa_result_desc && o.payment_status !== 'paid' && (
-                          <div className="text-[11px] font-sans text-slate-500 truncate">
+                          <div className="text-[11px] font-sans text-slate-400 truncate">
                             {o.mpesa_result_desc}
                           </div>
                         )}
                       </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-950">
+                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-white">
                         <div>${Number(o.amount_usd).toFixed(2)}</div>
                         {Number(o.amount_kes) > 0 && (
-                          <div className="text-[11px] font-normal text-slate-500">
+                          <div className="text-[11px] font-normal text-slate-400">
                             KES {Number(o.amount_kes).toLocaleString()}
                           </div>
                         )}
                       </td>
                       <td className="py-3 pr-4">
                         {o.payment_status === 'paid' ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#16E563]">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             <span>Paid</span>
                           </span>
                         ) : o.payment_status === 'processing' ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#F5B82E]">
                             <Clock className="w-3.5 h-3.5" />
                             <span>Processing</span>
                           </span>
                         ) : o.payment_status === 'failed' || o.payment_status === 'refunded' ? (
-                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 capitalize">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-rose-400 capitalize">
                             <AlertCircle className="w-3.5 h-3.5" />
                             <span>{o.payment_status}</span>
                           </span>
                         ) : (
-                          <span className="text-xs font-semibold text-slate-500">Pending</span>
+                          <span className="text-xs font-semibold text-slate-400">Pending</span>
                         )}
                       </td>
                       <td className="py-3 text-right whitespace-nowrap space-x-2">
@@ -890,7 +890,7 @@ export const OrdersDashboardView: React.FC<{
                           <button
                             type="button"
                             onClick={() => setReceiptOrder(o)}
-                            className="px-2.5 py-1 border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold rounded-md inline-flex items-center gap-1 cursor-pointer"
+                            className="px-2.5 py-1 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-100 text-xs font-semibold rounded-md inline-flex items-center gap-1 cursor-pointer"
                           >
                             <Receipt className="w-3 h-3" />
                             <span>Receipt</span>
@@ -922,19 +922,19 @@ export const OrdersDashboardView: React.FC<{
       {/* Printable Official Receipt Modal */}
       {receiptOrder && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-5">
-            <div className="flex items-start justify-between border-b border-slate-200 pb-4">
+          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl max-w-md w-full p-6 shadow-2xl space-y-5">
+            <div className="flex items-start justify-between border-b border-emerald-500/20 pb-4">
               <div>
-                <div className="text-xs font-semibold text-emerald-700">Official Payment Receipt</div>
-                <h3 className="text-lg font-bold text-slate-950 mt-0.5">{merchantName}</h3>
-                <div className="text-xs font-mono text-slate-500 mt-0.5">
+                <div className="text-xs font-semibold text-[#16E563]">Official Payment Receipt</div>
+                <h3 className="text-lg font-bold text-white mt-0.5">{merchantName}</h3>
+                <div className="text-xs font-mono text-slate-400 mt-0.5">
                   {receiptOrder.order_number}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setReceiptOrder(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-800 rounded-lg cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer"
                 aria-label="Close receipt"
               >
                 <X className="w-5 h-5" />
@@ -942,64 +942,64 @@ export const OrdersDashboardView: React.FC<{
             </div>
 
             <div className="space-y-2.5 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Customer</span>
-                <span className="font-semibold text-slate-900">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Customer</span>
+                <span className="font-semibold text-white">
                   {user?.name || receiptOrder.user_name || 'Verified Trader'}
                 </span>
               </div>
               {user?.email && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Account Email</span>
-                  <span className="font-mono text-slate-800">{user.email}</span>
+                <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                  <span className="text-slate-400">Account Email</span>
+                  <span className="font-mono text-slate-100">{user.email}</span>
                 </div>
               )}
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Subscription Module</span>
-                <span className="font-semibold text-slate-900 text-right max-w-[220px]">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Subscription Module</span>
+                <span className="font-semibold text-white text-right max-w-[220px]">
                   {receiptOrder.product_name}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Billing Cycle</span>
-                <span className="font-mono text-slate-900">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Billing Cycle</span>
+                <span className="font-mono text-white">
                   {getPlanSpec(receiptOrder.billing_cycle).label} ({receiptOrder.duration_days || getPlanSpec(receiptOrder.billing_cycle).durationDays} days)
                 </span>
               </div>
               {receiptOrder.subscription_ends_at && (
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-500">Coverage Window</span>
-                  <span className="font-mono text-emerald-700">
+                <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                  <span className="text-slate-400">Coverage Window</span>
+                  <span className="font-mono text-[#16E563]">
                     {formatShortDate(receiptOrder.subscription_starts_at || receiptOrder.paid_at || receiptOrder.created_at)} – {formatShortDate(receiptOrder.subscription_ends_at)}
                   </span>
                 </div>
               )}
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Payment Method</span>
-                <span className="font-mono uppercase text-slate-900">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Payment Method</span>
+                <span className="font-mono uppercase text-white">
                   {receiptOrder.payment_method === 'mpesa'
                     ? 'Safaricom M-Pesa Daraja'
                     : `${receiptOrder.crypto_currency || 'Crypto'} (${receiptOrder.crypto_network || 'Mainnet'})`}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Confirmation Reference</span>
-                <span className="font-mono font-semibold text-emerald-700 break-all text-right max-w-[210px]">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Confirmation Reference</span>
+                <span className="font-mono font-semibold text-[#16E563] break-all text-right max-w-[210px]">
                   {receiptOrder.mpesa_receipt ||
                     receiptOrder.crypto_tx_hash ||
                     receiptOrder.mpesa_checkout_id ||
                     'Confirmed'}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-100">
-                <span className="text-slate-500">Paid Date</span>
-                <span className="font-mono text-slate-800">
+              <div className="flex justify-between py-1 border-b border-emerald-500/10">
+                <span className="text-slate-400">Paid Date</span>
+                <span className="font-mono text-slate-100">
                   {(receiptOrder.paid_at || receiptOrder.created_at).slice(0, 19).replace('T', ' ')} UTC
                 </span>
               </div>
               <div className="flex justify-between pt-2 text-sm">
-                <span className="font-bold text-slate-950">Total Settled</span>
-                <span className="font-mono font-bold tabular-nums text-slate-950">
+                <span className="font-bold text-white">Total Settled</span>
+                <span className="font-mono font-bold tabular-nums text-white">
                   ${Number(receiptOrder.amount_usd).toFixed(2)} USD
                   {Number(receiptOrder.amount_kes) > 0
                     ? ` (KES ${Number(receiptOrder.amount_kes).toLocaleString()})`
@@ -1020,7 +1020,7 @@ export const OrdersDashboardView: React.FC<{
               <button
                 type="button"
                 onClick={() => setReceiptOrder(null)}
-                className="py-2.5 px-4 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer"
+                className="py-2.5 px-4 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-200 text-xs font-semibold rounded-lg cursor-pointer"
               >
                 Close
               </button>
@@ -1102,8 +1102,8 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
 
   if (loading || !data) {
     return (
-      <div className="bg-white border border-slate-200 rounded-xl p-8 flex items-center gap-3 text-sm text-slate-600">
-        <Loader2 className="w-4 h-4 animate-spin text-amber-600" />
+      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-8 flex items-center gap-3 text-sm text-slate-300">
+        <Loader2 className="w-4 h-4 animate-spin text-[#F5B82E]" />
         <span>Syncing influencer partner ledger from cloud database...</span>
       </div>
     );
@@ -1251,54 +1251,54 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
 
       {/* 4-Column Partner Performance KPI Strip */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Tracked Link Clicks</span>
             <TrendingUp className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
             {data.clicks.toLocaleString()}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+          <div className="text-[11px] text-slate-400 mt-1 tabular-nums">
             {conversionRate}% click-to-signup rate
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Referred Traders</span>
             <Users className="w-4 h-4 text-slate-400" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
             {data.signups.length.toLocaleString()}
           </div>
-          <div className="text-[11px] text-slate-500 mt-1 tabular-nums">
+          <div className="text-[11px] text-slate-400 mt-1 tabular-nums">
             {paidConversions} paid subscription payment{paidConversions === 1 ? '' : 's'}
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Lifetime Commissions</span>
-            <DollarSign className="w-4 h-4 text-emerald-600" />
+            <DollarSign className="w-4 h-4 text-[#16E563]" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-emerald-700 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-[#16E563] mt-2">
             ${data.totalEarned.toFixed(2)}
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-slate-500 mt-1">
+          <div className="text-[11px] font-mono tabular-nums text-slate-400 mt-1">
             Disbursed: ${paidOutTotal.toFixed(2)}
           </div>
         </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+          <div className="flex items-center justify-between text-xs text-slate-400">
             <span>Available Balance</span>
-            <Wallet className="w-4 h-4 text-amber-600" />
+            <Wallet className="w-4 h-4 text-[#F5B82E]" />
           </div>
-          <div className="text-2xl font-bold font-mono tabular-nums text-slate-950 mt-2">
+          <div className="text-2xl font-bold font-mono tabular-nums text-white mt-2">
             ${data.availableBalance.toFixed(2)}
           </div>
-          <div className="text-[11px] font-mono tabular-nums text-slate-500 mt-1">
+          <div className="text-[11px] font-mono tabular-nums text-slate-400 mt-1">
             {pendingPayoutTotal > 0 ? `Pending queue: $${pendingPayoutTotal.toFixed(2)}` : 'Min payout $5.00'}
           </div>
         </div>
@@ -1308,23 +1308,23 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <form
           onSubmit={requestPayout}
-          className="lg:col-span-5 bg-white border border-slate-200 rounded-xl overflow-hidden"
+          className="lg:col-span-5 bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden"
         >
-          <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">Request Commission Payout</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-sm font-bold text-white">Request Commission Payout</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
                 Processed directly by the Grid Pips treasury desk
               </p>
             </div>
-            <span className="font-mono text-xs font-semibold tabular-nums text-emerald-700">
+            <span className="font-mono text-xs font-semibold tabular-nums text-[#16E563]">
               ${data.availableBalance.toFixed(2)} avail.
             </span>
           </div>
 
           <div className="p-6 space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">Payout Channel</label>
+              <label className="block text-xs font-semibold text-slate-200 mb-1.5">Payout Channel</label>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -1332,7 +1332,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                   className={`py-2 px-3 text-xs font-semibold rounded-lg border cursor-pointer transition-colors ${
                     method === 'mpesa'
                       ? 'bg-[#0B0F19] border-[#0B0F19] text-[#E5A93C]'
-                      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                      : 'bg-[#0B120E] border-emerald-500/25 text-slate-200 hover:bg-emerald-500/10'
                   }`}
                 >
                   M-Pesa (KES)
@@ -1343,7 +1343,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                   className={`py-2 px-3 text-xs font-semibold rounded-lg border cursor-pointer transition-colors ${
                     method === 'crypto'
                       ? 'bg-[#0B0F19] border-[#0B0F19] text-[#E5A93C]'
-                      : 'bg-white border-slate-300 text-slate-700 hover:bg-slate-50'
+                      : 'bg-[#0B120E] border-emerald-500/25 text-slate-200 hover:bg-emerald-500/10'
                   }`}
                 >
                   USDT (TRC20)
@@ -1352,7 +1352,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-200 mb-1">
                 {method === 'mpesa' ? 'M-Pesa Phone Number' : 'USDT TRC20 Wallet Address'}
               </label>
               <input
@@ -1360,20 +1360,20 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
                 placeholder={method === 'mpesa' ? '0712345678 or 254712345678' : 'T... (TRC20 address)'}
-                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg font-mono focus:outline-none focus:border-slate-900"
+                className="w-full px-3 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
               />
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-1">
-                <label className="block text-xs font-semibold text-slate-700">
+                <label className="block text-xs font-semibold text-slate-200">
                   Amount (USD · Min $5.00)
                 </label>
                 {data.availableBalance >= 5 && (
                   <button
                     type="button"
                     onClick={() => setAmountUsd(data.availableBalance.toFixed(2))}
-                    className="text-[11px] font-semibold text-amber-700 hover:text-amber-800 cursor-pointer"
+                    className="text-[11px] font-semibold text-[#F5B82E] hover:text-[#F5B82E] cursor-pointer"
                   >
                     Use Max (${data.availableBalance.toFixed(2)})
                   </button>
@@ -1386,10 +1386,10 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                 required
                 value={amountUsd}
                 onChange={(e) => setAmountUsd(e.target.value)}
-                className="w-full px-3 py-2.5 text-sm border border-slate-300 rounded-lg font-mono tabular-nums focus:outline-none focus:border-slate-900"
+                className="w-full px-3 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none tabular-nums focus:outline-none focus:border-[#16E563]"
               />
               {method === 'mpesa' && Number(amountUsd) > 0 && (
-                <div className="text-[11px] font-mono text-slate-500 mt-1 tabular-nums">
+                <div className="text-[11px] font-mono text-slate-400 mt-1 tabular-nums">
                   Estimated M-Pesa disbursement: KES{' '}
                   {Math.round(Number(amountUsd) * usdKesRate).toLocaleString()} (@ {usdKesRate} KES/USD)
                 </div>
@@ -1400,14 +1400,14 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
               <div
                 className={`p-3 rounded-lg border text-xs flex items-start gap-2 ${
                   feedback.type === 'success'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                    : 'bg-rose-50 border-rose-200 text-rose-800'
+                    ? 'bg-emerald-500/12 border-emerald-500/30 text-emerald-200'
+                    : 'bg-rose-500/12 border-rose-500/30 text-rose-300'
                 }`}
               >
                 {feedback.type === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-[#16E563]" />
                 ) : (
-                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
                 )}
                 <span>{feedback.text}</span>
               </div>
@@ -1426,29 +1426,29 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
               href={config.telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-center text-xs text-slate-500 hover:text-slate-900 pt-1"
+              className="block text-center text-xs text-slate-400 hover:text-white pt-1"
             >
               Partner support via Telegram <ArrowUpRight className="w-3 h-3 inline" />
             </a>
           </div>
         </form>
 
-        <div className="lg:col-span-7 bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div className="lg:col-span-7 bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-slate-950">Partner Activity Ledger</h3>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <h3 className="text-sm font-bold text-white">Partner Activity Ledger</h3>
+              <p className="text-xs text-slate-400 mt-0.5">
                 Track referred trader signups, recurring subscription commissions, and disbursement status
               </p>
             </div>
-            <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg">
+            <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
               <button
                 type="button"
                 onClick={() => setActiveLedgerTab('signups')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
                   activeLedgerTab === 'signups'
-                    ? 'bg-white text-slate-950 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-[#16E563] text-[#041108] font-bold'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Referred Traders ({data.signups.length})
@@ -1458,8 +1458,8 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                 onClick={() => setActiveLedgerTab('payouts')}
                 className={`px-3 py-1.5 text-xs font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
                   activeLedgerTab === 'payouts'
-                    ? 'bg-white text-slate-950 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
+                    ? 'bg-[#16E563] text-[#041108] font-bold'
+                    : 'text-slate-300 hover:text-white'
                 }`}
               >
                 Payout History ({data.payouts.length})
@@ -1471,11 +1471,11 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
             {activeLedgerTab === 'signups' ? (
               data.signups.length === 0 ? (
                 <div className="py-10 text-center space-y-2">
-                  <div className="w-11 h-11 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                  <div className="w-11 h-11 rounded-lg bg-[#0E1712] text-slate-400 flex items-center justify-center mx-auto">
                     <Users className="w-5 h-5" />
                   </div>
-                  <div className="text-sm font-semibold text-slate-900">No referred traders yet</div>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                  <div className="text-sm font-semibold text-white">No referred traders yet</div>
+                  <p className="text-xs text-slate-400 max-w-sm mx-auto">
                     Copy your referral link or promo pitch above to start tracking signups and earning {data.commissionPct}% commissions.
                   </p>
                 </div>
@@ -1483,7 +1483,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
                     <thead>
-                      <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                      <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                         <th className="py-2.5 pr-3">Trader</th>
                         <th className="py-2.5 pr-3">Exness ID</th>
                         <th className="py-2.5 pr-3">Unlocked</th>
@@ -1491,23 +1491,23 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                         <th className="py-2.5 text-right">Joined</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-emerald-500/10">
                       {data.signups.map((s) => (
-                        <tr key={s.id} className="hover:bg-slate-50/70">
+                        <tr key={s.id} className="hover:bg-emerald-500/10">
                           <td className="py-3 pr-3">
-                            <div className="font-semibold text-slate-900">{s.name}</div>
+                            <div className="font-semibold text-white">{s.name}</div>
                             {s.email && <div className="text-[11px] text-slate-400">{s.email}</div>}
                           </td>
-                          <td className="py-3 pr-3 font-mono text-slate-600">{s.exness_account_id}</td>
-                          <td className="py-3 pr-3 text-slate-700 font-medium">
+                          <td className="py-3 pr-3 font-mono text-slate-300">{s.exness_account_id}</td>
+                          <td className="py-3 pr-3 text-slate-200 font-medium">
                             {[s.has_analyzer ? 'ICT Analyzer' : null, s.has_ea_bots ? 'DRT Analyzer' : null]
                               .filter(Boolean)
                               .join(' · ') || 'Free Tier'}
                           </td>
-                          <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-emerald-700">
+                          <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-[#16E563]">
                             ${Number(s.commission_earned_usd || 0).toFixed(2)}
                           </td>
-                          <td className="py-3 text-right font-mono text-slate-500">
+                          <td className="py-3 text-right font-mono text-slate-400">
                             {s.created_at.slice(0, 10)}
                           </td>
                         </tr>
@@ -1518,11 +1518,11 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
               )
             ) : data.payouts.length === 0 ? (
               <div className="py-10 text-center space-y-2">
-                <div className="w-11 h-11 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                <div className="w-11 h-11 rounded-lg bg-[#0E1712] text-slate-400 flex items-center justify-center mx-auto">
                   <Wallet className="w-5 h-5" />
                 </div>
-                <div className="text-sm font-semibold text-slate-900">No payout requests yet</div>
-                <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                <div className="text-sm font-semibold text-white">No payout requests yet</div>
+                <p className="text-xs text-slate-400 max-w-sm mx-auto">
                   Once your available balance reaches $5.00, submit a payout via M-Pesa or USDT TRC20 on the left to track settlement here.
                 </p>
               </div>
@@ -1530,7 +1530,7 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500">
+                    <tr className="border-b border-emerald-500/20 text-[11px] uppercase tracking-wider text-slate-400">
                       <th className="py-2.5 pr-3">Date</th>
                       <th className="py-2.5 pr-3">Channel</th>
                       <th className="py-2.5 pr-3">Destination</th>
@@ -1538,27 +1538,27 @@ export const ReferralsHubView: React.FC<{ config: PublicConfig }> = ({ config })
                       <th className="py-2.5 text-right">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-emerald-500/10">
                     {data.payouts.map((p) => (
-                      <tr key={p.id} className="hover:bg-slate-50/70">
-                        <td className="py-3 pr-3 font-mono text-slate-600">
+                      <tr key={p.id} className="hover:bg-emerald-500/10">
+                        <td className="py-3 pr-3 font-mono text-slate-300">
                           {p.created_at.slice(0, 10)}
                         </td>
-                        <td className="py-3 pr-3 font-mono uppercase text-slate-700">{p.method}</td>
-                        <td className="py-3 pr-3 font-mono text-slate-600 max-w-[180px] truncate">
+                        <td className="py-3 pr-3 font-mono uppercase text-slate-200">{p.method}</td>
+                        <td className="py-3 pr-3 font-mono text-slate-300 max-w-[180px] truncate">
                           {p.destination}
                         </td>
-                        <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-slate-950">
+                        <td className="py-3 pr-3 text-right font-mono tabular-nums font-semibold text-white">
                           ${Number(p.amount_usd).toFixed(2)}
                         </td>
                         <td className="py-3 text-right font-semibold capitalize">
                           <span
                             className={
                               p.status === 'paid'
-                                ? 'text-emerald-700'
+                                ? 'text-[#16E563]'
                                 : p.status === 'rejected'
-                                ? 'text-rose-700'
-                                : 'text-amber-700'
+                                ? 'text-rose-400'
+                                : 'text-[#F5B82E]'
                             }
                           >
                             {p.status}
@@ -1588,28 +1588,28 @@ export const EmailsInboxView: React.FC = () => {
   }, []);
 
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between gap-2">
-        <h3 className="text-base font-bold text-slate-950 flex items-center gap-2">
-          <Mail className="w-4 h-4 text-amber-600" />
+    <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
+      <div className="px-6 py-4 border-b border-emerald-500/20 flex items-center justify-between gap-2">
+        <h3 className="text-base font-bold text-white flex items-center gap-2">
+          <Mail className="w-4 h-4 text-[#F5B82E]" />
           <span>Automated Email Notifications</span>
         </h3>
-        <span className="text-xs text-slate-500">Dispatched on sign-in, purchases &amp; payouts</span>
+        <span className="text-xs text-slate-400">Dispatched on sign-in, purchases &amp; payouts</span>
       </div>
       <div className="p-6">
         {emails.length === 0 ? (
-          <p className="text-sm text-slate-500">No automated emails logged yet.</p>
+          <p className="text-sm text-slate-400">No automated emails logged yet.</p>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-emerald-500/10">
             {emails.map((em) => (
               <div key={em.id} className="py-3.5 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-slate-950">{em.subject}</span>
-                  <span className="text-xs font-mono text-slate-500">
+                  <span className="text-sm font-semibold text-white">{em.subject}</span>
+                  <span className="text-xs font-mono text-slate-400">
                     {em.category} · {em.delivery_status} · {em.created_at}
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 mt-1">{em.body_preview}</p>
+                <p className="text-xs text-slate-300 mt-1">{em.body_preview}</p>
               </div>
             ))}
           </div>
