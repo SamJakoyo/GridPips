@@ -12,6 +12,7 @@ async function startServer() {
   const isProd = process.env.NODE_ENV === 'production' && fs.existsSync(path.resolve(process.cwd(), 'dist'));
 
   if (!isProd) {
+    app.use(express.static(path.resolve(process.cwd(), 'public')));
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
