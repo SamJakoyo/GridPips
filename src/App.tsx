@@ -1,33 +1,40 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, MotionConfig, motion } from 'motion/react';
 import {
   Activity,
   BarChart3,
+  Bell,
   BookOpen,
   Calculator,
   Calendar,
   CandlestickChart,
   CheckSquare,
   CreditCard,
+  Crown,
   Layers,
   LayoutDashboard,
   LogOut,
   Mail,
   Menu,
   NotebookPen,
+  Search,
   Send,
   Shield,
+  TrendingUp,
+  Trophy,
   Users,
   X,
   ArrowUpRight,
   UserCircle,
   Check,
+  Wallet,
 } from 'lucide-react';
 import {
   apiFetch,
   clearSessionToken,
   setSessionToken,
   INITIAL_MARKET_QUOTES,
+  type MarketMiniBar,
   type MarketSymbolQuote,
   type TradingViewMarketStatus,
 } from './lib/api';
@@ -119,6 +126,8 @@ export default function App() {
   const [chartTimeframe, setChartTimeframe] = useState<AnalyzerTimeframe>('1M');
   const [drtSymbol, setDrtSymbol] = useState('EURUSD');
   const [drtTimeframe, setDrtTimeframe] = useState<AnalyzerTimeframe>('15M');
+  const [assetSearch, setAssetSearch] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
 
   const [checkoutState, setCheckoutState] = useState<{
     productKey: 'analyzer' | 'drt_analyzer' | 'ea_bots';
@@ -223,7 +232,7 @@ export default function App() {
       .finally(() => setBooting(false));
   }, [loadUserWorkspaceData]);
 
-  // Live TradingView market quote & session status polling (no synthetic random ticks)
+  // Live TradingView market quote & session status polling
   useEffect(() => {
     let active = true;
     const syncQuotes = async () => {
@@ -280,9 +289,17 @@ export default function App() {
     });
   }
 
+  const filteredSearchQuotes = useMemo(() => {
+    const q = assetSearch.trim().toLowerCase();
+    if (!q) return quotes.slice(0, 6);
+    return quotes
+      .filter((item) => item.sym.toLowerCase().includes(q) || item.name.toLowerCase().includes(q))
+      .slice(0, 6);
+  }, [assetSearch, quotes]);
+
   if (booting) {
     return (
-      <div className="min-h-screen bg-[#F7F5F0] flex items-center justify-center text-sm font-mono text-amber-700">
+      <div className="min-h-screen bg-[#050907] flex items-center justify-center text-sm font-mono text-[#16E563]">
         Initializing Grid Pips...
       </div>
     );
@@ -344,6 +361,10 @@ export default function App() {
     );
   }
 
+  const hasDrt = Boolean(user.hasDrtAnalyzer ?? user.hasEaBots);
+  const bothProActive = Boolean(user.hasAnalyzer && hasDrt);
+  const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
+
   const navGroups: Array<{
     label: string;
     items: Array<{ id: WorkspaceTab; name: string; icon: React.ReactNode; tag?: string }>;
@@ -366,11 +387,11 @@ export default function App() {
           id: 'drt',
           name: 'DRT Analyzer',
           icon: <Layers className="w-4 h-4" />,
-          tag: (user.hasDrtAnalyzer ?? user.hasEaBots)
+          tag: hasDrt
             ? 'Active'
             : (user.drtAnalyzerSubscriptionStatus ?? user.eaBotsSubscriptionStatus) === 'expired'
             ? 'Expired'
-            : `$${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo`,
+            : `$${drtPriceUsd.toFixed(2)}/mo`,
         },
         { id: 'orders', name: 'Subscriptions & Billing', icon: <CreditCard className="w-4 h-4" /> },
       ],
@@ -385,7 +406,7 @@ export default function App() {
         { id: 'paper', name: 'Paper Trading', icon: <Activity className="w-4 h-4" /> },
         { id: 'plan', name: 'Trading Plan', icon: <CheckSquare className="w-4 h-4" /> },
         { id: 'calendar', name: 'Calendar', icon: <Calendar className="w-4 h-4" /> },
-        { id: 'education', name: 'ICT & SMC Academy', icon: <BookOpen className="w-4 h-4" /> },
+        { id: 'education', name: 'ICT & DRT Academy', icon: <BookOpen className="w-4 h-4" /> },
       ],
     },
     {
@@ -400,9 +421,6 @@ export default function App() {
       ],
     },
   ];
-
-  const currentTabTitle =
-    navGroups.flatMap((g) => g.items).find((i) => i.id === activeTab)?.name || 'Dashboard';
 
   const firstName = (user.name || user.email || 'Trader').trim().split(/\s+/)[0];
   const userInitials = (user.name || user.email || 'GP')
@@ -419,29 +437,40 @@ export default function App() {
     : 'Checking live TradingView market sessions...';
 
   const marketStatusStyle = !marketStatus
-    ? 'bg-slate-50 border-slate-200 text-slate-600'
+    ? 'bg-[#0E1712] border-emerald-500/20 text-slate-400'
     : marketStatus.traditionalOpen
-    ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+    ? 'bg-[#0C1E14] border-[#16E563]/35 text-[#16E563]'
     : marketStatus.cryptoOpen
-    ? 'bg-amber-50 border-amber-200 text-amber-800'
-    : 'bg-rose-50 border-rose-200 text-rose-700';
+    ? 'bg-[#1A1508] border-[#F5B82E]/35 text-[#F5B82E]'
+    : 'bg-rose-950/50 border-rose-500/30 text-rose-300';
+
+  const pendingOrdersCount = orders.filter(
+    (o) => o.payment_status === 'pending' || o.payment_status === 'processing'
+  ).length;
 
   return (
-    <div className="min-h-screen bg-[#F7F5F0] text-slate-900 flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white border-r border-slate-200 sticky top-0 h-screen shrink-0">
-        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between gap-2">
+    <div
+      className="min-h-screen bg-[#050907] text-slate-100 flex"
+      style={{
+        backgroundImage:
+          'radial-gradient(circle at 80% 0%, rgba(22, 229, 99, 0.1), transparent 40%)',
+      }}
+    >
+      {/* Desktop Obsidian Emerald Sidebar matching the exact artwork */}
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-[#080E0B] border-r border-emerald-500/15 sticky top-0 h-screen shrink-0">
+        <div className="h-16 px-4 border-b border-emerald-500/15 flex items-center justify-between gap-2">
           <button
+            type="button"
             onClick={() => setScreen('landing')}
             className="cursor-pointer shrink-0"
           >
-            <BrandLogo variant="dark" size="sm" />
+            <BrandLogo variant="light" size="sm" />
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('account')}
             title="View my account information"
-            className="text-[11px] font-mono text-slate-500 hover:text-amber-600 truncate cursor-pointer"
+            className="text-[11px] font-mono text-slate-400 hover:text-[#16E563] truncate cursor-pointer"
           >
             {user.exnessAccountId}
           </button>
@@ -451,31 +480,34 @@ export default function App() {
           {navGroups.map((group) => (
             <div key={group.label}>
               <div className="px-3 text-[11px] font-medium text-slate-500 mb-1.5">{group.label}</div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {group.items.map((item) => {
                   const isActive = activeTab === item.id;
                   return (
                     <button
+                      type="button"
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? 'bg-amber-50 border border-amber-200 text-slate-950'
-                          : 'border border-transparent text-slate-600 hover:text-slate-950 hover:bg-slate-100'
+                          ? 'bg-[#16E563] text-[#041108] font-bold shadow-[0_0_22px_rgba(22,229,99,0.25)]'
+                          : 'text-slate-300 font-medium hover:text-white hover:bg-emerald-500/10'
                       }`}
                     >
                       <span className="flex items-center gap-2.5 min-w-0">
-                        <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
+                        <span className={isActive ? 'text-[#041108]' : 'text-slate-400'}>
                           {item.icon}
                         </span>
                         <span className="truncate">{item.name}</span>
                       </span>
                       {item.tag && (
                         <span
-                          className={`font-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${
-                            item.tag === 'Active'
-                              ? 'border-amber-200 bg-amber-50 text-amber-700'
-                              : 'border-slate-200 bg-slate-100 text-slate-600'
+                          className={`font-mono text-[10px] shrink-0 ${
+                            isActive
+                              ? 'text-[#041108] font-bold'
+                              : item.tag === 'Active'
+                              ? 'text-[#16E563]'
+                              : 'text-slate-400'
                           }`}
                         >
                           {item.tag}
@@ -489,22 +521,43 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="p-3.5 border-t border-slate-200 space-y-2">
-          <a
-            href={config.telegramUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-2.5 px-3 bg-slate-50 border border-slate-200 hover:border-amber-400 text-slate-800 text-xs font-medium rounded-lg flex items-center justify-between transition-colors"
-          >
-            <span className="inline-flex items-center gap-2">
-              <Send className="w-3.5 h-3.5 text-amber-600" />
-              JakoyoFX Telegram
-            </span>
-            <ArrowUpRight className="w-3.5 h-3.5 text-slate-400" />
-          </a>
+        {/* Bottom VIP Gold "Go Pro" Card matching the exact sidebar artwork */}
+        <div className="p-3.5 border-t border-emerald-500/15 space-y-2.5">
+          <div className="rounded-xl p-3.5 bg-gradient-to-br from-[#241A08] via-[#151108] to-[#0A0F0C] border border-[#F5B82E]/40 space-y-2.5">
+            <div className="flex items-center gap-2.5">
+              <span className="w-8 h-8 rounded-lg bg-[#F5B82E]/15 border border-[#F5B82E]/40 flex items-center justify-center shrink-0">
+                <Crown className="w-4 h-4 text-[#F5B82E]" />
+              </span>
+              <div className="min-w-0">
+                <div className="text-xs font-bold text-white leading-tight">
+                  {bothProActive ? 'Pro VIP Active' : 'Go Pro'}
+                </div>
+                <div className="text-[11px] text-amber-200/75 truncate">
+                  {bothProActive ? 'ICT & DRT Unlocked' : 'Unlock ICT & DRT'}
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!user.hasAnalyzer) {
+                  setCheckoutState({ productKey: 'analyzer', billingCycle: 'monthly' });
+                } else if (!hasDrt) {
+                  setCheckoutState({ productKey: 'drt_analyzer', billingCycle: 'monthly' });
+                } else {
+                  setActiveTab('orders');
+                }
+              }}
+              className="w-full py-2 px-3 rounded-lg bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-xs font-bold transition-colors cursor-pointer"
+            >
+              {bothProActive ? 'Manage Plans →' : 'Upgrade Now →'}
+            </button>
+          </div>
+
           <button
+            type="button"
             onClick={handleLogout}
-            className="w-full py-2 px-3 text-xs font-medium text-slate-500 hover:text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
+            className="w-full py-1.5 px-3 text-xs font-medium text-slate-400 hover:text-rose-400 flex items-center gap-2 cursor-pointer transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign out ({firstName})
@@ -516,16 +569,17 @@ export default function App() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-black/50"
+            className="fixed inset-0 bg-black/75"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 bg-white border-r border-slate-200 h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
+          <div className="relative w-72 bg-[#080E0B] border-r border-emerald-500/20 h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
             <div>
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
-                <BrandLogo variant="dark" size="sm" />
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-emerald-500/15">
+                <BrandLogo variant="light" size="sm" />
                 <button
+                  type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 text-slate-500 hover:text-slate-950"
+                  className="p-1.5 text-slate-400 hover:text-white"
                   aria-label="Close menu"
                 >
                   <X className="w-5 h-5" />
@@ -541,24 +595,29 @@ export default function App() {
                       const isActive = activeTab === item.id;
                       return (
                         <button
+                          type="button"
                           key={item.id}
                           onClick={() => {
                             setActiveTab(item.id);
                             setMobileMenuOpen(false);
                           }}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium ${
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs ${
                             isActive
-                              ? 'bg-amber-50 border border-amber-200 text-slate-950'
-                              : 'text-slate-600 hover:text-slate-950'
+                              ? 'bg-[#16E563] text-[#041108] font-bold'
+                              : 'text-slate-300 font-medium hover:text-white'
                           }`}
                         >
                           <span className="flex items-center gap-2.5">
-                            <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
+                            <span className={isActive ? 'text-[#041108]' : 'text-slate-400'}>
                               {item.icon}
                             </span>
                             <span>{item.name}</span>
                           </span>
-                          {item.tag && <span className="font-mono text-[10px] text-amber-600">{item.tag}</span>}
+                          {item.tag && (
+                            <span className={`font-mono text-[10px] ${isActive ? 'text-[#041108]' : 'text-[#16E563]'}`}>
+                              {item.tag}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -567,8 +626,9 @@ export default function App() {
               </div>
             </div>
             <button
+              type="button"
               onClick={handleLogout}
-              className="mt-6 w-full py-2.5 border border-slate-200 bg-slate-50 rounded-lg text-xs font-semibold text-rose-600"
+              className="mt-6 w-full py-2.5 border border-rose-500/30 bg-rose-950/30 rounded-xl text-xs font-semibold text-rose-300"
             >
               Sign out
             </button>
@@ -578,66 +638,119 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Context Header */}
-        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-sm border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
-          <div className="flex items-center gap-3 min-w-0">
+        {/* Top Obsidian Context Header matching the exact dashboard top bar */}
+        <header className="sticky top-0 z-30 h-16 bg-[#080E0B]/95 backdrop-blur-md border-b border-emerald-500/15 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 flex-1 min-w-0 max-w-md">
             <button
+              type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-700"
+              className="lg:hidden p-2 -ml-2 text-slate-300 hover:text-white"
               aria-label="Open navigation"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <div className="text-sm font-medium text-slate-500 truncate">
-              Grid Pips / <span className="font-semibold text-slate-950">{currentTabTitle}</span>
+
+            {/* Functional Asset & Market Search */}
+            <div className="relative flex-1 min-w-0">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={assetSearch}
+                onFocus={() => setSearchFocused(true)}
+                onBlur={() => window.setTimeout(() => setSearchFocused(false), 180)}
+                onChange={(e) => setAssetSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && filteredSearchQuotes.length > 0) {
+                    const top = filteredSearchQuotes[0];
+                    setChartSymbol(top.sym);
+                    setActiveTab('charts');
+                    setAssetSearch('');
+                    setSearchFocused(false);
+                  }
+                }}
+                placeholder="Search assets, markets (XAUUSD, EURUSD, BTCUSD)..."
+                aria-label="Search assets and markets"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-[#0E1712] border border-emerald-500/20 focus:border-[#16E563] text-white placeholder:text-slate-500 rounded-xl focus:outline-none transition-colors"
+              />
+              {searchFocused && filteredSearchQuotes.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#0B120E] border border-emerald-500/30 rounded-xl shadow-2xl overflow-hidden z-40">
+                  {filteredSearchQuotes.map((item) => {
+                    const up = item.chgPct >= 0;
+                    return (
+                      <button
+                        type="button"
+                        key={item.sym}
+                        onMouseDown={() => {
+                          setChartSymbol(item.sym);
+                          setActiveTab('charts');
+                          setAssetSearch('');
+                          setSearchFocused(false);
+                        }}
+                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs hover:bg-emerald-500/10 cursor-pointer border-b last:border-b-0 border-emerald-500/10"
+                      >
+                        <span className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono font-bold text-white">{item.sym}</span>
+                          <span className="text-slate-400 truncate">{item.name}</span>
+                        </span>
+                        <span className="font-mono tabular-nums flex items-center gap-2 shrink-0">
+                          <span className="text-slate-200">{item.price.toFixed(item.digits)}</span>
+                          <span className={up ? 'text-[#16E563]' : 'text-rose-400'}>
+                            {up ? '+' : ''}
+                            {item.chgPct.toFixed(2)}%
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={() => setActiveTab('charts')}
               title={marketStatusTooltip}
-              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${marketStatusStyle}`}
+              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium whitespace-nowrap cursor-pointer transition-colors ${marketStatusStyle}`}
             >
               <span>{marketStatus ? marketStatus.summaryLabel : 'Checking TradingView…'}</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('emails')}
+              title="Notifications & Email Inbox"
+              className="relative p-2 rounded-xl bg-[#0E1712] border border-emerald-500/20 hover:border-[#16E563] text-slate-300 hover:text-white cursor-pointer transition-colors"
+              aria-label="Open notifications inbox"
+            >
+              <Bell className="w-4 h-4" />
+              {pendingOrdersCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-white font-mono text-[10px] font-bold flex items-center justify-center">
+                  {pendingOrdersCount}
+                </span>
+              )}
+            </button>
+
             <button
               type="button"
               onClick={() => setActiveTab('account')}
               title="My Information"
-              className={`hidden sm:inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === 'account'
-                  ? 'bg-amber-50 border-amber-500 text-slate-950'
-                  : 'bg-slate-50 border-slate-200 hover:border-amber-400 text-slate-700'
+                  ? 'bg-[#16E563]/15 border-[#16E563] text-white'
+                  : 'bg-[#0E1712] border-emerald-500/20 hover:border-[#16E563] text-slate-200'
               }`}
             >
-              <span className="w-5 h-5 rounded bg-[#E5A93C] text-[#090806] font-bold text-[10px] flex items-center justify-center">
+              <span className="w-6 h-6 rounded-full bg-[#16E563] text-[#041108] font-bold text-[10px] flex items-center justify-center">
                 {userInitials || 'GP'}
               </span>
-              <span>{firstName}</span>
+              <span className="hidden sm:inline max-w-[120px] truncate">{user.name || firstName}</span>
             </button>
-            <a
-              href={config.exnessIbUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-slate-50 border border-slate-200 hover:border-slate-300 text-xs font-medium text-slate-800 rounded-lg whitespace-nowrap transition-colors"
-            >
-              Exness Portal
-              <ArrowUpRight className="w-3.5 h-3.5 text-slate-500" />
-            </a>
-            {!user.hasAnalyzer && (
-              <button
-                onClick={() => setCheckoutState({ productKey: 'analyzer', billingCycle: 'monthly' })}
-                className="px-3.5 py-1.5 bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs font-semibold rounded-lg whitespace-nowrap cursor-pointer transition-colors"
-              >
-                Subscribe ICT (${config.analyzerPriceUsd.toFixed(2)}/mo)
-              </button>
-            )}
           </div>
         </header>
 
-        <main className="p-6 max-w-7xl w-full mx-auto flex-1">
+        <main className="p-4 sm:p-6 max-w-7xl w-full mx-auto flex-1">
           <MotionConfig reducedMotion="user">
             <AnimatePresence mode="wait">
               <motion.div
@@ -851,24 +964,6 @@ function getKillzoneTimelineState(now: Date) {
   return { activeKey, detail, nyTimeFormatted };
 }
 
-const HERO_CANDLES = [
-  { x: 18, yOpen: 112, yClose: 104, yHigh: 96, yLow: 120, up: true },
-  { x: 46, yOpen: 104, yClose: 115, yHigh: 98, yLow: 124, up: false },
-  { x: 74, yOpen: 113, yClose: 99, yHigh: 90, yLow: 118, up: true },
-  { x: 102, yOpen: 99, yClose: 85, yHigh: 78, yLow: 106, up: true },
-  { x: 130, yOpen: 86, yClose: 96, yHigh: 81, yLow: 102, up: false },
-  { x: 158, yOpen: 94, yClose: 74, yHigh: 66, yLow: 98, up: true },
-  { x: 186, yOpen: 75, yClose: 66, yHigh: 56, yLow: 82, up: true },
-  { x: 214, yOpen: 67, yClose: 80, yHigh: 61, yLow: 87, up: false },
-  { x: 242, yOpen: 78, yClose: 55, yHigh: 46, yLow: 83, up: true },
-  { x: 270, yOpen: 55, yClose: 36, yHigh: 25, yLow: 60, up: true },
-  { x: 298, yOpen: 36, yClose: 45, yHigh: 29, yLow: 52, up: false },
-  { x: 326, yOpen: 44, yClose: 22, yHigh: 12, yLow: 49, up: true },
-];
-
-const HERO_TREND_PATH =
-  'M 18 108 L 46 110 L 74 104 L 102 90 L 130 92 L 158 82 L 186 69 L 214 75 L 242 60 L 270 42 L 298 41 L 326 27';
-
 const WorkspaceOverview: React.FC<{
   user: User;
   config: PublicConfig;
@@ -885,10 +980,38 @@ const WorkspaceOverview: React.FC<{
   const [tickDirs, setTickDirs] = useState<Record<string, 'up' | 'down'>>({});
   const [tickSeq, setTickSeq] = useState(0);
 
+  // Market Overview interactive chart state matching the exact dashboard artwork
+  const [overviewSym, setOverviewSym] = useState<string>('XAUUSD');
+  const [overviewTf, setOverviewTf] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1D');
+  const [overviewBars, setOverviewBars] = useState<MarketMiniBar[]>([]);
+  const [loadingBars, setLoadingBars] = useState(true);
+
   useEffect(() => {
     const id = window.setInterval(() => setNyClock(new Date()), 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingBars(true);
+    apiFetch<{ bars: MarketMiniBar[] }>(
+      `/api/market/mini-candles?symbol=${encodeURIComponent(overviewSym)}&tf=${encodeURIComponent(overviewTf)}`
+    )
+      .then((res) => {
+        if (!cancelled && Array.isArray(res.bars)) {
+          setOverviewBars(res.bars.slice(-28));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOverviewBars([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingBars(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [overviewSym, overviewTf]);
 
   useEffect(() => {
     const nextDirs: Record<string, 'up' | 'down'> = {};
@@ -910,610 +1033,595 @@ const WorkspaceOverview: React.FC<{
   }, [quotes]);
 
   const totalPnl = journal.reduce((acc, t) => acc + Number(t.pnl || 0), 0);
+  const winningTrades = journal.filter((t) => Number(t.pnl || 0) > 0).length;
+  const winRatePct = journal.length > 0 ? Math.round((winningTrades / journal.length) * 100) : 0;
+
   const firstName = (user.name || user.email || 'Trader').trim().split(/\s+/)[0];
-  const featuredGold = quotes.find((q) => q.sym === 'XAUUSD') || quotes[0];
-  const featuredUp = (featuredGold?.chgPct ?? 0) >= 0;
-  const featuredTickDir = featuredGold ? tickDirs[featuredGold.sym] : undefined;
+  const userInitials = (user.name || user.email || 'GP')
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('');
+
+  const selectedQuote = quotes.find((q) => q.sym === overviewSym) || quotes[0];
   const killzone = getKillzoneTimelineState(nyClock);
   const hasDrt = Boolean(user.hasDrtAnalyzer ?? user.hasEaBots);
   const drtDaysRemaining = user.drtAnalyzerDaysRemaining ?? user.eaBotsDaysRemaining;
   const drtStatus = user.drtAnalyzerSubscriptionStatus ?? user.eaBotsSubscriptionStatus;
   const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
 
-  let heroSubtext =
-    'Scan live TradingView liquidity sweeps in the ICT Analyzer, map 4-quadrant Dealing Ranges & PD Arrays in the DRT Analyzer, and log every setup in one desk.';
-  if (user.hasAnalyzer && hasDrt) {
-    heroSubtext = 'Both your ICT Strategy Analyzer and DRT Strategy Analyzer are active. Pick up where you left off.';
-  } else if (user.hasAnalyzer) {
-    heroSubtext = 'Your ICT Strategy Analyzer is active and synced with live TradingView data.';
-  } else if (hasDrt) {
-    heroSubtext = 'Your DRT Strategy Analyzer (Dealing Range Theory) is active and ready to scan 4-quadrant PD Arrays.';
-  }
+  const topAssets = useMemo(() => {
+    const order = ['BTCUSD', 'XAUUSD', 'EURUSD', 'NAS100', 'GBPUSD'];
+    return order
+      .map((s) => quotes.find((q) => q.sym === s))
+      .filter((q): q is MarketSymbolQuote => Boolean(q));
+  }, [quotes]);
+
+  const chartGeometry = useMemo(() => {
+    if (!overviewBars.length) return null;
+    const highs = overviewBars.map((b) => b.high);
+    const lows = overviewBars.map((b) => b.low);
+    const maxHigh = Math.max(...highs);
+    const minLow = Math.min(...lows);
+    const span = Math.max(maxHigh - minLow, 1e-9);
+    const padTop = 18;
+    const padBottom = 26;
+    const usableH = 190 - padTop - padBottom;
+    const toY = (price: number) => padTop + ((maxHigh - price) / span) * usableH;
+
+    const candles = overviewBars.map((b, idx) => {
+      const x = 44 + (idx / Math.max(1, overviewBars.length - 1)) * 540;
+      const yOpen = toY(b.open);
+      const yClose = toY(b.close);
+      const yHigh = toY(b.high);
+      const yLow = toY(b.low);
+      return { x, yOpen, yClose, yHigh, yLow, bull: b.close >= b.open };
+    });
+
+    const smoothPoints = candles.map((c) => `${c.x.toFixed(1)},${c.yClose.toFixed(1)}`).join(' ');
+    const areaPoints = `${candles[0].x.toFixed(1)},170 ${smoothPoints} ${candles[candles.length - 1].x.toFixed(1)},170`;
+    const gridLevels = [0, 0.33, 0.66, 1].map((ratio) => {
+      const price = maxHigh - ratio * span;
+      return { y: padTop + ratio * usableH, price };
+    });
+    return { candles, smoothPoints, areaPoints, gridLevels };
+  }, [overviewBars]);
 
   return (
     <div className="space-y-5">
-      {/* Light Editorial Ivory + Gold Hero Banner */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-[radial-gradient(ellipse_at_top_left,_rgba(245,158,11,0.14),_#FFFFFF_52%,_#FAF7F0_100%)] p-6 sm:p-7"
+      {/* Welcome Banner + Exact Brand Artwork Card matching the exact dashboard header */}
+      <div
+        className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-[#0B120E] p-5 sm:p-6"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 18% 0%, rgba(22, 229, 99, 0.18), transparent 52%)',
+        }}
       >
-        {/* Soft editorial candlestick visual backdrop on right side */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-full lg:w-3/5 overflow-hidden">
-          <img
-            src={LANDING_IMAGES.gridPipsBanner}
-            alt=""
-            referrerPolicy="no-referrer"
-            className="w-full h-full object-cover object-center opacity-20 mix-blend-multiply"
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#FAF7F0] via-[#FAF7F0]/70 to-transparent" />
-        </div>
-
-        {/* Subtle ambient gold drift */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -top-24 -left-16 w-80 h-80 rounded-full bg-[#E5A93C]/15 blur-3xl animate-hero-ambient"
-        />
-
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-7 space-y-4">
-            <motion.h1
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: 0.05 }}
-              className="text-3xl sm:text-4xl font-bold text-slate-950 tracking-tight leading-[1.12] max-w-md"
-            >
-              Welcome back, {firstName}
-            </motion.h1>
-            <motion.p
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: 0.1 }}
-              className="text-sm text-slate-600 max-w-lg leading-relaxed"
-            >
-              {heroSubtext}
-            </motion.p>
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-full bg-[#16E563]/15 border-2 border-[#16E563] text-[#16E563] font-bold text-base flex items-center justify-center shrink-0">
+                {userInitials || 'GP'}
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight">
+                  Welcome back, {firstName}!
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                  Here&apos;s what&apos;s happening with your ICT &amp; DRT trading desk today.
+                </p>
+              </div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: 0.14 }}
-              className="flex flex-wrap items-center gap-2.5 pt-0.5"
-            >
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-400">
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5"
+                className="hover:text-white transition-colors cursor-pointer"
               >
-                <span>Exness ID</span>
-                <span className="font-mono font-semibold text-amber-700">{user.exnessAccountId}</span>
-                <span
-                  className={`font-semibold ${
-                    user.exnessVerified ? 'text-emerald-700' : 'text-amber-700'
-                  }`}
-                >
-                  · {user.exnessVerified ? 'Verified Partner' : 'Pending IB Review'}
+                Exness ID <span className="font-mono font-semibold text-[#16E563] ml-1">{user.exnessAccountId}</span>
+                <span className="text-slate-600 mx-1.5">·</span>
+                <span className={user.exnessVerified ? 'text-[#16E563]' : 'text-[#F5B82E]'}>
+                  {user.exnessVerified ? 'Verified Partner' : 'Pending IB Review'}
                 </span>
               </button>
+              <span aria-hidden="true" className="text-slate-700">|</span>
               <button
                 type="button"
-                onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-amber-50/80 border border-amber-200 hover:border-amber-400 text-xs text-slate-700 hover:text-slate-950 transition-colors cursor-pointer whitespace-nowrap"
+                onClick={() => onNavigate('referrals')}
+                className="hover:text-white transition-colors cursor-pointer"
               >
-                Referral code <span className="font-mono font-semibold text-slate-950 ml-1">{user.referralCode}</span>
+                Referral <span className="font-mono font-semibold text-white ml-1">{user.referralCode}</span>
+                <span className="text-[#F5B82E] ml-1.5">({config.commissionPct}% payout)</span>
               </button>
-              <button
-                type="button"
-                onClick={() => onNavigate('account')}
-                className="px-3 py-1.5 rounded-lg bg-transparent text-xs font-semibold text-amber-700 hover:underline cursor-pointer whitespace-nowrap"
-              >
-                My information →
-              </button>
-            </motion.div>
+            </div>
 
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.32, delay: 0.18 }}
-              className="flex flex-wrap items-center gap-3 pt-1"
-            >
-              <motion.button
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
                 type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.985 }}
                 onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-                className="px-5 py-2.5 rounded-lg bg-[#E5A93C] hover:bg-[#F0B84D] text-[#090806] text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                className="px-5 py-2.5 rounded-xl bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
+                <Activity className="w-4 h-4" />
                 {user.hasAnalyzer
-                  ? 'Launch ICT Scanner'
+                  ? 'Launch ICT Analyzer'
                   : `Subscribe ICT Analyzer ($${config.analyzerPriceUsd.toFixed(2)}/mo)`}
-              </motion.button>
-              <motion.button
+              </button>
+              <button
                 type="button"
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.985 }}
                 onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
-                className="px-5 py-2.5 rounded-lg bg-white border border-slate-300 hover:border-amber-500 text-slate-900 text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
-                <Layers className="w-4 h-4 text-amber-600" />
+                <Layers className="w-4 h-4" />
                 {hasDrt
                   ? 'Launch DRT Analyzer'
                   : `Subscribe DRT Analyzer ($${drtPriceUsd.toFixed(2)}/mo)`}
-              </motion.button>
-            </motion.div>
+              </button>
+              <a
+                href={config.exnessIbUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-4 py-2.5 rounded-xl bg-white/5 border border-emerald-500/25 hover:border-[#16E563] text-xs sm:text-sm font-semibold text-slate-200 hover:text-white transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              >
+                Exness Portal
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#16E563]" />
+              </a>
+            </div>
           </div>
 
-          {/* Right Live Highlight + Animated Ascending Gold Candlestick Chart */}
-          <div className="lg:col-span-5 flex flex-col items-end">
-            {featuredGold && (
-              <button
-                type="button"
-                onClick={() => onOpenSymbolChart(featuredGold.sym)}
-                className="text-right mb-2 cursor-pointer group"
-              >
-                <div className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">
-                  {featuredGold.sym} · {featuredGold.sym === 'XAUUSD' ? 'Gold' : featuredGold.name}
-                  {featuredGold.marketStatusLabel ? ` · ${featuredGold.marketStatusLabel}` : ''}
-                </div>
-                <div className="flex items-baseline justify-end gap-2 mt-0.5">
-                  <motion.span
-                    key={`${featuredGold.sym}-${featuredGold.price}`}
-                    initial={featuredTickDir ? { scale: 1.04 } : false}
-                    animate={{ scale: 1 }}
-                    transition={{ duration: 0.25 }}
-                    className={`text-xl sm:text-2xl font-mono tabular-nums font-bold text-amber-600 ${
-                      featuredTickDir === 'up'
-                        ? 'animate-price-up'
-                        : featuredTickDir === 'down'
-                        ? 'animate-price-down'
-                        : ''
-                    }`}
-                  >
-                    {featuredGold.price.toLocaleString(undefined, {
-                      minimumFractionDigits: featuredGold.digits,
-                      maximumFractionDigits: featuredGold.digits,
-                    })}
-                  </motion.span>
-                  <span
-                    className={`text-xs font-mono tabular-nums font-semibold ${
-                      featuredUp ? 'text-emerald-600' : 'text-rose-600'
-                    }`}
-                  >
-                    {featuredUp ? '▲ +' : '▼ '}
-                    {featuredGold.chgPct.toFixed(2)}%
-                  </span>
-                </div>
-              </button>
-            )}
-
-            <div className="w-full max-w-[360px]">
-              <svg viewBox="0 0 344 136" className="w-full h-auto" aria-hidden="true">
-                <defs>
-                  <linearGradient id="heroGoldFill" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#E5A93C" stopOpacity="0.26" />
-                    <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
-                  </linearGradient>
-                  <radialGradient id="heroTipGlow" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stopColor="#F5C451" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
-                  </radialGradient>
-                </defs>
-                {[28, 56, 84, 112].map((y) => (
-                  <line
-                    key={y}
-                    x1="8"
-                    y1={y}
-                    x2="338"
-                    y2={y}
-                    stroke="rgba(15,23,42,0.07)"
-                    strokeWidth="1"
-                  />
-                ))}
-                <motion.polygon
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.9, delay: 0.25 }}
-                  points="18,108 46,110 74,104 102,90 130,92 158,82 186,69 214,75 242,60 270,42 298,41 326,27 326,130 18,130"
-                  fill="url(#heroGoldFill)"
-                />
-                <motion.path
-                  d={HERO_TREND_PATH}
-                  fill="none"
-                  stroke="#E5A93C"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  initial={{ pathLength: 0, opacity: 0.4 }}
-                  animate={{ pathLength: 1, opacity: 1 }}
-                  transition={{ duration: 1.05, ease: [0.22, 1, 0.36, 1], delay: 0.12 }}
-                />
-                {HERO_CANDLES.map((c, idx) => {
-                  const color = c.up ? '#22C55E' : '#EF4444';
-                  const top = Math.min(c.yOpen, c.yClose);
-                  const height = Math.max(5, Math.abs(c.yClose - c.yOpen));
-                  const isLast = idx === HERO_CANDLES.length - 1;
-                  return (
-                    <motion.g
-                      key={idx}
-                      initial={{ opacity: 0, scaleY: 0.35 }}
-                      animate={{ opacity: 1, scaleY: 1 }}
-                      transition={{
-                        duration: 0.36,
-                        delay: 0.08 + idx * 0.045,
-                        ease: [0.22, 1, 0.36, 1],
-                      }}
-                      style={{ transformOrigin: `${c.x}px ${c.yLow}px` }}
-                    >
-                      <line x1={c.x} y1={c.yHigh} x2={c.x} y2={c.yLow} stroke={color} strokeWidth="1.5" />
-                      <rect
-                        x={c.x - 4.5}
-                        y={top}
-                        width="9"
-                        height={height}
-                        rx="1.5"
-                        fill={color}
-                        className={isLast ? 'animate-hero-live-candle' : undefined}
-                      />
-                    </motion.g>
-                  );
-                })}
-                {/* Live tip halo */}
-                <motion.circle
-                  cx="326"
-                  cy="27"
-                  r="11"
-                  fill="url(#heroTipGlow)"
-                  animate={{ opacity: [0.45, 0.95, 0.45], scale: [0.85, 1.15, 0.85] }}
-                  transition={{ duration: 2.6, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ transformOrigin: '326px 27px' }}
-                />
-                <circle cx="326" cy="27" r="2.8" fill="#F5C451" />
-              </svg>
+          <div className="lg:col-span-5 flex flex-col items-stretch lg:items-end gap-2">
+            <div className="text-xs sm:text-sm italic text-emerald-200/90 font-medium lg:text-right">
+              &ldquo;Dream it. Trade it. Achieve it.&rdquo;
+            </div>
+            <div className="w-full rounded-xl overflow-hidden border border-emerald-500/30 bg-[#050907]">
+              <img
+                src={LANDING_IMAGES.brandHeroArtwork}
+                alt="Grid Pips Trade Invest Prosper desk visual"
+                referrerPolicy="no-referrer"
+                className="w-full h-36 sm:h-40 object-cover object-top"
+              />
             </div>
           </div>
         </div>
-      </motion.div>
-
-      {/* 4-Column KPI Row with Unique Visual Headers */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.08 }}
-          whileHover={{ y: -2 }}
-          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
-        >
-          <div className="relative h-28 overflow-hidden bg-slate-900">
-            <img
-              src={LANDING_IMAGES.analystIct3d}
-              alt="ICT market strategist reviewing liquidity pools and fair value gaps"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
-              ICT Liquidity Engine
-            </span>
-          </div>
-          <div className="p-5 flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500">ICT Strategy Analyzer</span>
-                {user.hasAnalyzer && (
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
-                    <Check className="w-3 h-3 text-emerald-600" />
-                  </span>
-                )}
-              </div>
-              <div className="text-lg font-bold text-slate-950 mt-1.5">
-                {user.hasAnalyzer
-                  ? user.analyzerDaysRemaining != null
-                    ? `Active · ${user.analyzerDaysRemaining}d left`
-                    : 'Active subscription'
-                  : user.analyzerSubscriptionStatus === 'expired'
-                  ? 'Subscription expired'
-                  : `$${config.analyzerPriceUsd.toFixed(2)}/mo plan`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-            >
-              {user.hasAnalyzer ? 'Launch ICT Scanner →' : 'Subscribe via M-Pesa / Crypto →'}
-            </button>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.14 }}
-          whileHover={{ y: -2 }}
-          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
-        >
-          <div className="relative h-28 overflow-hidden bg-slate-900">
-            <img
-              src={LANDING_IMAGES.automatorCode3d}
-              alt="Quant trader mapping Dealing Range Theory 4-quadrant PD Arrays beside live charts"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
-              Ali Khan DRT Engine
-            </span>
-          </div>
-          <div className="p-5 flex-1 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs text-slate-500">DRT Strategy Analyzer</span>
-                {hasDrt && (
-                  <span className="w-5 h-5 rounded-full bg-emerald-100 border border-emerald-300 flex items-center justify-center">
-                    <Check className="w-3 h-3 text-emerald-600" />
-                  </span>
-                )}
-              </div>
-              <div className="text-lg font-bold text-slate-950 mt-1.5">
-                {hasDrt
-                  ? drtDaysRemaining != null
-                    ? `Active · ${drtDaysRemaining}d left`
-                    : 'Active subscription'
-                  : drtStatus === 'expired'
-                  ? 'Subscription expired'
-                  : `$${drtPriceUsd.toFixed(2)}/mo plan`}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
-              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-            >
-              {hasDrt ? 'Launch DRT Scanner →' : 'Subscribe to DRT Analyzer →'}
-            </button>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.2 }}
-          whileHover={{ y: -2 }}
-          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
-        >
-          <div className="relative h-28 overflow-hidden bg-slate-900">
-            <img
-              src={LANDING_IMAGES.heroTrader3d}
-              alt="Forex trader auditing execution metrics at dual-screen desk"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
-              Execution Review
-            </span>
-          </div>
-          <div className="p-5 flex-1 flex flex-col justify-between">
-            <div>
-              <div className="text-xs text-slate-500">Journal performance</div>
-              <div
-                className={`text-lg font-bold font-mono tabular-nums mt-1.5 ${
-                  totalPnl >= 0 ? 'text-amber-600' : 'text-rose-600'
-                }`}
-              >
-                {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('journal')}
-              className="text-left text-xs font-semibold text-slate-600 hover:text-slate-950 mt-2.5 cursor-pointer"
-            >
-              {journal.length} logged trade{journal.length === 1 ? '' : 's'} →
-            </button>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, delay: 0.26 }}
-          whileHover={{ y: -2 }}
-          className="group rounded-2xl bg-white border border-slate-200 hover:border-amber-300 transition-colors overflow-hidden flex flex-col"
-        >
-          <div className="relative h-28 overflow-hidden bg-slate-900">
-            <img
-              src={LANDING_IMAGES.automatorEa3d}
-              alt="Institutional multi-monitor desk managing orders and Exness partner commissions"
-              referrerPolicy="no-referrer"
-              className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/60 via-transparent to-transparent" />
-            <span className="absolute bottom-2 left-3 text-[11px] font-medium text-amber-200">
-              Partner &amp; Billing
-            </span>
-          </div>
-          <div className="p-5 flex-1 flex flex-col justify-between">
-            <div>
-              <div className="text-xs text-slate-500">Orders and referrals</div>
-              <div className="text-lg font-bold font-mono tabular-nums text-slate-950 mt-1.5">
-                {orders.length} order{orders.length === 1 ? '' : 's'}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('referrals')}
-              className="text-left text-xs font-semibold text-amber-700 hover:underline mt-2.5 cursor-pointer"
-            >
-              Earn {config.commissionPct}% commissions →
-            </button>
-          </div>
-        </motion.div>
       </div>
 
-      {/* Market Overview Table & Right Rail */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.34, delay: 0.22 }}
-          className="lg:col-span-8 rounded-2xl bg-white border border-slate-200 p-6"
+      {/* 4 Dark Emerald KPI Cards matching the exact picture layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* KPI 1: ICT Analyzer */}
+        <button
+          type="button"
+          onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
+          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-[#16E563]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
         >
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <h2 className="text-base font-bold text-slate-950">Market overview</h2>
-              {marketStatus && (
-                <span className="text-xs font-mono text-slate-500">
-                  · TradingView {marketStatus.openCount}/{marketStatus.totalCount} open
-                </span>
-              )}
+          <span className="w-11 h-11 rounded-xl bg-[#16E563]/15 border border-[#16E563]/35 text-[#16E563] flex items-center justify-center shrink-0">
+            <Wallet className="w-5 h-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-400">ICT Strategy Analyzer</span>
+              {user.hasAnalyzer && <Check className="w-3.5 h-3.5 text-[#16E563] shrink-0" />}
             </div>
-            <button
-              type="button"
-              onClick={() => onNavigate('charts')}
-              className="text-xs font-semibold text-amber-700 hover:underline cursor-pointer"
-            >
-              Open TradingView charts →
-            </button>
+            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+              {user.hasAnalyzer
+                ? user.analyzerDaysRemaining != null
+                  ? `${user.analyzerDaysRemaining}d Active`
+                  : 'Active Plan'
+                : `$${config.analyzerPriceUsd.toFixed(2)}/mo`}
+            </div>
+            <div className="text-xs font-medium text-[#16E563] mt-0.5 truncate">
+              {user.hasAnalyzer ? 'Open live scanner →' : 'Subscribe now →'}
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-xs text-slate-500">
-                  <th className="py-2.5 pr-4 font-medium">Symbol</th>
-                  <th className="py-2.5 pr-4 font-medium">Instrument</th>
-                  <th className="py-2.5 pr-4 font-medium">TradingView Session</th>
-                  <th className="py-2.5 pr-4 text-right font-medium">Price</th>
-                  <th className="py-2.5 pr-4 text-right font-medium">24h</th>
-                  <th className="py-2.5 text-right font-medium">Trend</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {quotes.map((q, idx) => {
-                  const up = q.chgPct >= 0;
-                  const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
-                  const dir = tickDirs[q.sym];
-                  const statusLabel = q.marketStatusLabel || (q.isMarketOpen === true ? 'Open' : q.isMarketOpen === false ? 'Closed' : '—');
-                  const statusClass =
-                    q.isMarketOpen === true
-                      ? 'text-emerald-700'
-                      : q.isMarketOpen === false
-                      ? 'text-slate-500'
-                      : 'text-slate-400';
-                  return (
-                    <tr
-                      key={q.sym}
-                      onClick={() => onOpenSymbolChart(q.sym)}
-                      className="group hover:bg-amber-50/50 transition-colors cursor-pointer"
-                    >
-                      <td className="py-3 pr-4 font-mono font-bold text-slate-950 group-hover:text-amber-700 transition-colors whitespace-nowrap">
-                        {q.sym}
-                      </td>
-                      <td className="py-3 pr-4 text-slate-600 text-xs whitespace-nowrap">{q.name}</td>
-                      <td className={`py-3 pr-4 text-xs font-medium whitespace-nowrap ${statusClass}`}>
-                        {statusLabel}
-                      </td>
-                      <td className="py-3 pr-4 text-right font-mono tabular-nums font-semibold text-slate-900 whitespace-nowrap">
-                        <span
-                          key={dir ? `${q.sym}-${tickSeq}` : q.sym}
-                          className={
-                            dir === 'up'
-                              ? 'inline-block animate-price-up'
-                              : dir === 'down'
-                              ? 'inline-block animate-price-down'
-                              : ''
-                          }
-                        >
-                          {q.price.toLocaleString(undefined, {
-                            minimumFractionDigits: q.digits,
-                            maximumFractionDigits: q.digits,
-                          })}
-                        </span>
-                      </td>
-                      <td
-                        className={`py-3 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
-                          up ? 'text-emerald-600' : 'text-rose-600'
-                        }`}
-                      >
-                        {up ? '+' : ''}
-                        {q.chgPct.toFixed(2)}%
-                      </td>
-                      <td className="py-2.5 text-right">
-                        <svg
-                          viewBox="0 0 76 20"
-                          className="w-16 h-5 inline-block transition-transform duration-200 group-hover:scale-105"
-                          aria-hidden="true"
-                        >
-                          <motion.polyline
-                            fill="none"
-                            stroke={up ? '#22C55E' : '#EF4444'}
-                            strokeWidth="1.6"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            points={sparkPoints}
-                            initial={{ pathLength: 0, opacity: 0.4 }}
-                            animate={{ pathLength: 1, opacity: 1 }}
-                            transition={{ duration: 0.65, delay: 0.15 + idx * 0.05 }}
-                          />
-                        </svg>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </motion.div>
+        </button>
 
-        <div className="lg:col-span-4 space-y-5">
-          {/* Warm Amber Gold Telegram Card with Mentorship Visual */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.34, delay: 0.28 }}
-            whileHover={{ y: -2 }}
-            className="group rounded-2xl bg-[#E5A93C] text-[#090806] overflow-hidden"
-          >
-            <div className="relative h-32 overflow-hidden bg-slate-900">
-              <img
-                src={LANDING_IMAGES.mentorCommunity3d}
-                alt="Trading mentor reviewing ICT smart money setups for JakoyoFX community"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#E5A93C]/20 to-[#E5A93C]" />
+        {/* KPI 2: DRT Analyzer */}
+        <button
+          type="button"
+          onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
+          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-[#16E563]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+        >
+          <span className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-400/35 text-emerald-300 flex items-center justify-center shrink-0">
+            <Layers className="w-5 h-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-slate-400">DRT Strategy Analyzer</span>
+              {hasDrt && <Check className="w-3.5 h-3.5 text-[#16E563] shrink-0" />}
             </div>
-            <div className="p-6 pt-3">
-              <div className="text-xs font-semibold text-[#3F2D0B] mb-1">JakoyoFX Trading Desk</div>
-              <h3 className="text-lg font-bold tracking-tight mb-2">Join our Telegram community</h3>
-              <p className="text-xs text-[#2B1E06] leading-relaxed mb-5">
-                Trade alongside fellow ICT, DRT, and SMC traders, review live killzone setups, and refine Premium/Discount PD Array entries.
-              </p>
-              <motion.a
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.985 }}
+            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+              {hasDrt
+                ? drtDaysRemaining != null
+                  ? `${drtDaysRemaining}d Active`
+                  : 'Active Plan'
+                : drtStatus === 'expired'
+                ? 'Expired'
+                : `$${drtPriceUsd.toFixed(2)}/mo`}
+            </div>
+            <div className="text-xs font-medium text-[#16E563] mt-0.5 truncate">
+              {hasDrt ? 'Open DRT scanner →' : 'Subscribe DRT →'}
+            </div>
+          </div>
+        </button>
+
+        {/* KPI 3: Journal Net P&L / Trades */}
+        <button
+          type="button"
+          onClick={() => onNavigate('journal')}
+          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-indigo-400/50 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+        >
+          <span className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-400/35 text-indigo-300 flex items-center justify-center shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-slate-400">Journal Net P&amp;L</div>
+            <div
+              className={`text-lg font-bold font-mono tabular-nums truncate mt-0.5 ${
+                totalPnl >= 0 ? 'text-white' : 'text-rose-400'
+              }`}
+            >
+              {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
+            </div>
+            <div className="text-xs font-medium text-[#16E563] mt-0.5 font-mono tabular-nums">
+              {journal.length} logged trade{journal.length === 1 ? '' : 's'}
+            </div>
+          </div>
+        </button>
+
+        {/* KPI 4: Win Rate & 35% Referrals (Gold Trophy tile matching artwork) */}
+        <button
+          type="button"
+          onClick={() => onNavigate(journal.length > 0 ? 'analytics' : 'referrals')}
+          className="text-left rounded-2xl bg-[#0B120E] border border-amber-400/25 hover:border-[#F5B82E]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+        >
+          <span className="w-11 h-11 rounded-xl bg-[#F5B82E]/15 border border-[#F5B82E]/35 text-[#F5B82E] flex items-center justify-center shrink-0">
+            <Trophy className="w-5 h-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-slate-400">
+              {journal.length > 0 ? 'Journal Win Rate' : 'Partner Payouts'}
+            </div>
+            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+              {journal.length > 0 ? `${winRatePct}%` : `${config.commissionPct}%`}
+            </div>
+            <div className="text-xs font-medium text-[#F5B82E] mt-0.5 truncate">
+              {orders.length} order{orders.length === 1 ? '' : 's'} · {config.commissionPct}% partner hub →
+            </div>
+          </div>
+        </button>
+      </div>
+
+      {/* Main 8/4 Split matching the exact dashboard artwork: Market Overview Chart + Top Assets */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Left 8 Cols: Dark Emerald Market Overview Candlestick Chart + Quotes Table */}
+        <div className="lg:col-span-8 space-y-5">
+          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <h2 className="text-base font-bold text-white">Market Overview</h2>
+                <select
+                  value={overviewSym}
+                  onChange={(e) => setOverviewSym(e.target.value)}
+                  aria-label="Market overview chart symbol"
+                  className="px-2.5 py-1 text-xs font-mono font-bold bg-[#070D0A] border border-emerald-500/25 text-[#16E563] rounded-lg focus:outline-none focus:border-[#16E563]"
+                >
+                  {['XAUUSD', 'BTCUSD', 'EURUSD', 'NAS100', 'GBPUSD', 'USDJPY'].map((s) => (
+                    <option key={s} value={s} className="bg-[#0B120E] text-white">
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                {selectedQuote && (
+                  <span className="text-xs font-mono tabular-nums text-slate-300">
+                    {selectedQuote.price.toFixed(selectedQuote.digits)}{' '}
+                    <span className={selectedQuote.chgPct >= 0 ? 'text-[#16E563]' : 'text-rose-400'}>
+                      ({selectedQuote.chgPct >= 0 ? '+' : ''}
+                      {selectedQuote.chgPct.toFixed(2)}%)
+                    </span>
+                  </span>
+                )}
+              </div>
+
+              {/* 1D 1W 1M 3M 1Y Segmented Filter matching the picture */}
+              <div className="flex items-center gap-1 p-1 bg-[#070D0A] border border-emerald-500/20 rounded-lg">
+                {(['1D', '1W', '1M', '3M', '1Y'] as const).map((tf) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setOverviewTf(tf)}
+                    className={`px-2.5 py-1 text-xs font-mono font-bold rounded-md transition-colors cursor-pointer ${
+                      overviewTf === tf
+                        ? 'bg-[#16E563] text-[#041108]'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dark Emerald Candlestick & Trendline Chart */}
+            <div className="relative rounded-xl bg-[#070D0A] border border-emerald-500/15 p-3">
+              {selectedQuote && (
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-[#0E1A13] border border-emerald-500/30 font-mono text-xs tabular-nums font-bold text-white">
+                  {selectedQuote.price.toLocaleString(undefined, {
+                    minimumFractionDigits: selectedQuote.digits,
+                    maximumFractionDigits: selectedQuote.digits,
+                  })}
+                </div>
+              )}
+              <svg viewBox="0 0 600 190" className="w-full h-48 sm:h-52">
+                <defs>
+                  <linearGradient id="overviewEmeraldArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#16E563" stopOpacity="0.24" />
+                    <stop offset="100%" stopColor="#16E563" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {chartGeometry ? (
+                  <>
+                    {chartGeometry.gridLevels.map((g, idx) => (
+                      <g key={idx}>
+                        <line
+                          x1="40"
+                          y1={g.y}
+                          x2="592"
+                          y2={g.y}
+                          stroke="rgba(22, 229, 99, 0.09)"
+                          strokeWidth="1"
+                        />
+                        <text
+                          x="4"
+                          y={g.y + 3}
+                          fill="#64748B"
+                          fontSize="9"
+                          fontFamily="IBM Plex Mono, monospace"
+                        >
+                          {g.price.toFixed(selectedQuote?.digits ?? 2)}
+                        </text>
+                      </g>
+                    ))}
+                    <polygon points={chartGeometry.areaPoints} fill="url(#overviewEmeraldArea)" />
+                    <polyline
+                      fill="none"
+                      stroke="#16E563"
+                      strokeWidth="1.6"
+                      strokeOpacity="0.85"
+                      points={chartGeometry.smoothPoints}
+                    />
+                    {chartGeometry.candles.map((c, idx) => {
+                      const col = c.bull ? '#16E563' : '#EF4444';
+                      const top = Math.min(c.yOpen, c.yClose);
+                      const h = Math.max(3, Math.abs(c.yClose - c.yOpen));
+                      return (
+                        <g key={idx}>
+                          <line
+                            x1={c.x}
+                            y1={c.yHigh}
+                            x2={c.x}
+                            y2={c.yLow}
+                            stroke={col}
+                            strokeWidth="1.3"
+                          />
+                          <rect
+                            x={c.x - 4}
+                            y={top}
+                            width="8"
+                            height={h}
+                            rx="1.5"
+                            fill={col}
+                          />
+                        </g>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <text
+                    x="300"
+                    y="98"
+                    textAnchor="middle"
+                    fill="#94A3B8"
+                    fontSize="12"
+                    fontFamily="IBM Plex Mono, monospace"
+                  >
+                    {loadingBars
+                      ? `Loading live ${overviewSym} (${overviewTf}) TradingView candles...`
+                      : `Open TradingView chart to view live ${overviewSym} bars`}
+                  </text>
+                )}
+              </svg>
+            </div>
+
+            {/* Live Market Quotes Table */}
+            <div className="mt-5">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div className="text-xs font-mono text-slate-400">
+                  {marketStatus
+                    ? `Live TradingView Feeds · ${marketStatus.openCount}/${marketStatus.totalCount} open`
+                    : 'Live TradingView Feeds'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onNavigate('charts')}
+                  className="text-xs font-semibold text-[#16E563] hover:underline cursor-pointer"
+                >
+                  Open full TradingView terminal →
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-emerald-500/15 text-xs text-slate-500">
+                      <th className="py-2 pr-4 font-medium">Symbol</th>
+                      <th className="py-2 pr-4 font-medium">Instrument</th>
+                      <th className="py-2 pr-4 font-medium">Session</th>
+                      <th className="py-2 pr-4 text-right font-medium">Price</th>
+                      <th className="py-2 pr-4 text-right font-medium">24h</th>
+                      <th className="py-2 text-right font-medium">Trend</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-emerald-500/10">
+                    {quotes.map((q, idx) => {
+                      const up = q.chgPct >= 0;
+                      const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
+                      const dir = tickDirs[q.sym];
+                      const statusLabel =
+                        q.marketStatusLabel || (q.isMarketOpen === true ? 'Open' : q.isMarketOpen === false ? 'Closed' : '—');
+                      return (
+                        <tr
+                          key={q.sym}
+                          onClick={() => onOpenSymbolChart(q.sym)}
+                          className="group hover:bg-emerald-500/5 transition-colors cursor-pointer"
+                        >
+                          <td className="py-2.5 pr-4 font-mono font-bold text-white group-hover:text-[#16E563] transition-colors whitespace-nowrap">
+                            {q.sym}
+                          </td>
+                          <td className="py-2.5 pr-4 text-slate-400 text-xs whitespace-nowrap">{q.name}</td>
+                          <td
+                            className={`py-2.5 pr-4 text-xs font-medium whitespace-nowrap ${
+                              q.isMarketOpen === true ? 'text-[#16E563]' : 'text-slate-500'
+                            }`}
+                          >
+                            {statusLabel}
+                          </td>
+                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums font-semibold text-slate-100 whitespace-nowrap">
+                            <span
+                              key={dir ? `${q.sym}-${tickSeq}` : q.sym}
+                              className={
+                                dir === 'up'
+                                  ? 'inline-block animate-price-up'
+                                  : dir === 'down'
+                                  ? 'inline-block animate-price-down'
+                                  : ''
+                              }
+                            >
+                              {q.price.toLocaleString(undefined, {
+                                minimumFractionDigits: q.digits,
+                                maximumFractionDigits: q.digits,
+                              })}
+                            </span>
+                          </td>
+                          <td
+                            className={`py-2.5 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
+                              up ? 'text-[#16E563]' : 'text-rose-400'
+                            }`}
+                          >
+                            {up ? '+' : ''}
+                            {q.chgPct.toFixed(2)}%
+                          </td>
+                          <td className="py-2 text-right">
+                            <svg
+                              viewBox="0 0 76 20"
+                              className="w-16 h-5 inline-block"
+                              aria-hidden="true"
+                            >
+                              <polyline
+                                fill="none"
+                                stroke={up ? '#16E563' : '#EF4444'}
+                                strokeWidth="1.6"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                points={sparkPoints}
+                              />
+                            </svg>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right 4 Cols: Top Assets + Trade Anywhere Exact Picture Card + Killzones */}
+        <div className="lg:col-span-4 space-y-5">
+          {/* Top Assets List matching the exact bottom-right panel in the picture */}
+          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5">
+            <div className="flex items-center justify-between gap-2 mb-3.5">
+              <h3 className="text-sm font-bold text-white">Top Assets</h3>
+              <button
+                type="button"
+                onClick={() => onNavigate('charts')}
+                className="text-xs font-semibold text-[#16E563] hover:underline cursor-pointer"
+              >
+                View All →
+              </button>
+            </div>
+            <div className="divide-y divide-emerald-500/10">
+              {topAssets.map((asset) => {
+                const up = asset.chgPct >= 0;
+                return (
+                  <button
+                    type="button"
+                    key={asset.sym}
+                    onClick={() => onOpenSymbolChart(asset.sym)}
+                    className="w-full py-3 flex items-center justify-between gap-3 hover:bg-emerald-500/5 rounded-lg px-1.5 -mx-1.5 transition-colors cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-9 h-9 rounded-full bg-[#101C15] border border-emerald-500/25 text-[#16E563] font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
+                        {asset.sym.slice(0, 3)}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-white truncate">{asset.name}</div>
+                        <div className="text-[11px] font-mono text-slate-400">{asset.sym}</div>
+                      </div>
+                    </div>
+                    <div className="text-right font-mono tabular-nums shrink-0">
+                      <div className="text-xs font-bold text-white">
+                        {asset.price.toLocaleString(undefined, {
+                          minimumFractionDigits: asset.digits,
+                          maximumFractionDigits: asset.digits,
+                        })}
+                      </div>
+                      <div className={`text-[11px] font-semibold ${up ? 'text-[#16E563]' : 'text-rose-400'}`}>
+                        {up ? '↑ +' : '↓ '}
+                        {asset.chgPct.toFixed(2)}%
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Trade Anywhere / JakoyoFX Community Card featuring the exact brand artwork */}
+          <div className="rounded-2xl bg-gradient-to-b from-[#0E1E15] to-[#08100C] border border-[#16E563]/35 overflow-hidden">
+            <div className="relative h-36 bg-[#050907] overflow-hidden">
+              <img
+                src={LANDING_IMAGES.brandHeroArtwork}
+                alt="Trade anywhere anytime on Grid Pips"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover object-bottom"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1710] via-[#0B1710]/30 to-transparent" />
+            </div>
+            <div className="p-5 pt-3 space-y-3">
+              <div>
+                <div className="text-xs font-semibold text-[#16E563]">JakoyoFX Trading Desk</div>
+                <h3 className="text-base font-bold text-white mt-0.5">Trade Anywhere, Anytime</h3>
+                <p className="text-xs text-slate-300 leading-relaxed mt-1">
+                  Join fellow ICT, DRT, and SMC traders on web &amp; mobile, review live killzone setups, and refine Premium/Discount PD Array entries.
+                </p>
+              </div>
+              <a
                 href={config.telegramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 px-4 bg-[#0B0A08] text-white text-xs font-semibold rounded-lg hover:bg-[#1A1813] inline-flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2.5 px-4 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-2 transition-colors"
               >
-                <Send className="w-3.5 h-3.5 text-[#E5A93C]" />
+                <Send className="w-3.5 h-3.5" />
                 Open t.me/JakoyoFx
-              </motion.a>
+              </a>
             </div>
-          </motion.div>
+          </div>
 
-          {/* Killzones (NY time) Card */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.34, delay: 0.34 }}
-            className="rounded-2xl bg-white border border-slate-200 p-5 space-y-3.5"
-          >
+          {/* Killzones (NY time) Dark Emerald Card */}
+          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5 space-y-3.5">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-slate-950">Killzones (NY time)</h3>
-              <span className="text-xs font-mono tabular-nums text-amber-700">{killzone.nyTimeFormatted} NY</span>
+              <h3 className="text-sm font-bold text-white">Killzones (NY time)</h3>
+              <span className="text-xs font-mono tabular-nums text-[#16E563]">{killzone.nyTimeFormatted} NY</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
@@ -1530,19 +1638,19 @@ const WorkspaceOverview: React.FC<{
                   <div key={seg.key} className="space-y-1.5">
                     <div
                       className={`relative overflow-hidden h-2 rounded-sm ${
-                        isActive ? 'bg-[#E5A93C]' : 'bg-slate-200'
+                        isActive ? 'bg-[#16E563]' : 'bg-[#16231B]'
                       }`}
                     >
                       {isActive && (
                         <div
                           aria-hidden="true"
-                          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/45 to-transparent animate-killzone-shimmer"
+                          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent animate-killzone-shimmer"
                         />
                       )}
                     </div>
                     <div
                       className={`text-[11px] font-medium ${
-                        isActive ? 'text-slate-950' : 'text-slate-500'
+                        isActive ? 'text-white' : 'text-slate-500'
                       }`}
                     >
                       {seg.label}
@@ -1552,13 +1660,12 @@ const WorkspaceOverview: React.FC<{
               })}
             </div>
 
-            <div className="text-xs text-slate-600 pt-0.5 font-mono tabular-nums">
+            <div className="text-xs text-slate-400 pt-0.5 font-mono tabular-nums">
               {killzone.detail}
             </div>
-          </motion.div>
+          </div>
         </div>
       </div>
     </div>
   );
 };
-

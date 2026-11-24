@@ -5,7 +5,11 @@ import mentorCommunity3d from './images/mentor_community_3d_1794555887279.jpg';
 import automatorCode3d from './images/automator_ea_3d_1794555887266.jpg';
 import gridPipsBanner from './images/gridpips_og_banner_1794808032172.jpg';
 
+export const EXACT_BRAND_ARTWORK =
+  '/assets/aistudio/WhatsApp_Image_2026-11-24_at_12.24.27_PM_e390c63a.jpeg';
+
 export const LANDING_IMAGES = {
+  brandHeroArtwork: EXACT_BRAND_ARTWORK,
   heroTrader3d,
   analystIct3d,
   automatorEa3d,

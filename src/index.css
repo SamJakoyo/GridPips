@@ -2,24 +2,24 @@
 
 @layer base {
   :root {
-    --font-display: 'Sora', system-ui, -apple-system, sans-serif;
-    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-display: 'Sora', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
-    color-scheme: light;
+    --gp-bg: #050907;
+    --gp-surface: #0b120e;
+    --gp-surface-elevated: #101a14;
+    --gp-emerald: #16e563;
+    --gp-emerald-hover: #2bf074;
+    --gp-gold: #f5b82e;
+    color-scheme: dark;
   }
 
   body {
     font-family: var(--font-body);
     font-weight: 400;
     line-height: 1.6;
-    color: #0f172a;
-    background-color: #f8f7f4;
-  }
-
-  input,
-  textarea,
-  select {
-    color: #0f172a;
+    color: #f1f5f9;
+    background-color: #050907;
   }
 
   h1, h2 {
@@ -59,10 +59,10 @@
     transform: scale(1) translate3d(0%, 0%, 0);
   }
   50% {
-    transform: scale(1.045) translate3d(-1%, -0.5%, 0);
+    transform: scale(1.03) translate3d(-0.6%, -0.3%, 0);
   }
   100% {
-    transform: scale(1.02) translate3d(0.8%, -0.2%, 0);
+    transform: scale(1.015) translate3d(0.4%, -0.15%, 0);
   }
 }
 
@@ -81,15 +81,15 @@
 @keyframes hero-candle-breathe {
   0%, 100% {
     transform: translateY(0px) scaleY(1);
-    opacity: 0.48;
+    opacity: 0.52;
   }
   50% {
     transform: translateY(-6px) scaleY(1.08);
-    opacity: 0.88;
+    opacity: 0.9;
   }
 }
 
-@keyframes hero-gold-wave {
+@keyframes hero-emerald-wave {
   0%, 100% {
     opacity: 0.55;
     transform: translateX(0px);
@@ -120,7 +120,7 @@
 }
 
 .animate-hero-wave {
-  animation: hero-gold-wave 5s ease-in-out infinite;
+  animation: hero-emerald-wave 5s ease-in-out infinite;
   will-change: transform, opacity;
 }
 
@@ -131,8 +131,8 @@
 
 @keyframes price-flash-up {
   0% {
-    color: #34d399;
-    text-shadow: 0 0 12px rgba(52, 211, 153, 0.45);
+    color: #16e563;
+    text-shadow: 0 0 12px rgba(22, 229, 99, 0.5);
   }
   100% {
     color: inherit;
@@ -177,7 +177,7 @@
     transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    opacity: 0.8;
+    opacity: 0.78;
     transform: translate3d(18px, -10px, 0) scale(1.06);
   }
 }
@@ -223,4 +223,3 @@
     animation: none;
   }
 }
-

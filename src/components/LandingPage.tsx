@@ -4,23 +4,21 @@ import {
   ShieldCheck,
   CheckCircle2,
   X,
-  Pause,
   Play,
   TrendingUp,
   Zap,
   ChevronDown,
+  Maximize2,
+  Crown,
+  Layers,
+  Activity,
 } from 'lucide-react';
 import { LANDING_IMAGES } from '../assets/landingImages';
 import { BrandLogo } from './BrandLogo';
 import { LiveTradingViewChart } from './LiveTradingViewChart';
 import { ANALYZER_TIMEFRAMES, TRADING_SYMBOLS, type AnalyzerTimeframe } from '../lib/tradingTimeframes';
 import type { PublicConfig, User } from '../types';
-import {
-  apiFetch,
-  type MarketMiniBar,
-  type MarketSymbolQuote,
-  type TradingViewMarketStatus,
-} from '../lib/api';
+import type { MarketSymbolQuote, TradingViewMarketStatus } from '../lib/api';
 
 interface LandingPageProps {
   config: PublicConfig;
@@ -33,24 +31,6 @@ interface LandingPageProps {
 }
 
 type LegalDocKey = 'risk' | 'affiliate' | 'terms' | 'privacy';
-
-const HERO_FRAMES = [
-  {
-    src: LANDING_IMAGES.heroTrader3d,
-    alt: '3D quantitative forex trader analyzing candlestick markets at an architectural desk',
-    caption: 'ICT Analyzer · Killzone Liquidity & FVG Mapping',
-  },
-  {
-    src: LANDING_IMAGES.automatorCode3d,
-    alt: 'Quantitative analyst mapping Dealing Range Theory 4-quadrant PD Arrays beside live charts',
-    caption: 'DRT Analyzer · 4-Quadrant Dealing Ranges & PD Arrays',
-  },
-  {
-    src: LANDING_IMAGES.gridPipsBanner,
-    alt: 'Institutional candlestick liquidity curve across cream and slate editorial canvas',
-    caption: 'Liquidity Flow · XAUUSD, Forex & Indices',
-  },
-];
 
 const LEGAL_DOCS: Record<LegalDocKey, { title: string; paragraphs: string[] }> = {
   risk: {
@@ -95,10 +75,14 @@ function ImageWithFallback({
   alt: string;
   className?: string;
 }) {
-  const [failed, setFailed] = React.useState(false);
+  const [failed, setFailed] = useState(false);
   if (failed) {
     return (
-      <div className={`bg-gradient-to-br from-neutral-950 to-black flex items-center justify-center p-6 text-neutral-300 text-sm ${className || ''}`}>
+      <div
+        className={`bg-gradient-to-br from-[#0B150F] to-[#050907] flex items-center justify-center p-6 text-emerald-200/70 text-sm ${
+          className || ''
+        }`}
+      >
         <span>{alt}</span>
       </div>
     );
@@ -135,15 +119,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 }) => {
   const [legalDoc, setLegalDoc] = useState<LegalDocKey | null>(null);
   const [demoOpen, setDemoOpen] = useState(false);
-  const [heroMotionActive, setHeroMotionActive] = useState(true);
-  const [frameIndex, setFrameIndex] = useState(0);
-  const [phoneTf, setPhoneTf] = useState<'1D' | '1W' | '1M' | '3M' | '1Y'>('1D');
-  const [phoneSymIndex, setPhoneSymIndex] = useState(0);
-  const [miniBars, setMiniBars] = useState<MarketMiniBar[]>([]);
-  const [miniBarsLoading, setMiniBarsLoading] = useState(true);
+  const [artworkOpen, setArtworkOpen] = useState(false);
   const [nyClock, setNyClock] = useState(() => getNyClock());
   const [freeChartSymbol, setFreeChartSymbol] = useState<string>('EURUSD');
-  const [freeChartTf, setFreeChartTf] = useState<AnalyzerTimeframe>('1M');
+  const [freeChartTf, setFreeChartTf] = useState<AnalyzerTimeframe>('15M');
+
+  const drtPriceUsd = config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd;
 
   useEffect(() => {
     const clockId = setInterval(() => {
@@ -152,14 +133,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     return () => clearInterval(clockId);
   }, []);
 
-  useEffect(() => {
-    if (!heroMotionActive) return;
-    const frameId = setInterval(() => {
-      setFrameIndex((i) => (i + 1) % HERO_FRAMES.length);
-    }, 7000);
-    return () => clearInterval(frameId);
-  }, [heroMotionActive]);
-
   const featuredQuotes = useMemo(() => {
     const targetSyms = ['XAUUSD', 'EURUSD', 'BTCUSD', 'NAS100', 'GBPUSD'];
     return targetSyms
@@ -167,107 +140,53 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       .filter(Boolean);
   }, [quotes]);
 
-  const phoneQuote = featuredQuotes[phoneSymIndex % Math.max(1, featuredQuotes.length)] || quotes[0];
-  const phoneSymbol = phoneQuote?.sym || 'XAUUSD';
-
-  useEffect(() => {
-    let cancelled = false;
-    const loadMiniBars = async () => {
-      try {
-        const res = await apiFetch<{ bars: MarketMiniBar[] }>(
-          `/api/market/mini-candles?symbol=${encodeURIComponent(phoneSymbol)}&tf=${encodeURIComponent(phoneTf)}`
-        );
-        if (!cancelled && Array.isArray(res.bars)) {
-          setMiniBars(res.bars.slice(-12));
-        }
-      } catch {
-        if (!cancelled) {
-          setMiniBars([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setMiniBarsLoading(false);
-        }
-      }
-    };
-
-    setMiniBarsLoading(true);
-    loadMiniBars();
-    if (!heroMotionActive) {
-      return () => {
-        cancelled = true;
-      };
-    }
-    const pollId = setInterval(loadMiniBars, 20000);
-    return () => {
-      cancelled = true;
-      clearInterval(pollId);
-    };
-  }, [phoneSymbol, phoneTf, heroMotionActive]);
-
-  const normalizedPhoneCandles = useMemo(() => {
-    if (!miniBars.length) return [];
-    const highs = miniBars.map((b) => b.high);
-    const lows = miniBars.map((b) => b.low);
-    const maxHigh = Math.max(...highs);
-    const minLow = Math.min(...lows);
-    const span = Math.max(maxHigh - minLow, 1e-9);
-    const toY = (price: number) => 66 - ((price - minLow) / span) * 58;
-    return miniBars.map((b) => ({
-      yHigh: toY(b.high),
-      yLow: toY(b.low),
-      yOpen: toY(b.open),
-      yClose: toY(b.close),
-      bull: b.close >= b.open,
-    }));
-  }, [miniBars]);
-
   return (
-    <div className="min-h-screen bg-[#F7F5F0] text-slate-950">
-      {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-6">
+    <div className="min-h-screen bg-[#050907] text-slate-100">
+      {/* Strict 3-Zone Obsidian Emerald Top Bar */}
+      <header className="sticky top-0 z-40 bg-[#050907]/90 backdrop-blur-md border-b border-emerald-500/15">
+        <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between gap-8">
           <a href="#top" className="shrink-0">
-            <BrandLogo variant="dark" size="md" />
+            <BrandLogo variant="light" size="md" />
           </a>
 
-          <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
+          <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
             <a
               href="#top"
-              className="text-slate-950 hover:text-slate-950 transition-colors whitespace-nowrap shrink-0 border-b-2 border-amber-500 pb-0.5"
+              className="text-[#16E563] hover:text-[#2BF074] transition-colors whitespace-nowrap shrink-0 border-b-2 border-[#16E563] pb-0.5"
             >
               Home
             </a>
             <a
               href="#free-chart"
-              className="hover:text-slate-950 transition-colors whitespace-nowrap shrink-0"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Live Chart
+              Markets
             </a>
             <a
               href="#capabilities"
-              className="hover:text-slate-950 transition-colors whitespace-nowrap shrink-0"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Capabilities
+              Analyzers
             </a>
             <a
               href="#pricing"
-              className="hover:text-slate-950 transition-colors whitespace-nowrap shrink-0"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
               Pricing
             </a>
             <a
               href="#education-preview"
-              className="hover:text-slate-950 transition-colors whitespace-nowrap shrink-0"
+              className="hover:text-white transition-colors whitespace-nowrap shrink-0"
             >
-              Education
+              Learn
             </a>
           </nav>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             <button
+              type="button"
               onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-              className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-5 py-2 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-sm font-bold rounded-full transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               {user ? 'Open Dashboard →' : 'Get Started →'}
             </button>
@@ -275,371 +194,135 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </header>
 
-      {/* Hero Section — Warm Ivory & Gold */}
+      {/* Hero Section — Obsidian Black & Electric Neon Emerald featuring the exact brand artwork */}
       <section
         id="top"
-        className="relative overflow-hidden bg-[#F7F5F0] text-slate-950 border-b border-slate-200"
+        className="relative overflow-hidden bg-[#050907] text-white border-b border-emerald-500/15"
         style={{
-          backgroundImage: 'radial-gradient(circle at 65% 42%, rgba(245, 158, 11, 0.16), transparent 60%)',
+          backgroundImage:
+            'radial-gradient(circle at 68% 36%, rgba(22, 229, 99, 0.22), transparent 52%), radial-gradient(circle at 12% 70%, rgba(22, 229, 99, 0.12), transparent 44%)',
         }}
       >
-        {/* Live Animated Wireframe Globe, Ascending Gold Trajectory Wave & Pulsing Candlesticks */}
-        <svg
-          aria-hidden="true"
-          viewBox="0 0 1440 620"
-          className="pointer-events-none absolute inset-0 w-full h-full opacity-25"
-          preserveAspectRatio="xMidYMid slice"
-        >
-          <defs>
-            <linearGradient id="goldWaveGrad" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.1" />
-              <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="#fde68a" stopOpacity="0.3" />
-            </linearGradient>
-          </defs>
-
-          {/* Rotating Golden Globe */}
-          <g
-            className={heroMotionActive ? 'animate-hero-globe' : 'animate-hero-globe animate-hero-paused'}
-            stroke="#fbbf24"
-            strokeOpacity="0.45"
-            fill="none"
-            strokeWidth="1.2"
-          >
-            <circle cx="960" cy="255" r="205" />
-            <circle cx="960" cy="255" r="145" strokeDasharray="6 6" />
-            <ellipse cx="960" cy="255" rx="205" ry="74" />
-            <ellipse cx="960" cy="255" rx="125" ry="205" />
-            <ellipse cx="960" cy="255" rx="52" ry="205" />
-            <line x1="755" y1="255" x2="1165" y2="255" />
-          </g>
-
-          {/* Live Bullish Gold Momentum Curve */}
-          <path
-            d="M 40 530 Q 340 490 580 390 T 1060 270 T 1420 120"
-            fill="none"
-            stroke="url(#goldWaveGrad)"
-            strokeWidth="2.5"
-            className={heroMotionActive ? 'animate-hero-wave' : 'animate-hero-wave animate-hero-paused'}
-          />
-
-          {/* Live Pulsing Ascending Golden Candlesticks */}
-          {[
-            { x: 180, y: 470, h: 45 },
-            { x: 225, y: 455, h: 52 },
-            { x: 270, y: 430, h: 68 },
-            { x: 315, y: 440, h: 48 },
-            { x: 360, y: 405, h: 72 },
-            { x: 405, y: 380, h: 85 },
-            { x: 450, y: 392, h: 54 },
-            { x: 495, y: 350, h: 78 },
-            { x: 540, y: 320, h: 92 },
-            { x: 1200, y: 265, h: 64 },
-            { x: 1245, y: 220, h: 80 },
-            { x: 1290, y: 175, h: 96 },
-            { x: 1335, y: 190, h: 55 },
-            { x: 1380, y: 130, h: 108 },
-          ].map((c, idx) => (
-            <g
-              key={idx}
-              className={heroMotionActive ? 'animate-hero-candle' : 'animate-hero-candle animate-hero-paused'}
-              style={{ animationDelay: `${idx * 0.22}s` }}
-            >
-              <line
-                x1={c.x + 6}
-                y1={c.y - 18}
-                x2={c.x + 6}
-                y2={c.y + c.h + 18}
-                stroke="#f59e0b"
-                strokeWidth="1.5"
-                strokeOpacity="0.55"
-              />
-              <rect
-                x={c.x}
-                y={c.y}
-                width="12"
-                height={c.h}
-                rx="2"
-                fill={idx % 2 === 0 ? '#f59e0b' : '#fbbf24'}
-                fillOpacity={idx % 3 === 0 ? '0.42' : '0.72'}
-              />
-            </g>
-          ))}
-        </svg>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-12 pb-8 lg:pt-16 lg:pb-10">
+        <div className="relative z-10 max-w-7xl mx-auto px-6 pt-12 pb-10 lg:pt-16 lg:pb-12">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
             {/* Left Copy Column */}
-            <div className="lg:col-span-6 flex flex-col justify-center">
-              <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 mb-5">
-                <Zap className="w-3.5 h-3.5 text-amber-600" />
-                <span>Trade the Global Markets</span>
-                <span aria-hidden="true">·</span>
-                <span className="text-slate-600">Grid Pips</span>
+            <div className="lg:col-span-5 flex flex-col justify-center">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#16E563] mb-4">
+                <Zap className="w-3.5 h-3.5 text-[#16E563]" />
+                <span>Trade Smarter. Grow Bigger.</span>
+                <span aria-hidden="true" className="text-slate-600">·</span>
+                <span className="font-mono tabular-nums text-slate-400">NY {nyClock}</span>
               </div>
 
               <h1
-                className="font-bold tracking-tight mb-5"
-                style={{ fontSize: 'clamp(2.35rem, 4.3vw, 3.85rem)', lineHeight: 1.06, textWrap: 'balance' }}
+                className="font-extrabold tracking-tight mb-3"
+                style={{ fontSize: 'clamp(2.5rem, 4.4vw, 3.85rem)', lineHeight: 1.04, textWrap: 'balance' }}
               >
-                <span className="block text-slate-950">Smarter Trading.</span>
-                <span className="block bg-gradient-to-r from-amber-600 via-amber-500 to-amber-700 bg-clip-text text-transparent">
-                  Greater Possibilities.
-                </span>
+                <span className="text-white">Grid</span>
+                <span className="text-[#16E563]">pips</span>
               </h1>
 
-              <p className="text-[15px] lg:text-base font-normal text-slate-600 leading-relaxed mb-8 max-w-lg">
-                Join Grid Pips — two dedicated institutional market analyzers (ICT Strategy Analyzer &amp; Ali Khan DRT Dealing Range Analyzer) built for Exness traders worldwide.
+              <div className="text-xl sm:text-2xl font-bold tracking-tight text-white mb-5">
+                Trade <span className="text-slate-500 mx-1">·</span>{' '}
+                <span className="text-[#16E563]">Invest</span>{' '}
+                <span className="text-slate-500 mx-1">·</span> Prosper
+              </div>
+
+              <p className="text-[15px] lg:text-base font-normal text-slate-300 leading-relaxed mb-8 max-w-lg">
+                Your ultimate trading platform for forex, gold, indices, and crypto. Scan live TradingView liquidity sweeps in the ICT Analyzer, map 4-quadrant PD Arrays in the DRT Analyzer, and manage every setup in one desk.
               </p>
 
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3.5">
                 <button
+                  type="button"
                   onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                  className="px-6 py-3.5 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer"
+                  className="px-6 py-3.5 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-sm font-bold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap cursor-pointer shadow-[0_0_28px_rgba(22,229,99,0.28)]"
                 >
                   {user ? 'Open Dashboard →' : 'Start Trading Now →'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setDemoOpen(true)}
-                  className="px-5 py-3.5 text-sm font-semibold text-slate-900 rounded-full border border-slate-300 hover:border-amber-500 bg-white/90 inline-flex items-center gap-2.5 whitespace-nowrap transition-colors cursor-pointer"
+                  className="px-5 py-3.5 text-sm font-semibold text-white rounded-full border border-emerald-500/35 hover:border-[#16E563] bg-white/5 hover:bg-white/10 inline-flex items-center gap-2.5 whitespace-nowrap transition-colors cursor-pointer"
                 >
-                  <Play className="w-4 h-4 text-amber-600" />
+                  <Play className="w-4 h-4 text-[#16E563]" />
                   Watch Demo
                 </button>
+                {!user && (
+                  <button
+                    type="button"
+                    onClick={() => onGoAuth('login')}
+                    className="px-4 py-3.5 text-sm font-semibold text-slate-300 hover:text-[#16E563] whitespace-nowrap transition-colors cursor-pointer"
+                  >
+                    Member Login
+                  </button>
+                )}
               </div>
 
-              {/* 3-Metric Bottom Row */}
-              <div className="mt-10 pt-7 border-t border-slate-300/80 grid grid-cols-3 gap-6 max-w-lg">
-                <div className="pr-4 border-r border-slate-300">
-                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-amber-600">
+              {/* 3-Metric Proof Row */}
+              <div className="mt-10 pt-7 border-t border-emerald-500/20 grid grid-cols-3 gap-5 max-w-lg">
+                <div className="pr-4 border-r border-emerald-500/15">
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-[#16E563]">
                     <TrendingUp className="w-4 h-4 shrink-0" />
                     <span>${config.analyzerPriceUsd.toFixed(2)}</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">ICT &amp; DRT Analyzers</div>
+                  <div className="text-xs text-slate-400 mt-1">ICT &amp; DRT Analyzers</div>
                 </div>
-                <div className="pr-4 border-r border-slate-300">
-                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-amber-600">
-                    <ShieldCheck className="w-4 h-4 shrink-0" />
+                <div className="pr-4 border-r border-emerald-500/15">
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-white">
+                    <ShieldCheck className="w-4 h-4 shrink-0 text-[#16E563]" />
                     <span>Free</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">Exness Desk</div>
+                  <div className="text-xs text-slate-400 mt-1">Exness Desk</div>
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-amber-600">
+                  <div className="flex items-center gap-1.5 text-2xl font-bold font-mono tabular-nums text-[#F5B82E]">
                     <Zap className="w-4 h-4 shrink-0" />
                     <span>{config.commissionPct}%</span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">Referral Payout</div>
+                  <div className="text-xs text-slate-400 mt-1">Referral Payout</div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column: Landscape Live Animated 3D Picture + Tilted Live Interactive Grid Pips Smartphone Terminal */}
-            <div className="lg:col-span-6 relative">
-              <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-amber-500/25 bg-black">
-                {HERO_FRAMES.map((frame, idx) => {
-                  const isActive = idx === frameIndex;
-                  return (
-                    <img
-                      key={frame.src}
-                      src={frame.src}
-                      alt={frame.alt}
-                      referrerPolicy="no-referrer"
-                      className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-1000 ${
-                        isActive ? 'opacity-90' : 'opacity-0 pointer-events-none'
-                      } ${
-                        heroMotionActive
-                          ? 'animate-hero-picture'
-                          : 'animate-hero-picture animate-hero-picture-paused'
-                      }`}
-                    />
-                  );
-                })}
-                {/* Black & Gold Atmospheric Rim Scrim */}
-                <div
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background:
-                      'linear-gradient(120deg, rgba(5,5,5,0.45) 0%, rgba(245,158,11,0.14) 50%, rgba(5,5,5,0.88) 100%)',
-                  }}
-                />
-
-                {/* Live Picture & Animation Controls */}
-                <div className="absolute top-3 left-3 flex items-center gap-1.5 z-10">
+            {/* Right Column: Exact Uploaded Picture Showcase */}
+            <div className="lg:col-span-7 relative">
+              <div className="relative rounded-2xl overflow-hidden border border-emerald-500/35 bg-[#070E0A] shadow-[0_24px_70px_rgba(0,0,0,0.75)]">
+                <div className="relative bg-[#050907]">
+                  <ImageWithFallback
+                    src={LANDING_IMAGES.brandHeroArtwork}
+                    alt="Grid Pips Trade Invest Prosper platform hero and live dashboard showcase"
+                    className="w-full h-auto block object-contain"
+                  />
                   <button
                     type="button"
-                    onClick={() => setHeroMotionActive((m) => !m)}
-                    className="px-2.5 py-1 bg-black/80 border border-neutral-700 hover:border-amber-400/70 text-white text-[11px] font-medium rounded-lg inline-flex items-center gap-1 cursor-pointer"
+                    onClick={() => setArtworkOpen(true)}
+                    aria-label="Inspect full platform artwork"
+                    className="absolute top-3 right-3 px-3 py-1.5 rounded-lg bg-[#050907]/85 border border-emerald-500/35 hover:border-[#16E563] text-xs font-semibold text-white inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                   >
-                    {heroMotionActive ? <Pause className="w-3 h-3 text-amber-400" /> : <Play className="w-3 h-3 text-amber-400" />}
-                    {heroMotionActive ? 'Pause Live' : 'Play Live'}
+                    <Maximize2 className="w-3.5 h-3.5 text-[#16E563]" />
+                    <span>Full View</span>
                   </button>
-                  <div className="flex items-center gap-0.5 bg-black/80 border border-neutral-700 rounded-lg p-0.5">
-                    {HERO_FRAMES.map((_, idx) => (
-                      <button
-                        key={idx}
-                        type="button"
-                        onClick={() => setFrameIndex(idx)}
-                        aria-label={`Switch live hero scene ${idx + 1}`}
-                        className={`px-1.5 py-0.5 text-[10px] font-mono rounded cursor-pointer ${
-                          idx === frameIndex ? 'bg-amber-400 text-black font-semibold' : 'text-neutral-300'
-                        }`}
-                      >
-                        0{idx + 1}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-
-                {/* Bottom Live NY Session Caption */}
-                <div className="absolute bottom-3 left-3 right-36 text-[11px] font-mono tabular-nums text-neutral-200 truncate pointer-events-none">
-                  {HERO_FRAMES[frameIndex].caption} · NY {nyClock}
+                <div className="px-5 py-3 bg-[#09120D] border-t border-emerald-500/15 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="italic text-emerald-200/90 font-medium">
+                    &ldquo;Your Financial Freedom Awaits — Dream it. Trade it. Achieve it.&rdquo;
+                  </span>
+                  <span className="font-mono text-slate-400">
+                    ICT Liquidity + Ali Khan DRT Engine
+                  </span>
                 </div>
               </div>
-
-              {/* Tilted Live Animated Grid Pips Smartphone Terminal */}
-              {phoneQuote && (
-                <div className="mt-5 sm:mt-0 sm:w-64 sm:ml-auto lg:absolute lg:-bottom-6 lg:right-2 lg:w-60 bg-[#0b0b0d] border-2 border-amber-400/55 rounded-3xl p-4 shadow-2xl lg:-rotate-3 transition-transform duration-300 hover:rotate-0">
-                  <div className="flex items-center justify-between pb-2.5 border-b border-neutral-800">
-                    <BrandLogo variant="light" size="sm" />
-                    <button
-                      type="button"
-                      onClick={() => setPhoneSymIndex((i) => i + 1)}
-                      className="text-[10px] font-mono text-amber-400 hover:text-amber-300 cursor-pointer"
-                    >
-                      Switch Pair ↻
-                    </button>
-                  </div>
-
-                  <div className="pt-3 pb-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-neutral-300 font-mono">
-                        {phoneQuote.sym}
-                      </span>
-                      <span
-                        className={`text-[10px] font-mono ${
-                          phoneQuote.isMarketOpen === false ? 'text-rose-400' : 'text-amber-400'
-                        }`}
-                      >
-                        {phoneQuote.marketStatusLabel === 'Open'
-                          ? 'LIVE TICK'
-                          : phoneQuote.marketStatusLabel
-                            ? phoneQuote.marketStatusLabel.toUpperCase()
-                            : 'LIVE TICK'}
-                      </span>
-                    </div>
-                    <div
-                      className={`text-2xl font-bold font-mono tabular-nums mt-0.5 transition-colors duration-200 ${
-                        phoneQuote.chgPct >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {phoneQuote.price.toFixed(phoneQuote.digits)}
-                    </div>
-                    <div
-                      className={`text-xs font-mono tabular-nums ${
-                        phoneQuote.chgPct >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                      }`}
-                    >
-                      {phoneQuote.chgPct >= 0 ? '▲ +' : '▼ '}
-                      {phoneQuote.chgPct.toFixed(2)}%
-                    </div>
-                  </div>
-
-                  {/* Live TradingView Candlestick Chart */}
-                  <div className="my-2 bg-black/80 border border-neutral-800 rounded-xl p-2">
-                    <svg viewBox="0 0 180 72" className="w-full h-16">
-                      {normalizedPhoneCandles.length > 0 ? (
-                        normalizedPhoneCandles.map((c, idx) => {
-                          const step = 164 / Math.max(1, normalizedPhoneCandles.length);
-                          const x = 8 + idx * step;
-                          const col = c.bull ? '#22c55e' : '#f59e0b';
-                          const yTop = Math.min(c.yOpen, c.yClose);
-                          const h = Math.max(2.5, Math.abs(c.yClose - c.yOpen));
-                          return (
-                            <g key={idx}>
-                              <line
-                                x1={x + 3}
-                                y1={c.yHigh}
-                                x2={x + 3}
-                                y2={c.yLow}
-                                stroke={col}
-                                strokeWidth="1.2"
-                              />
-                              <rect
-                                x={x}
-                                y={yTop}
-                                width="6"
-                                height={h}
-                                fill={col}
-                                rx="1"
-                              />
-                            </g>
-                          );
-                        })
-                      ) : (
-                        <text
-                          x="90"
-                          y="39"
-                          textAnchor="middle"
-                          fill="#94a3b8"
-                          fontSize="8.5"
-                          fontFamily="monospace"
-                        >
-                          {miniBarsLoading ? 'Loading TradingView bars...' : 'Awaiting TradingView feed'}
-                        </text>
-                      )}
-                    </svg>
-
-                    <div className="mt-1.5 flex items-center justify-between gap-1">
-                      {(['1D', '1W', '1M', '3M', '1Y'] as const).map((tf) => (
-                        <button
-                          key={tf}
-                          type="button"
-                          onClick={() => setPhoneTf(tf)}
-                          className={`flex-1 py-0.5 text-[10px] font-mono rounded cursor-pointer ${
-                            phoneTf === tf ? 'bg-amber-400 text-black font-semibold' : 'text-neutral-400 hover:text-white'
-                          }`}
-                        >
-                          {tf}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                      className="py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      Buy ↗
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                      className="py-2 bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold rounded-xl cursor-pointer"
-                    >
-                      Sell ↘
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Live TradingView Market Session Summary + Bottom 5-Item Market Quote Strip */}
+          {/* Live TradingView Market Session Summary + 5-Item Quote Strip */}
           {marketStatus && (
-            <div className="mt-10 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-600">
-              <span className="inline-flex items-center gap-2 font-semibold text-slate-800">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    marketStatus.traditionalOpen ? 'bg-emerald-500' : 'bg-amber-500'
-                  }`}
-                />
-                TradingView Live Session: {marketStatus.summaryLabel}
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-slate-400">
+              <span className="font-semibold text-emerald-300">
+                TradingView Live Session · {marketStatus.summaryLabel}
               </span>
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-slate-400 tabular-nums">
                 {marketStatus.openCount}/{marketStatus.totalCount} markets open · Updated{' '}
                 {new Date(marketStatus.checkedAt).toLocaleTimeString()}
               </span>
@@ -647,32 +330,30 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           )}
 
           <div
-            className={`${marketStatus ? 'mt-3' : 'mt-12'} pt-4 pb-3 border-t border-b border-slate-300 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4`}
+            className={`${
+              marketStatus ? 'mt-3' : 'mt-12'
+            } pt-4 pb-3 border-t border-b border-emerald-500/20 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4`}
           >
             {featuredQuotes.map((q) => {
               const up = q.chgPct >= 0;
               return (
-                <div
+                <button
+                  type="button"
                   key={q.sym}
+                  onClick={() => {
+                    setFreeChartSymbol(q.sym);
+                    document.getElementById('free-chart')?.scrollIntoView({ behavior: 'smooth' });
+                  }}
                   title={q.marketStatusLabel ? `${q.sym} · TradingView: ${q.marketStatusLabel}` : q.sym}
-                  className="flex items-center justify-between lg:justify-center gap-2.5 text-xs font-mono tabular-nums lg:border-r lg:last:border-r-0 border-slate-300 pr-2"
+                  className="flex items-center justify-between lg:justify-center gap-2.5 text-xs font-mono tabular-nums lg:border-r lg:last:border-r-0 border-emerald-500/15 pr-2 hover:text-[#16E563] transition-colors cursor-pointer"
                 >
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-slate-950">
-                    {typeof q.isMarketOpen === 'boolean' && (
-                      <span
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          q.isMarketOpen ? 'bg-emerald-500' : 'bg-rose-400'
-                        }`}
-                      />
-                    )}
-                    {q.sym}
-                  </span>
-                  <span className="text-slate-600">{q.price.toFixed(q.digits)}</span>
-                  <span className={up ? 'text-emerald-600' : 'text-rose-600'}>
+                  <span className="font-bold text-white">{q.sym}</span>
+                  <span className="text-slate-300">{q.price.toFixed(q.digits)}</span>
+                  <span className={up ? 'text-[#16E563]' : 'text-rose-400'}>
                     {up ? '▲ +' : '▼ '}
                     {q.chgPct.toFixed(2)}%
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
@@ -680,22 +361,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="mt-4 flex justify-center">
             <a
               href="#free-chart"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-amber-700 transition-colors"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-[#16E563] transition-colors"
             >
               <ChevronDown className="w-3.5 h-3.5" />
-              Open Free Live Chart
+              Open Free Live Market Chart
             </a>
           </div>
         </div>
       </section>
 
       {/* Free Public Live Market Chart (No Login or Subscription Required) */}
-      <section id="free-chart" className="bg-white text-slate-950 py-14 border-b border-slate-200">
+      <section id="free-chart" className="bg-[#080E0B] text-white py-14 border-b border-emerald-500/15">
         <div className="max-w-7xl mx-auto px-6 space-y-5">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold text-amber-700 mb-1">Free Live Terminal · No Account Required</p>
-              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-950">
+              <p className="text-xs font-semibold text-[#16E563] mb-1">
+                Free Live Terminal · No Account Required
+              </p>
+              <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                 Free Live Market Chart (1M to 1W)
               </h2>
             </div>
@@ -705,25 +388,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 value={freeChartSymbol}
                 onChange={(e) => setFreeChartSymbol(e.target.value)}
                 aria-label="Free chart symbol"
-                className="px-3 py-2 text-xs font-mono font-semibold bg-white border border-slate-300 text-slate-950 rounded-lg"
+                className="px-3 py-2 text-xs font-mono font-semibold bg-[#0E1712] border border-emerald-500/25 text-white rounded-lg focus:outline-none focus:border-[#16E563]"
               >
                 {TRADING_SYMBOLS.map((sym) => (
-                  <option key={sym} value={sym}>
+                  <option key={sym} value={sym} className="bg-[#0B120E] text-white">
                     {sym}
                   </option>
                 ))}
               </select>
 
-              <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0D1611] border border-emerald-500/20 rounded-lg">
                 {ANALYZER_TIMEFRAMES.map((tf) => (
                   <button
                     key={tf}
                     type="button"
                     onClick={() => setFreeChartTf(tf)}
-                    className={`px-2.5 py-1.5 text-xs font-mono font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 ${
+                    className={`px-2.5 py-1.5 text-xs font-mono font-semibold rounded-md cursor-pointer whitespace-nowrap shrink-0 transition-colors ${
                       freeChartTf === tf
-                        ? 'bg-amber-400 text-black'
-                        : 'text-slate-600 hover:text-slate-950'
+                        ? 'bg-[#16E563] text-[#041108]'
+                        : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     {tf}
@@ -736,9 +419,18 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={() =>
                   user ? onSelectProduct('analyzer', freeChartSymbol, freeChartTf) : onGoAuth('register')
                 }
-                className="px-4 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0"
+                className="px-4 py-2 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs font-bold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
               >
-                Scan {freeChartSymbol} ({freeChartTf}) in ICT Analyzer →
+                Scan in ICT Analyzer →
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  user ? onSelectProduct('drt_analyzer', freeChartSymbol, freeChartTf) : onGoAuth('register')
+                }
+                className="px-4 py-2 bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-xs font-bold rounded-lg cursor-pointer whitespace-nowrap shrink-0 transition-colors"
+              >
+                Scan in DRT Analyzer →
               </button>
             </div>
           </div>
@@ -751,43 +443,46 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Capabilities Asymmetric Bento with 3D Human Visuals */}
-      <section id="capabilities" className="bg-[#F7F5F0] text-slate-950 py-16 lg:py-20 border-b border-slate-200">
+      {/* Capabilities Bento */}
+      <section id="capabilities" className="bg-[#050907] text-white py-16 lg:py-20 border-b border-emerald-500/15">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mb-10">
-            <p className="text-xs font-semibold mb-2 text-amber-700">Core Architecture</p>
-            <h2 className="text-3xl font-bold tracking-tight text-slate-950" style={{ textWrap: 'balance' }}>
+            <p className="text-xs font-semibold mb-2 text-[#16E563]">Core Architecture</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white" style={{ textWrap: 'balance' }}>
               Two separate institutional analyzers: ICT Liquidity &amp; Ali Khan DRT Dealing Ranges.
             </h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Card 1: ICT Analyzer */}
-            <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-              <div className="h-64 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
+            <div className="lg:col-span-6 bg-[#0B120E] border border-emerald-500/20 hover:border-[#16E563]/50 transition-colors rounded-2xl overflow-hidden flex flex-col">
+              <div className="h-60 sm:h-68 overflow-hidden bg-[#070D09] border-b border-emerald-500/15 relative">
                 <ImageWithFallback
                   src={LANDING_IMAGES.analystIct3d}
-                  alt="3D female market strategist reviewing ICT smart money charts"
+                  alt="Market strategist reviewing ICT liquidity pools and fair value gaps"
                   className="w-full h-full object-cover object-top"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0B120E] via-transparent to-transparent" />
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-semibold mb-2 text-amber-700">
+                  <div className="text-xs font-semibold mb-2 text-[#16E563]">
                     01. ICT Liquidity Engine · ${config.analyzerPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
-                  <h3 className="text-xl font-bold text-slate-950 mb-2">
-                    ICT Strategy Market Analyzer
+                  <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-[#16E563] shrink-0" />
+                    <span>ICT Strategy Market Analyzer</span>
                   </h3>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                  <p className="text-sm text-slate-300 leading-relaxed mb-5">
                     Engineered around the Inner Circle Trader methodology (YouTube channel {config.ictYoutubeChannelId}). Automatically maps Buy-Side and Sell-Side Liquidity pools, Displacement Fair Value Gaps, Order Blocks, Optimal Trade Entry (0.618–0.786), and active London/New York Killzones.
                   </p>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                  <span className="text-xs font-mono text-slate-500">EURUSD · XAUUSD · NAS100 · BTCUSD</span>
+                <div className="flex items-center justify-between pt-4 border-t border-emerald-500/15">
+                  <span className="text-xs font-mono text-slate-400">EURUSD · XAUUSD · NAS100 · BTCUSD</span>
                   <button
+                    type="button"
                     onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                    className="text-sm font-semibold cursor-pointer text-amber-700 hover:text-amber-600"
+                    className="text-sm font-semibold cursor-pointer text-[#16E563] hover:text-[#2BF074]"
                   >
                     Subscribe ICT Analyzer →
                   </button>
@@ -796,31 +491,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 2: DRT Analyzer */}
-            <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl overflow-hidden flex flex-col">
-              <div className="h-64 sm:h-72 overflow-hidden bg-slate-900 border-b border-slate-200">
+            <div className="lg:col-span-6 bg-[#0B120E] border border-amber-400/25 hover:border-[#F5B82E]/60 transition-colors rounded-2xl overflow-hidden flex flex-col">
+              <div className="h-60 sm:h-68 overflow-hidden bg-[#070D09] border-b border-amber-400/15 relative">
                 <ImageWithFallback
                   src={LANDING_IMAGES.automatorEa3d}
-                  alt="3D institutional trader mapping Dealing Range Theory quadrants and PD Arrays"
+                  alt="Institutional trader mapping Dealing Range Theory quadrants and PD Arrays"
                   className="w-full h-full object-cover object-top"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0B120E] via-transparent to-transparent" />
               </div>
               <div className="p-7 flex-1 flex flex-col justify-between">
                 <div>
-                  <div className="text-xs font-semibold mb-2 text-amber-700">
-                    02. Dealing Range Theory · ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo Subscription (Save up to 20%)
+                  <div className="text-xs font-semibold mb-2 text-[#F5B82E]">
+                    02. Dealing Range Theory · ${drtPriceUsd.toFixed(2)}/mo Subscription (Save up to 20%)
                   </div>
-                  <h3 className="text-xl font-bold text-slate-950 mb-2">
-                    DRT Strategy Market Analyzer
+                  <h3 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                    <Layers className="w-5 h-5 text-[#F5B82E] shrink-0" />
+                    <span>DRT Strategy Market Analyzer</span>
                   </h3>
-                  <p className="text-sm text-slate-600 leading-relaxed mb-5">
+                  <p className="text-sm text-slate-300 leading-relaxed mb-5">
                     Built strictly around Ali Khan ICT&apos;s Dealing Range Theory. Maps 0.00 / 0.25 / 0.50 / 0.75 / 1.00 DRT quadrants, classifies Type 1/2/3 dealing ranges, detects live correlated SMT Divergence, 50% DRT Equilibrium Flips, and Premium vs. Discount PD Arrays (FVG, OB, Breaker &amp; Rejection Blocks).
                   </p>
                 </div>
-                <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-                  <span className="text-xs font-mono text-slate-500">0/25/50/75/100 DRT + SMT + PD Arrays</span>
+                <div className="flex items-center justify-between pt-4 border-t border-emerald-500/15">
+                  <span className="text-xs font-mono text-slate-400">0/25/50/75/100 DRT + SMT + PD Arrays</span>
                   <button
+                    type="button"
                     onClick={() => (user ? onSelectProduct('drt_analyzer') : onGoAuth('register'))}
-                    className="text-sm font-semibold cursor-pointer text-amber-700 hover:text-amber-600"
+                    className="text-sm font-semibold cursor-pointer text-[#F5B82E] hover:text-amber-300"
                   >
                     Subscribe DRT Analyzer →
                   </button>
@@ -829,46 +527,51 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* Card 3: Education + Community */}
-            <div id="education-preview" className="lg:col-span-12 bg-white border border-slate-200 rounded-xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-              <div className="lg:col-span-5 h-64 lg:h-auto bg-slate-900">
+            <div
+              id="education-preview"
+              className="lg:col-span-12 bg-[#0B120E] border border-emerald-500/20 rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12"
+            >
+              <div className="lg:col-span-5 h-64 lg:h-auto bg-[#070D09] relative">
                 <ImageWithFallback
                   src={LANDING_IMAGES.mentorCommunity3d}
-                  alt="3D trading mentor presenting Smart Money Concepts liquidity structure"
+                  alt="Trading mentor presenting Smart Money Concepts and Dealing Range structure"
                   className="w-full h-full object-cover object-top"
                 />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#0B120E]/80 hidden lg:block" />
               </div>
               <div className="lg:col-span-7 p-8 flex flex-col justify-center">
-                <div className="text-xs font-semibold mb-2 text-amber-700">
+                <div className="text-xs font-semibold mb-2 text-[#16E563]">
                   03. Free Curriculum &amp; Live Community · Included with Exness Registration
                 </div>
-                <h3 className="text-2xl font-bold text-slate-950 mb-3">
-                  ICT Mentorship Curriculum, Smart Money Concepts &amp; JakoyoFX Telegram
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  ICT Mentorship, Ali Khan DRT Framework &amp; JakoyoFX Telegram
                 </h3>
-                <p className="text-sm text-slate-600 leading-relaxed mb-6">
-                  Study directly from the official ICT YouTube library alongside structured Smart Money Concepts (SMC) breakdowns covering BOS, CHoCH, Inducement, and Mitigation Blocks. Connect with active traders inside our Telegram channel for daily bias discussions.
+                <p className="text-sm text-slate-300 leading-relaxed mb-6">
+                  Study directly from the official ICT YouTube library and Ali Khan&apos;s Dealing Range Theory breakdowns alongside structured Smart Money Concepts (SMC) modules. Connect with active traders inside our Telegram channel for daily killzone bias discussions.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6 text-sm text-slate-200">
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-[#16E563]" />
                     <span>Unlimited Trading Journal with screenshot uploads &amp; analytics</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-[#16E563]" />
                     <span>$10,000 Paper Trading Simulator &amp; 8 Risk Calculators</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-[#16E563]" />
                     <span>Official TradingView Advanced Charts &amp; Economic Calendar</span>
                   </div>
                   <div className="flex items-start gap-2.5">
-                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
-                    <span>Automated email confirmations &amp; encrypted session security</span>
+                    <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0 text-[#16E563]" />
+                    <span>{config.commissionPct}% recurring influencer referral payouts</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
+                    type="button"
                     onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                    className="px-5 py-2.5 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors cursor-pointer"
+                    className="px-5 py-2.5 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-sm font-bold rounded-full transition-colors cursor-pointer"
                   >
                     Start Free with Exness
                   </button>
@@ -876,10 +579,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     href={config.telegramUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-5 py-2.5 bg-slate-100 border border-slate-300 hover:border-amber-500 text-slate-950 text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2"
+                    className="px-5 py-2.5 bg-white/5 border border-emerald-500/30 hover:border-[#16E563] text-white text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2"
                   >
                     Open t.me/JakoyoFx
-                    <ArrowUpRight className="w-4 h-4" />
+                    <ArrowUpRight className="w-4 h-4 text-[#16E563]" />
                   </a>
                 </div>
               </div>
@@ -889,51 +592,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Transparent Pricing */}
-      <section id="pricing" className="py-16 bg-white text-slate-950 border-b border-slate-200">
+      <section id="pricing" className="py-16 bg-[#080E0B] text-white border-b border-emerald-500/15">
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-2xl mb-10">
-            <p className="text-xs font-semibold mb-2 text-amber-700">Transparent Access</p>
-            <h2 className="text-3xl font-bold tracking-tight text-slate-950">
-              Free trading desk for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)} pro modules.
+            <p className="text-xs font-semibold mb-2 text-[#16E563]">Transparent Access</p>
+            <h2 className="text-3xl font-bold tracking-tight text-white">
+              Free trading desk for Exness traders. Two ${config.analyzerPriceUsd.toFixed(2)}/mo pro analyzers.
             </h2>
-            <p className="text-sm text-slate-600 mt-2">
-              Pay seamlessly with Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) and mobile money checkout inside your dashboard.
+            <p className="text-sm text-slate-400 mt-2">
+              Pay seamlessly with M-Pesa Till ({config.mpesaTillNumber}) or Crypto (USDT TRC20, USDT ERC20, or Bitcoin BTC) inside your dashboard. Save 10% quarterly or 20% annually.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="border border-slate-200 rounded-xl p-7 flex flex-col justify-between bg-[#F7F5F0]">
+            {/* Free Core Desk */}
+            <div className="border border-emerald-500/20 rounded-2xl p-7 flex flex-col justify-between bg-[#0B120E]">
               <div>
-                <div className="text-xs font-medium text-slate-500 mb-1">For All Exness Registered Traders</div>
-                <h3 className="text-lg font-bold text-slate-950">Core Trading Desk</h3>
-                <div className="text-3xl font-bold font-mono tabular-nums text-slate-950 my-4">$0</div>
-                <ul className="space-y-2.5 text-sm text-slate-700 mb-6">
+                <div className="text-xs font-medium text-slate-400 mb-1">For All Exness Registered Traders</div>
+                <h3 className="text-lg font-bold text-white">Core Trading Desk</h3>
+                <div className="text-3xl font-bold font-mono tabular-nums text-white my-4">$0</div>
+                <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
                   <li>· TradingView Charts &amp; Watchlist</li>
                   <li>· Unlimited Trading Journal &amp; Analytics</li>
                   <li>· 8 Risk, Lot Size &amp; Margin Calculators</li>
                   <li>· $10,000 Paper Trading Simulator</li>
-                  <li>· ICT ({config.ictYoutubeChannelId}) &amp; SMC Lessons</li>
+                  <li>· ICT &amp; Ali Khan DRT Education Academy</li>
                 </ul>
               </div>
               <button
+                type="button"
                 onClick={() => (user ? onGoWorkspace() : onGoAuth('register'))}
-                className="w-full py-2.5 bg-white border border-slate-300 hover:border-amber-500 text-slate-950 text-sm font-semibold rounded-full transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-white/5 border border-emerald-500/30 hover:border-[#16E563] text-white text-sm font-semibold rounded-full transition-colors cursor-pointer"
               >
                 {user ? 'Open Dashboard' : 'Register via Exness IB'}
               </button>
             </div>
 
-            <div className="border-2 border-amber-500 rounded-xl p-7 flex flex-col justify-between bg-white shadow-sm">
+            {/* ICT Analyzer — Electric Neon Emerald */}
+            <div className="border-2 border-[#16E563] rounded-2xl p-7 flex flex-col justify-between bg-[#0D1A12] shadow-[0_0_35px_rgba(22,229,99,0.12)]">
               <div>
-                <div className="text-xs font-semibold mb-1 text-amber-700">ICT Algorithmic Scanner</div>
-                <h3 className="text-lg font-bold text-slate-950">ICT Strategy Market Analyzer</h3>
+                <div className="text-xs font-semibold mb-1 text-[#16E563]">ICT Algorithmic Scanner</div>
+                <h3 className="text-lg font-bold text-white">ICT Strategy Market Analyzer</h3>
                 <div className="my-4">
-                  <span className="text-3xl font-bold font-mono tabular-nums text-slate-950">
+                  <span className="text-3xl font-bold font-mono tabular-nums text-white">
                     ${config.analyzerPriceUsd.toFixed(2)}
                   </span>
-                  <span className="text-xs text-slate-500 ml-1">/month</span>
+                  <span className="text-xs text-slate-400 ml-1">/month</span>
                 </div>
-                <ul className="space-y-2.5 text-sm text-slate-700 mb-6">
+                <ul className="space-y-2.5 text-sm text-slate-200 mb-6">
                   <li>· Automated FVG (BISI / SIBI) Detection</li>
                   <li>· Bullish &amp; Bearish Order Block Mapping</li>
                   <li>· BSL / SSL Liquidity Sweep Targets</li>
@@ -942,24 +648,29 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </ul>
               </div>
               <button
+                type="button"
                 onClick={() => (user ? onSelectProduct('analyzer') : onGoAuth('register'))}
-                className="w-full py-2.5 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-sm font-bold rounded-full transition-colors cursor-pointer"
               >
                 Subscribe ICT Analyzer — ${config.analyzerPriceUsd.toFixed(2)}/mo
               </button>
             </div>
 
-            <div className="border border-slate-900 rounded-xl p-7 flex flex-col justify-between bg-slate-950 text-white">
+            {/* DRT Analyzer — VIP Gold matching the Go Pro card in the artwork */}
+            <div className="border-2 border-[#F5B82E]/70 rounded-2xl p-7 flex flex-col justify-between bg-gradient-to-b from-[#1A1508] via-[#11100A] to-[#0B100D]">
               <div>
-                <div className="text-xs font-semibold text-amber-400 mb-1">Ali Khan Dealing Range Theory</div>
+                <div className="text-xs font-semibold text-[#F5B82E] mb-1 inline-flex items-center gap-1.5">
+                  <Crown className="w-3.5 h-3.5" />
+                  <span>Ali Khan Dealing Range Theory</span>
+                </div>
                 <h3 className="text-lg font-bold text-white">DRT Strategy Market Analyzer</h3>
                 <div className="my-4">
                   <span className="text-3xl font-bold font-mono tabular-nums text-white">
-                    ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}
+                    ${drtPriceUsd.toFixed(2)}
                   </span>
                   <span className="text-xs text-slate-400 ml-1">/month</span>
                 </div>
-                <ul className="space-y-2.5 text-sm text-slate-300 mb-6">
+                <ul className="space-y-2.5 text-sm text-slate-200 mb-6">
                   <li>· 0.00 / 0.25 / 0.50 / 0.75 / 1.00 DRT Grid</li>
                   <li>· Type 1, Type 2 &amp; Type 3 Dealing Ranges</li>
                   <li>· Live Correlated SMT Divergence Engine</li>
@@ -968,10 +679,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </ul>
               </div>
               <button
+                type="button"
                 onClick={() => (user ? onSelectProduct('drt_analyzer') : onGoAuth('register'))}
-                className="w-full py-2.5 bg-amber-400 text-black text-sm font-semibold rounded-full hover:bg-amber-300 transition-colors cursor-pointer"
+                className="w-full py-2.5 bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-sm font-bold rounded-full transition-colors cursor-pointer"
               >
-                Subscribe DRT Analyzer — ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo
+                Subscribe DRT Analyzer — ${drtPriceUsd.toFixed(2)}/mo
               </button>
             </div>
           </div>
@@ -979,19 +691,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </section>
 
       {/* Exness IB Banner */}
-      <section className="bg-[#F7F5F0] py-14 border-b border-slate-200">
+      <section className="bg-[#050907] py-14 border-b border-emerald-500/15">
         <div className="max-w-7xl mx-auto px-6">
-          <div className="bg-white text-slate-950 border border-slate-200 rounded-xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+          <div className="bg-[#0B120E] text-white border border-emerald-500/25 rounded-2xl p-8 lg:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="max-w-2xl">
-              <div className="flex items-center gap-2 text-xs font-semibold mb-2 text-amber-700">
+              <div className="flex items-center gap-2 text-xs font-semibold mb-2 text-[#16E563]">
                 <ShieldCheck className="w-4 h-4" />
                 <span>Required Brokerage Onboarding</span>
               </div>
-              <h3 className="text-2xl font-bold tracking-tight mb-2 text-slate-950">
+              <h3 className="text-2xl font-bold tracking-tight mb-2 text-white">
                 Open your Exness trading account to access Grid Pips.
               </h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free trading tools and ${config.analyzerPriceUsd.toFixed(2)}/mo pro subscription modules.
+              <p className="text-sm text-slate-300 leading-relaxed">
+                Account creation, deposits, and trade execution occur directly on Exness. Register using our official IB partner link, then link your Exness Account ID to enter both the free trading tools and ${config.analyzerPriceUsd.toFixed(2)}/mo pro subscription analyzers.
               </p>
             </div>
             <div className="flex flex-wrap gap-3 shrink-0">
@@ -999,14 +711,15 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 href={config.exnessIbUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-6 py-3 bg-amber-400 hover:bg-amber-300 text-black text-sm font-semibold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                className="px-6 py-3 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-sm font-bold rounded-full transition-colors inline-flex items-center gap-2 whitespace-nowrap"
               >
                 Open Exness Account
                 <ArrowUpRight className="w-4 h-4" />
               </a>
               <button
+                type="button"
                 onClick={() => onGoAuth('login')}
-                className="px-6 py-3 bg-slate-100 border border-slate-300 hover:border-amber-500 text-slate-950 text-sm font-semibold rounded-full transition-colors whitespace-nowrap cursor-pointer"
+                className="px-6 py-3 bg-white/5 border border-emerald-500/30 hover:border-[#16E563] text-white text-sm font-semibold rounded-full transition-colors whitespace-nowrap cursor-pointer"
               >
                 Member Login
               </button>
@@ -1015,25 +728,25 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </div>
       </section>
 
-      {/* Quiet Footer */}
-      <footer className="bg-white text-slate-600 py-12">
+      {/* Quiet Dark Footer */}
+      <footer className="bg-[#040705] text-slate-400 py-12">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-8 text-sm">
           <div className="md:col-span-2">
-            <BrandLogo variant="dark" size="md" showTagline className="mb-3" />
-            <p className="text-xs text-slate-500 leading-relaxed max-w-md">
+            <BrandLogo variant="light" size="md" showTagline className="mb-3" />
+            <p className="text-xs text-slate-400 leading-relaxed max-w-md">
               Risk Disclosure: CFDs and leveraged forex instruments carry a high risk of losing money rapidly. Grid Pips provides educational tools, the ICT Strategy Market Analyzer, and the DRT Dealing Range Theory Analyzer only. We do not hold client funds or execute brokerage orders.
             </p>
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-950 mb-3">Integrations</div>
+            <div className="text-xs font-semibold text-white mb-3">Integrations</div>
             <ul className="space-y-2 text-xs">
               <li>
-                <a href={config.exnessIbUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-950">
+                <a href={config.exnessIbUrl} target="_blank" rel="noopener noreferrer" className="hover:text-[#16E563]">
                   Exness IB Partner Portal
                 </a>
               </li>
               <li>
-                <a href={config.telegramUrl} target="_blank" rel="noopener noreferrer" className="hover:text-slate-950">
+                <a href={config.telegramUrl} target="_blank" rel="noopener noreferrer" className="hover:text-[#16E563]">
                   JakoyoFX Telegram Community
                 </a>
               </li>
@@ -1042,7 +755,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   href={`https://www.youtube.com/channel/${config.ictYoutubeChannelId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-slate-950"
+                  className="hover:text-[#16E563]"
                 >
                   ICT YouTube Mentorship
                 </a>
@@ -1053,7 +766,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     href={config.drtYoutubeChannelUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-slate-950"
+                    className="hover:text-[#16E563]"
                   >
                     Ali Khan ICT (DRT Strategy)
                   </a>
@@ -1062,80 +775,111 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </ul>
           </div>
           <div>
-            <div className="text-xs font-semibold text-slate-950 mb-3">Access &amp; Compliance</div>
+            <div className="text-xs font-semibold text-white mb-3">Access &amp; Compliance</div>
             <ul className="space-y-2 text-xs">
               <li>
-                <button onClick={() => onGoAuth('login')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => onGoAuth('login')} className="hover:text-[#16E563] cursor-pointer">
                   Member Sign In
                 </button>
               </li>
               <li>
-                <button onClick={() => onGoAuth('register')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => onGoAuth('register')} className="hover:text-[#16E563] cursor-pointer">
                   Exness Account Registration
                 </button>
               </li>
               <li>
-                <button onClick={() => setLegalDoc('risk')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => setLegalDoc('risk')} className="hover:text-[#16E563] cursor-pointer">
                   Risk Disclosure
                 </button>
               </li>
               <li>
-                <button onClick={() => setLegalDoc('affiliate')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => setLegalDoc('affiliate')} className="hover:text-[#16E563] cursor-pointer">
                   Exness IB &amp; Affiliate Terms
                 </button>
               </li>
               <li>
-                <button onClick={() => setLegalDoc('terms')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => setLegalDoc('terms')} className="hover:text-[#16E563] cursor-pointer">
                   Terms of Service
                 </button>
               </li>
               <li>
-                <button onClick={() => setLegalDoc('privacy')} className="hover:text-slate-950 cursor-pointer">
+                <button type="button" onClick={() => setLegalDoc('privacy')} className="hover:text-[#16E563] cursor-pointer">
                   Privacy Policy
                 </button>
               </li>
             </ul>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto px-6 mt-8 pt-6 border-t border-slate-200 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
+        <div className="max-w-7xl mx-auto px-6 mt-8 pt-6 border-t border-emerald-500/15 text-xs text-slate-500 flex flex-col sm:flex-row justify-between gap-2">
           <span>© 2026 Grid Pips. All rights reserved.</span>
           <span>Secured with scrypt hashing, rate limiting, and HTTP-only signed sessions.</span>
         </div>
       </footer>
 
+      {/* Fullscreen Exact Artwork Modal */}
+      {artworkOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setArtworkOpen(false)}
+        >
+          <div
+            className="relative max-w-6xl w-full bg-[#080E0B] border border-emerald-500/35 rounded-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-3 border-b border-emerald-500/20 flex items-center justify-between">
+              <BrandLogo variant="light" size="sm" />
+              <button
+                type="button"
+                onClick={() => setArtworkOpen(false)}
+                className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
+                aria-label="Close full artwork preview"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={LANDING_IMAGES.brandHeroArtwork}
+              alt="Grid Pips platform overview"
+              referrerPolicy="no-referrer"
+              className="w-full max-h-[82vh] object-contain bg-[#050907]"
+            />
+          </div>
+        </div>
+      )}
+
       {/* Watch Demo Modal */}
       {demoOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 space-y-4 text-slate-950">
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#0B120E] border border-emerald-500/30 rounded-2xl max-w-2xl w-full p-6 space-y-4 text-white">
+            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-950">Grid Pips Platform Walkthrough</h3>
-                <p className="text-xs text-slate-500">ICT Strategy Market Analyzer + DRT Strategy Market Analyzer</p>
+                <h3 className="text-base font-bold text-white">Grid Pips Platform Walkthrough</h3>
+                <p className="text-xs text-slate-400">ICT Strategy Market Analyzer + DRT Strategy Market Analyzer</p>
               </div>
               <button
                 type="button"
                 onClick={() => setDemoOpen(false)}
-                className="p-1.5 text-slate-500 hover:text-slate-950 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
                 aria-label="Close demo preview"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-600">
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">01. Exness Onboarding &amp; Free Desk</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-300">
+              <div className="p-4 rounded-xl bg-[#070E0A] border border-emerald-500/20 space-y-2">
+                <div className="font-semibold text-[#16E563]">01. Exness Onboarding &amp; Free Desk</div>
                 <p>Link your Exness IB account ID once to access TradingView charts, unlimited journal with screenshots, 8 calculators, and $10,000 paper trading.</p>
               </div>
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">02. ${config.analyzerPriceUsd.toFixed(2)}/mo ICT Strategy Analyzer</div>
+              <div className="p-4 rounded-xl bg-[#070E0A] border border-emerald-500/20 space-y-2">
+                <div className="font-semibold text-[#16E563]">02. ${config.analyzerPriceUsd.toFixed(2)}/mo ICT Strategy Analyzer</div>
                 <p>Detects London &amp; NY Killzones, Premium/Discount PD Arrays, Fair Value Gaps (BISI/SIBI), Order Blocks, 0.705 OTE Fibs, and BSL/SSL liquidity targets.</p>
               </div>
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">03. ${(config.drtAnalyzerPriceUsd ?? config.eaBotsPriceUsd).toFixed(2)}/mo DRT Strategy Analyzer</div>
+              <div className="p-4 rounded-xl bg-[#070E0A] border border-amber-400/25 space-y-2">
+                <div className="font-semibold text-[#F5B82E]">03. ${drtPriceUsd.toFixed(2)}/mo DRT Strategy Analyzer</div>
                 <p>Standalone Ali Khan Dealing Range Theory scanner mapping 0/25/50/75/100 DRT quadrants, Type 1/2/3 ranges, live SMT divergence, 50% equilibrium flips, and PD Arrays.</p>
               </div>
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-                <div className="font-semibold text-amber-700">04. JakoyoFX Community &amp; {config.commissionPct}% Referrals</div>
+              <div className="p-4 rounded-xl bg-[#070E0A] border border-emerald-500/20 space-y-2">
+                <div className="font-semibold text-[#16E563]">04. JakoyoFX Community &amp; {config.commissionPct}% Referrals</div>
                 <p>Join t.me/JakoyoFx for daily setup discussions and share your referral link to earn {config.commissionPct}% recurring commission on subscriptions and renewals.</p>
               </div>
             </div>
@@ -1143,7 +887,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => setDemoOpen(false)}
-                className="px-4 py-2 border border-slate-300 text-slate-700 text-xs font-semibold rounded-full hover:text-slate-950 cursor-pointer"
+                className="px-4 py-2 border border-emerald-500/25 text-slate-300 text-xs font-semibold rounded-full hover:text-white cursor-pointer"
               >
                 Close
               </button>
@@ -1154,7 +898,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   if (user) onGoWorkspace();
                   else onGoAuth('register');
                 }}
-                className="px-5 py-2 bg-amber-400 hover:bg-amber-300 text-black text-xs font-semibold rounded-full cursor-pointer"
+                className="px-5 py-2 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs font-bold rounded-full cursor-pointer"
               >
                 {user ? 'Open Dashboard →' : 'Start Free with Exness →'}
               </button>
@@ -1165,20 +909,20 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
       {/* Legal Disclosure Modal */}
       {legalDoc && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-lg w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-950">{LEGAL_DOCS[legalDoc].title}</h3>
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#0B120E] border border-emerald-500/30 rounded-2xl max-w-lg w-full p-6 space-y-4 text-white">
+            <div className="flex items-center justify-between border-b border-emerald-500/20 pb-3">
+              <h3 className="text-base font-bold text-white">{LEGAL_DOCS[legalDoc].title}</h3>
               <button
                 type="button"
                 onClick={() => setLegalDoc(null)}
-                className="p-1.5 text-slate-500 hover:text-slate-950 cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-white cursor-pointer"
                 aria-label="Close legal notice"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3 text-xs text-slate-600 leading-relaxed">
+            <div className="space-y-3 text-xs text-slate-300 leading-relaxed">
               {LEGAL_DOCS[legalDoc].paragraphs.map((p, idx) => (
                 <p key={idx}>{p}</p>
               ))}
@@ -1187,7 +931,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               <button
                 type="button"
                 onClick={() => setLegalDoc(null)}
-                className="px-5 py-2 bg-slate-950 text-white text-xs font-semibold rounded-full hover:bg-slate-800 cursor-pointer"
+                className="px-5 py-2 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs font-bold rounded-full cursor-pointer"
               >
                 Close
               </button>
