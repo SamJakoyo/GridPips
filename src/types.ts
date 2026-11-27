@@ -235,6 +235,29 @@ export interface IctConfluenceCheck {
   detail: string;
 }
 
+export interface IctSetupLifecycle {
+  status: 'Locked Active' | 'Locked Waiting' | 'Unlocked (No Trade)';
+  isLocked: boolean;
+  lockedAt: string | null;
+  lockedBarTime: string | null;
+  lockedBarTimestampSec: number | null;
+  lastClosedBarTime: string;
+  invalidationLevel: number | null;
+  invalidationRule: string;
+  validationLevel: number | null;
+  validationZone: string | null;
+  validationRule: string;
+  targetDolLevel: number | null;
+  liveProximity:
+    | 'In Entry Zone'
+    | 'Approaching Entry'
+    | 'Waiting for Retracement'
+    | 'In Progress Toward TP1/TP2'
+    | 'Stand Aside';
+  lastTransitionEvent: string | null;
+  fractalRole: string;
+}
+
 export interface IctAnalysisResult {
   symbol: string;
   tvSymbol?: string;
@@ -250,6 +273,7 @@ export interface IctAnalysisResult {
   verdictSummary: string;
   noTradeReasons: string[];
   confluenceChecks: IctConfluenceCheck[];
+  lifecycle?: IctSetupLifecycle;
   po3Phase: string;
   activeKillzone: string;
   structureShift: string;

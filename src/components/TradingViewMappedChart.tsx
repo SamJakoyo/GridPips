@@ -606,7 +606,13 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
       analysis.setup.tp2 != null
     ) {
       const isWait = analysis.tradeVerdict === 'Wait for Setup';
-      addLine(analysis.setup.stopLoss, isWait ? 'SL (Limit)' : 'SL', '#f43f5e', LineStyle.Solid, 1);
+      addLine(
+        analysis.setup.stopLoss,
+        isWait ? `INV / SL (${analysis.timeframe} Close)` : `INV / SL (${analysis.timeframe} Close)`,
+        '#f43f5e',
+        LineStyle.Solid,
+        1
+      );
       addLine(analysis.setup.tp1, isWait ? 'TP1 (Limit)' : 'TP1 (Partial)', '#10b981', LineStyle.Dashed, 1);
       addLine(analysis.setup.tp2, isWait ? 'TP2 DOL (Limit)' : 'TP2 (DOL)', '#059669', LineStyle.Dotted, 1);
     }

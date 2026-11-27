@@ -106,31 +106,36 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
     }
   }, [user.hasAnalyzer, loadCloudData]);
 
-  const runScan = useCallback(async () => {
-    if (!user.hasAnalyzer) return;
-    setLoading(true);
-    setError('');
-    try {
-      const res = await apiFetch<{ analysis: IctAnalysisResult }>(
-        `/api/analyzer/scan?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(activeTimeframe)}`
-      );
-      setAnalysis(res.analysis);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Analysis failed');
-    } finally {
-      setLoading(false);
-    }
-  }, [symbol, activeTimeframe, user.hasAnalyzer]);
+  const runScan = useCallback(
+    async (forceReset = false) => {
+      if (!user.hasAnalyzer) return;
+      setLoading(true);
+      setError('');
+      try {
+        const res = await apiFetch<{ analysis: IctAnalysisResult }>(
+          `/api/analyzer/scan?symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(
+            activeTimeframe
+          )}${forceReset ? '&forceReset=true' : ''}`
+        );
+        setAnalysis(res.analysis);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Analysis failed');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [symbol, activeTimeframe, user.hasAnalyzer]
+  );
 
   useEffect(() => {
-    runScan();
+    runScan(false);
   }, [runScan]);
 
   useEffect(() => {
     if (!user.hasAnalyzer || !autoSync) return;
     const intervalMs = activeTimeframe === '1M' ? 12000 : 25000;
     const id = setInterval(() => {
-      runScan();
+      runScan(false);
     }, intervalMs);
     return () => clearInterval(id);
   }, [user.hasAnalyzer, autoSync, activeTimeframe, runScan]);
@@ -504,9 +509,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               {analysis.tradeVerdict === 'Wait for Setup' ? 'Save Limit Setup' : 'Save Setup'}
             </button>
           )}
+          {analysis?.lifecycle?.isLocked && (
+            <button
+              type="button"
+              onClick={() => runScan(true)}
+              disabled={loading}
+              title={`Unlock current ${activeTimeframe} setup and re-evaluate fresh closed candles`}
+              className="px-3 py-2 border border-amber-500/35 bg-amber-500/10 text-[#F5B82E] text-xs font-semibold rounded-lg hover:bg-amber-500/20 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              Re-evaluate
+            </button>
+          )}
           <button
             type="button"
-            onClick={runScan}
+            onClick={() => runScan(false)}
             disabled={loading}
             className="px-4 py-2 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
           >
@@ -521,7 +538,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <span>{error}</span>
           <button
             type="button"
-            onClick={runScan}
+            onClick={() => runScan(false)}
             className="px-3 py-1 bg-rose-700 text-white font-semibold rounded-md hover:bg-rose-800 cursor-pointer"
           >
             Retry Scan
@@ -550,7 +567,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               </div>
               <button
                 type="button"
-                onClick={runScan}
+                onClick={() => runScan(false)}
                 disabled={loading}
                 className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5 cursor-pointer"
               >
@@ -625,7 +642,23 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                {analysis.lifecycle && (
+                  <span
+                    className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono font-semibold inline-flex items-center gap-1.5 ${
+                      analysis.lifecycle.isLocked
+                        ? 'bg-[#0B120E] border-emerald-500/35 text-emerald-300'
+                        : 'bg-[#0B120E] border-slate-700 text-slate-300'
+                    }`}
+                  >
+                    <Lock className="w-3 h-3" />
+                    <span>
+                      {analysis.lifecycle.isLocked
+                        ? `Locked (${analysis.timeframe} Close ${analysis.lifecycle.lockedBarTime})`
+                        : `Closed-Candle Scan (${analysis.lifecycle.lastClosedBarTime})`}
+                    </span>
+                  </span>
+                )}
                 <span
                   className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold uppercase tracking-wider ${
                     analysis.tradeVerdict === 'Actionable Trade'
@@ -643,6 +676,80 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 </span>
               </div>
             </div>
+
+            {/* Fractal Validation & Strict Candle-Close Invalidation Strip */}
+            {analysis.lifecycle && (
+              <div className="space-y-2.5">
+                {analysis.lifecycle.lastTransitionEvent && (
+                  <div className="px-3.5 py-2 rounded-lg bg-sky-950/40 border border-sky-500/35 text-xs text-sky-200 flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span>
+                      <strong className="text-white">State Transition: </strong>
+                      {analysis.lifecycle.lastTransitionEvent}
+                    </span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                  <div className="rounded-lg border border-emerald-500/20 bg-[#0B120E]/85 p-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        Validation Trigger
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-[#16E563]">
+                        {analysis.lifecycle.liveProximity}
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-white">
+                      {analysis.lifecycle.validationZone
+                        ? `${analysis.lifecycle.validationZone}`
+                        : 'Awaiting Qualified Setup'}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {analysis.lifecycle.validationRule}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-rose-500/25 bg-[#0B120E]/85 p-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        Strict Invalidation (Candle Close)
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-rose-400">
+                        {analysis.timeframe} CLOSE ONLY
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-rose-300">
+                      {analysis.lifecycle.invalidationLevel != null
+                        ? `${analysis.dailyBias === 'Bullish' ? 'Close <' : 'Close >'} ${analysis.lifecycle.invalidationLevel}`
+                        : 'None Locked'}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {analysis.lifecycle.invalidationRule} (wicks alone do not flip bias).
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-emerald-500/20 bg-[#0B120E]/85 p-3 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                        Fractal Timeframe Lock
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-[#F5B82E]">
+                        {analysis.timeframe} INDEPENDENT
+                      </span>
+                    </div>
+                    <div className="text-xs font-mono font-bold text-white truncate">
+                      {analysis.lifecycle.fractalRole}
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {analysis.lifecycle.targetDolLevel != null
+                        ? `Unlocks automatically on DOL hit (${analysis.lifecycle.targetDolLevel}), ${analysis.timeframe} invalidation close, or opposing closed MSS.`
+                        : `Evaluates strictly on closed ${analysis.timeframe} candles (last close: ${analysis.lifecycle.lastClosedBarTime}).`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 5-Gate Audit Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2.5 pt-1">

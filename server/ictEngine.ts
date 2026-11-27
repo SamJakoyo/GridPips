@@ -90,6 +90,29 @@ export interface IctConfluenceCheck {
   detail: string;
 }
 
+export interface IctSetupLifecycle {
+  status: 'Locked Active' | 'Locked Waiting' | 'Unlocked (No Trade)';
+  isLocked: boolean;
+  lockedAt: string | null;
+  lockedBarTime: string | null;
+  lockedBarTimestampSec: number | null;
+  lastClosedBarTime: string;
+  invalidationLevel: number | null;
+  invalidationRule: string;
+  validationLevel: number | null;
+  validationZone: string | null;
+  validationRule: string;
+  targetDolLevel: number | null;
+  liveProximity:
+    | 'In Entry Zone'
+    | 'Approaching Entry'
+    | 'Waiting for Retracement'
+    | 'In Progress Toward TP1/TP2'
+    | 'Stand Aside';
+  lastTransitionEvent: string | null;
+  fractalRole: string;
+}
+
 export interface IctAnalysisResult {
   symbol: string;
   tvSymbol: string;
@@ -105,6 +128,7 @@ export interface IctAnalysisResult {
   verdictSummary: string;
   noTradeReasons: string[];
   confluenceChecks: IctConfluenceCheck[];
+  lifecycle: IctSetupLifecycle;
   po3Phase: 'Accumulation' | 'Manipulation (Judas Swing)' | 'Distribution';
   activeKillzone: string;
   structureShift: string;
@@ -147,6 +171,35 @@ export interface IctAnalysisResult {
   lastUpdated: string;
 }
 
+interface LockedIctSetup {
+  lockedAt: string;
+  lockedBarTime: string;
+  lockedBarTimestampSec: number;
+  dailyBias: 'Bullish' | 'Bearish';
+  direction: 'Long (Buy)' | 'Short (Sell)';
+  entryZone: string;
+  entryArrayName: string;
+  entryTop: number;
+  entryBottom: number;
+  entryMid: number;
+  stopLoss: number;
+  tp1: number;
+  tp2: number;
+  rrRatio: number;
+  drawOnLiquidity: IctAnalysisResult['drawOnLiquidity'];
+  rangeHigh: number;
+  rangeLow: number;
+  equilibrium: number;
+  structureShift: string;
+  confluenceChecks: IctConfluenceCheck[];
+  lastVerdict: 'Actionable Trade' | 'Wait for Setup';
+  entryTapped: boolean;
+}
+
+// Fractal per-(symbol:timeframe) setup lock memory so lower & higher timeframes hold steady
+// until strict closed-candle invalidation, external DOL completion, or opposing closed-candle MSS.
+const lockedIctSetups = new Map<string, LockedIctSetup>();
+
 const VALID_TIMEFRAMES = ['1M', '5M', '15M', '30M', '1H', '4H', '1D', '1W'] as const;
 type ValidTimeframe = (typeof VALID_TIMEFRAMES)[number];
 
@@ -155,16 +208,17 @@ const TF_CONFIG: Record<
   {
     tvInterval: TvInterval;
     label: string;
+    fractalRole: string;
   }
 > = {
-  '1M': { tvInterval: '1', label: '1-Minute Precision Entry' },
-  '5M': { tvInterval: '5', label: '5-Minute Intraday Displacement' },
-  '15M': { tvInterval: '15', label: '15-Minute Session Structure' },
-  '30M': { tvInterval: '30', label: '30-Minute Killzone Framework' },
-  '1H': { tvInterval: '60', label: '1-Hour Institutional Orderflow' },
-  '4H': { tvInterval: '240', label: '4-Hour Intermediate Swing' },
-  '1D': { tvInterval: 'D', label: 'Daily HTF Draw on Liquidity' },
-  '1W': { tvInterval: 'W', label: 'Weekly Macro Liquidity Bias' },
+  '1M': { tvInterval: '1', label: '1-Minute Precision Entry', fractalRole: '1M Micro Execution · Locked on 1M Closes' },
+  '5M': { tvInterval: '5', label: '5-Minute Intraday Displacement', fractalRole: '5M LTF Execution · Locked on 5M Closes' },
+  '15M': { tvInterval: '15', label: '15-Minute Session Structure', fractalRole: '15M Intraday Session · Locked on 15M Closes' },
+  '30M': { tvInterval: '30', label: '30-Minute Killzone Framework', fractalRole: '30M Killzone Structure · Locked on 30M Closes' },
+  '1H': { tvInterval: '60', label: '1-Hour Institutional Orderflow', fractalRole: '1H Intermediate Orderflow · Locked on 1H Closes' },
+  '4H': { tvInterval: '240', label: '4-Hour Intermediate Swing', fractalRole: '4H Swing Structure · Locked on 4H Closes' },
+  '1D': { tvInterval: 'D', label: 'Daily HTF Draw on Liquidity', fractalRole: '1D HTF Macro Bias · Locked on Daily Closes' },
+  '1W': { tvInterval: 'W', label: 'Weekly Macro Liquidity Bias', fractalRole: '1W Macro Liquidity · Locked on Weekly Closes' },
 };
 
 export function normalizeServerTimeframe(raw?: string): ValidTimeframe {
@@ -238,18 +292,21 @@ function classifyPdZone(price: number, equilibrium: number, tolerance: number): 
 export async function runIctMarketAnalysis(
   symbolRaw: string,
   timeframeRaw: string,
-  ictChannelId: string
+  ictChannelId: string,
+  options?: { forceReset?: boolean }
 ): Promise<IctAnalysisResult> {
   const cleanSymbol = (symbolRaw || 'EURUSD').trim().toUpperCase();
   const timeframe = normalizeServerTimeframe(timeframeRaw);
   const tfCfg = TF_CONFIG[timeframe];
+  const lockKey = `${cleanSymbol}:${timeframe}`;
 
   // Fetch real live OHLC bars and current price directly from TradingView
   const tvData = await fetchTradingViewChartData(cleanSymbol, tfCfg.tvInterval);
   const digits = tvData.digits;
   const round = (n: number) => Number(n.toFixed(digits));
 
-  const candles: Candle[] = tvData.bars.map((b, idx) => ({
+  // Full bar series (including currently forming live bar) for charting
+  const allCandles: Candle[] = tvData.bars.map((b, idx) => ({
     index: idx,
     timestampSec: b.timestampSec,
     time: formatCandleTime(b.timestampSec, timeframe),
@@ -259,6 +316,11 @@ export async function runIctMarketAnalysis(
     close: b.close,
   }));
 
+  // STRICT CLOSED-CANDLE STRUCTURE ENGINE:
+  // Exclude the still-forming live candle from all structural calculations (MSS, sweeps, displacement, PD Arrays)
+  // so mid-candle ticks NEVER flicker or fabricate unconfirmed structure shifts.
+  const candles: Candle[] = allCandles.length >= 16 ? allCandles.slice(0, -1) : allCandles;
+  const lastClosedCandle = candles[candles.length - 1];
   const currentPrice = tvData.currentPrice;
 
   // Compute live Average True Range (ATR) from TradingView OHLC bars
@@ -1364,7 +1426,383 @@ export async function runIctMarketAnalysis(
     }
   }
 
+  // 8. Fractal Stateful Setup Lifecycle & Strict Closed-Candle Invalidation Lock
+  let lastTransitionEvent: string | null = null;
+  if (options?.forceReset) {
+    if (lockedIctSetups.has(lockKey)) {
+      lastTransitionEvent = `Manual re-evaluation triggered — cleared previous ${timeframe} lock and scanned closed candles.`;
+    }
+    lockedIctSetups.delete(lockKey);
+  }
+
+  let activeLock = lockedIctSetups.get(lockKey) ?? null;
+
+  if (activeLock) {
+    const newClosedBars = candles.filter((c) => c.timestampSec > activeLock!.lockedBarTimestampSec);
+    const isLockedLong = activeLock.dailyBias === 'Bullish';
+
+    // 1. STRICT CLOSED-CANDLE INVALIDATION CHECK (wick alone does NOT invalidate; requires full [TF] candle close beyond SL)
+    const invalidatingBar = newClosedBars.find((c) =>
+      isLockedLong ? c.close < activeLock!.stopLoss : c.close > activeLock!.stopLoss
+    );
+
+    // 2. EXTERNAL DRAW ON LIQUIDITY (TP2) COMPLETION CHECK
+    const dolCompletedBar = newClosedBars.find((c) =>
+      isLockedLong ? c.high >= activeLock!.tp2 : c.low <= activeLock!.tp2
+    );
+
+    // 3. CONFIRMED OPPOSING CLOSED-CANDLE MSS CHECK
+    const mssCandleObj = mssBullishCandle ?? mssBearishCandle;
+    const opposingClosedMss =
+      Boolean(
+        mssCandleObj &&
+          mssDirection &&
+          mssDirection !== activeLock.dailyBias &&
+          mssCandleObj.timestampSec > activeLock.lockedBarTimestampSec
+      );
+
+    // 4. VISIBLE DEALING RANGE EXPIRY CHECK
+    const expiredOffWindow = activeLock.lockedBarTimestampSec < candles[0].timestampSec;
+
+    if (invalidatingBar) {
+      lastTransitionEvent = `Previous ${activeLock.dailyBias} setup invalidated: ${timeframe} candle closed ${
+        isLockedLong ? 'below' : 'above'
+      } ${activeLock.stopLoss.toFixed(digits)} at ${invalidatingBar.time}.`;
+      lockedIctSetups.delete(lockKey);
+      activeLock = null;
+    } else if (dolCompletedBar) {
+      lastTransitionEvent = `Previous ${activeLock.dailyBias} setup completed: external DOL target ${activeLock.tp2.toFixed(
+        digits
+      )} reached at ${dolCompletedBar.time}.`;
+      lockedIctSetups.delete(lockKey);
+      activeLock = null;
+    } else if (opposingClosedMss && mssCandleObj) {
+      lastTransitionEvent = `Previous ${activeLock.dailyBias} setup unlocked by opposing ${mssDirection} ${timeframe} closed-candle MSS at ${mssCandleObj.time}.`;
+      lockedIctSetups.delete(lockKey);
+      activeLock = null;
+    } else if (expiredOffWindow) {
+      lastTransitionEvent = `Previous ${activeLock.dailyBias} setup aged outside the active ${timeframe} dealing range — re-evaluated.`;
+      lockedIctSetups.delete(lockKey);
+      activeLock = null;
+    } else {
+      // Lock holds! Check if price tapped the entry zone on any closed bar or live price
+      const tappedNow =
+        currentPrice >= activeLock.entryBottom - atr * 0.15 &&
+        currentPrice <= activeLock.entryTop + atr * 0.15;
+      const tappedClosed = newClosedBars.some(
+        (c) => c.low <= activeLock!.entryTop && c.high >= activeLock!.entryBottom
+      );
+      if (tappedNow || tappedClosed) {
+        activeLock.entryTapped = true;
+      }
+    }
+  }
+
+  // Helper to compute live proximity label for a valid locked setup
+  const computeLiveProximity = (
+    dirBias: 'Bullish' | 'Bearish',
+    entryBottom: number,
+    entryTop: number,
+    entryMid: number,
+    alignedNow: boolean,
+    entryTapped: boolean
+  ): IctSetupLifecycle['liveProximity'] => {
+    const zonePad = Math.max(atr * 0.15, Math.pow(10, -digits) * 2);
+    if (currentPrice >= entryBottom - zonePad && currentPrice <= entryTop + zonePad) {
+      return 'In Entry Zone';
+    }
+    const movingTowardTarget =
+      dirBias === 'Bullish' ? currentPrice > entryTop : currentPrice < entryBottom;
+    if (entryTapped && movingTowardTarget) {
+      return 'In Progress Toward TP1/TP2';
+    }
+    if (alignedNow) {
+      return 'Approaching Entry';
+    }
+    return 'Waiting for Retracement';
+  };
+
+  // CASE A: Active Locked Setup Holds Steady (Zero bias/level flickering across ticks)
+  if (activeLock) {
+    const isLockedLong = activeLock.dailyBias === 'Bullish';
+    const lockSpan = Math.max(activeLock.rangeHigh - activeLock.rangeLow, minStep);
+    const lockPosPct = Number(
+      Math.min(100, Math.max(0, ((currentPrice - activeLock.rangeLow) / lockSpan) * 100)).toFixed(1)
+    );
+    const lockEqTol = lockSpan * 0.025;
+    const lockCurrentZone = classifyPdZone(currentPrice, activeLock.equilibrium, lockEqTol);
+
+    let lockQuadrant: PremiumDiscountProfile['quadrant'] = 'Equilibrium (50%)';
+    if (lockPosPct >= 75) lockQuadrant = 'Deep Premium (75-100%)';
+    else if (lockPosPct > 52.5) lockQuadrant = 'Upper Premium (50-75%)';
+    else if (lockPosPct <= 25) lockQuadrant = 'Deep Discount (0-25%)';
+    else if (lockPosPct < 47.5) lockQuadrant = 'Upper Discount (25-50%)';
+
+    const inEntryZoneNow =
+      currentPrice >= activeLock.entryBottom - atr * 0.15 &&
+      currentPrice <= activeLock.entryTop + atr * 0.15;
+
+    // Hysteresis around 50% Equilibrium prevents Wait <-> Actionable bouncing on 0.5-pip ticks
+    let lockedVerdict: 'Actionable Trade' | 'Wait for Setup' = activeLock.lastVerdict;
+    if (activeLock.lastVerdict === 'Wait for Setup') {
+      if (inEntryZoneNow || (isLockedLong ? lockPosPct <= 48.0 : lockPosPct >= 52.0)) {
+        lockedVerdict = 'Actionable Trade';
+      }
+    } else {
+      if (
+        !inEntryZoneNow &&
+        !activeLock.entryTapped &&
+        (isLockedLong ? lockPosPct >= 55.0 : lockPosPct <= 45.0)
+      ) {
+        lockedVerdict = 'Wait for Setup';
+      }
+    }
+    activeLock.lastVerdict = lockedVerdict;
+    const lockAligned = lockedVerdict === 'Actionable Trade';
+
+    const liveProximity = computeLiveProximity(
+      activeLock.dailyBias,
+      activeLock.entryBottom,
+      activeLock.entryTop,
+      activeLock.entryMid,
+      lockAligned,
+      activeLock.entryTapped
+    );
+
+    const lockedHeadline =
+      lockedVerdict === 'Actionable Trade'
+        ? `Actionable Trade · ${activeLock.direction}`
+        : `Wait for Setup · ${isLockedLong ? 'Buy' : 'Sell'} Limit Only`;
+
+    const lockedSummary =
+      lockedVerdict === 'Actionable Trade'
+        ? `Locked ${activeLock.dailyBias} ${timeframe} setup (confirmed on ${activeLock.lockedBarTime} close) — holds until a ${timeframe} candle closes ${
+            isLockedLong ? 'below' : 'above'
+          } ${activeLock.stopLoss.toFixed(digits)} or hits DOL ${activeLock.tp2.toFixed(digits)}.`
+        : `Locked ${activeLock.dailyBias} ${timeframe} limit setup (confirmed on ${activeLock.lockedBarTime} close) — wait for retracement into ${activeLock.entryArrayName} (${activeLock.entryZone}). Invalidated only on a ${timeframe} candle close ${
+            isLockedLong ? 'below' : 'above'
+          } ${activeLock.stopLoss.toFixed(digits)}.`;
+
+    const lockedChecks: IctConfluenceCheck[] = activeLock.confluenceChecks.map((chk) =>
+      chk.id === 'pd_equilibrium'
+        ? {
+            ...chk,
+            passed: lockAligned,
+            detail: lockAligned
+              ? `Price (${lockPosPct}%) is aligned in ${lockCurrentZone} for ${activeLock!.dailyBias} execution (${liveProximity}).`
+              : `Price (${lockPosPct}%) is in ${lockCurrentZone} — locked ${activeLock!.dailyBias} bias holds; wait for retracement into ${activeLock!.entryZone}.`,
+          }
+        : chk
+    );
+
+    const lockedGuidance = lockAligned
+      ? `Locked ${activeLock.dailyBias} setup active (${liveProximity}) — strictly invalidated only if a ${timeframe} candle closes ${
+          isLockedLong ? 'below' : 'above'
+        } ${activeLock.stopLoss.toFixed(digits)}.`
+      : `Locked ${activeLock.dailyBias} bias — do NOT market-enter in ${lockCurrentZone}; wait for retracement into ${activeLock.entryArrayName} (${activeLock.entryZone}).`;
+
+    const lifecycle: IctSetupLifecycle = {
+      status: lockedVerdict === 'Actionable Trade' ? 'Locked Active' : 'Locked Waiting',
+      isLocked: true,
+      lockedAt: activeLock.lockedAt,
+      lockedBarTime: activeLock.lockedBarTime,
+      lockedBarTimestampSec: activeLock.lockedBarTimestampSec,
+      lastClosedBarTime: lastClosedCandle.time,
+      invalidationLevel: activeLock.stopLoss,
+      invalidationRule: `Strict ${timeframe} candle close ${
+        isLockedLong ? 'below' : 'above'
+      } ${activeLock.stopLoss.toFixed(digits)} invalidates ${activeLock.dailyBias} setup`,
+      validationLevel: activeLock.entryMid,
+      validationZone: activeLock.entryZone,
+      validationRule:
+        lockedVerdict === 'Actionable Trade'
+          ? `Validated in ${activeLock.entryArrayName} (${activeLock.entryZone}) · ${liveProximity}`
+          : `Limit trigger armed at ${activeLock.entryArrayName} (${activeLock.entryZone})`,
+      targetDolLevel: activeLock.tp2,
+      liveProximity,
+      lastTransitionEvent: null,
+      fractalRole: tfCfg.fractalRole,
+    };
+
+    return {
+      symbol: tvData.symbol,
+      tvSymbol: tvData.tvSymbol,
+      tradingViewUrl: `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvData.tvSymbol)}`,
+      timeframe,
+      currentPrice,
+      bid: tvData.bid,
+      ask: tvData.ask,
+      changePct: tvData.chgPct,
+      dailyBias: activeLock.dailyBias,
+      tradeVerdict: lockedVerdict,
+      verdictHeadline: lockedHeadline,
+      verdictSummary: lockedSummary,
+      noTradeReasons: [],
+      confluenceChecks: lockedChecks,
+      lifecycle,
+      po3Phase,
+      activeKillzone: kz.label,
+      structureShift: activeLock.structureShift,
+      mssIndex: mssBullishCandle?.index ?? mssBearishCandle?.index ?? null,
+      displacementDetected,
+      liquiditySweep,
+      sweepIndex,
+      drawOnLiquidity: activeLock.drawOnLiquidity,
+      bslLevel: activeLock.rangeHigh,
+      sslLevel: activeLock.rangeLow,
+      equalHighsLevel,
+      equalLowsLevel,
+      premiumDiscount: {
+        rangeHigh: activeLock.rangeHigh,
+        rangeLow: activeLock.rangeLow,
+        equilibrium: activeLock.equilibrium,
+        premiumStart: activeLock.equilibrium,
+        discountEnd: activeLock.equilibrium,
+        currentPositionPct: lockPosPct,
+        currentZone: lockCurrentZone,
+        quadrant: lockQuadrant,
+        alignedWithBias: lockAligned,
+        guidance: lockedGuidance,
+      },
+      pdArrays: sortedPdArrays.slice(0, 16),
+      oteLevels: {
+        fib618,
+        fib705,
+        fib786,
+        zone: isLockedLong ? 'Discount' : 'Premium',
+      },
+      zones: chartZones,
+      setup: {
+        direction: activeLock.direction,
+        entryZone: activeLock.entryZone,
+        entryArrayName: activeLock.entryArrayName,
+        stopLoss: activeLock.stopLoss,
+        tp1: activeLock.tp1,
+        tp2: activeLock.tp2,
+        rrRatio: activeLock.rrRatio,
+        projectedRrToDol: activeLock.rrRatio,
+        confluences: [
+          `LOCKED ${timeframe} SETUP (confirmed on ${activeLock.lockedBarTime} close) · ${liveProximity}`,
+          `Strict Invalidation: ${timeframe} candle close ${
+            isLockedLong ? 'below' : 'above'
+          } ${activeLock.stopLoss.toFixed(digits)}`,
+          `Anchor PD Array: ${activeLock.entryArrayName} (${activeLock.entryZone})`,
+          `${activeLock.drawOnLiquidity.side} Draw on Liquidity at ${activeLock.tp2.toFixed(
+            digits
+          )} (Real R:R 1 : ${activeLock.rrRatio.toFixed(2)})`,
+          `${kz.label} · Power of 3: ${po3Phase}`,
+        ],
+      },
+      candles: allCandles,
+      ictReferenceChannel: ictChannelId,
+      dataSource: 'tradingview_live',
+      lastUpdated: tvData.fetchedAt,
+    };
+  }
+
+  // CASE B: No Existing Lock — Evaluate Fresh Closed-Candle Structure & Lock If Valid
   const isTradeLocked = tradeVerdict === 'No Trade';
+  const freshStructureLabel = hasMss
+    ? structureShift
+    : displacementDetected
+    ? `${bullishBias ? 'Bullish' : 'Bearish'} Displacement Expansion (${timeframe})`
+    : `Consolidation / No MSS (${timeframe})`;
+
+  let freshLifecycle: IctSetupLifecycle;
+
+  if (
+    tradeVerdict !== 'No Trade' &&
+    bestEntryArray &&
+    candidateEntryZoneStr &&
+    candidateEntryArrayName &&
+    candidateEntryMid != null &&
+    candidateStopLoss != null &&
+    candidateTp1 != null &&
+    candidateTp2 != null &&
+    realRrToDol != null
+  ) {
+    const lockedBias: 'Bullish' | 'Bearish' = bullishBias ? 'Bullish' : 'Bearish';
+    const lockedDir: 'Long (Buy)' | 'Short (Sell)' = bullishBias ? 'Long (Buy)' : 'Short (Sell)';
+    const initialTapped =
+      currentPrice >= bestEntryArray.bottom - atr * 0.15 &&
+      currentPrice <= bestEntryArray.top + atr * 0.15;
+
+    const newLock: LockedIctSetup = {
+      lockedAt: tvData.fetchedAt,
+      lockedBarTime: lastClosedCandle.time,
+      lockedBarTimestampSec: lastClosedCandle.timestampSec,
+      dailyBias: lockedBias,
+      direction: lockedDir,
+      entryZone: candidateEntryZoneStr,
+      entryArrayName: candidateEntryArrayName,
+      entryTop: bestEntryArray.top,
+      entryBottom: bestEntryArray.bottom,
+      entryMid: candidateEntryMid,
+      stopLoss: candidateStopLoss,
+      tp1: candidateTp1,
+      tp2: candidateTp2,
+      rrRatio: realRrToDol,
+      drawOnLiquidity,
+      rangeHigh,
+      rangeLow,
+      equilibrium,
+      structureShift: freshStructureLabel,
+      confluenceChecks,
+      lastVerdict: tradeVerdict,
+      entryTapped: initialTapped,
+    };
+    lockedIctSetups.set(lockKey, newLock);
+
+    const liveProximity = computeLiveProximity(
+      lockedBias,
+      bestEntryArray.bottom,
+      bestEntryArray.top,
+      candidateEntryMid,
+      alignedWithBias,
+      initialTapped
+    );
+
+    freshLifecycle = {
+      status: tradeVerdict === 'Actionable Trade' ? 'Locked Active' : 'Locked Waiting',
+      isLocked: true,
+      lockedAt: tvData.fetchedAt,
+      lockedBarTime: lastClosedCandle.time,
+      lockedBarTimestampSec: lastClosedCandle.timestampSec,
+      lastClosedBarTime: lastClosedCandle.time,
+      invalidationLevel: candidateStopLoss,
+      invalidationRule: `Strict ${timeframe} candle close ${
+        bullishBias ? 'below' : 'above'
+      } ${candidateStopLoss.toFixed(digits)} invalidates ${lockedBias} setup`,
+      validationLevel: candidateEntryMid,
+      validationZone: candidateEntryZoneStr,
+      validationRule:
+        tradeVerdict === 'Actionable Trade'
+          ? `Validated in ${candidateEntryArrayName} (${candidateEntryZoneStr}) · ${liveProximity}`
+          : `Limit trigger armed at ${candidateEntryArrayName} (${candidateEntryZoneStr})`,
+      targetDolLevel: candidateTp2,
+      liveProximity,
+      lastTransitionEvent,
+      fractalRole: tfCfg.fractalRole,
+    };
+  } else {
+    freshLifecycle = {
+      status: 'Unlocked (No Trade)',
+      isLocked: false,
+      lockedAt: null,
+      lockedBarTime: null,
+      lockedBarTimestampSec: null,
+      lastClosedBarTime: lastClosedCandle.time,
+      invalidationLevel: null,
+      invalidationRule: `No active bias locked — waiting for clean ${timeframe} closed-candle structure`,
+      validationLevel: null,
+      validationZone: null,
+      validationRule: `Unlocks a setup only when a closed ${timeframe} candle passes all 4 confluence gates (>= 1:2.5 R:R)`,
+      targetDolLevel: null,
+      liveProximity: 'Stand Aside',
+      lastTransitionEvent,
+      fractalRole: tfCfg.fractalRole,
+    };
+  }
 
   return {
     symbol: tvData.symbol,
@@ -1381,13 +1819,10 @@ export async function runIctMarketAnalysis(
     verdictSummary,
     noTradeReasons,
     confluenceChecks,
+    lifecycle: freshLifecycle,
     po3Phase,
     activeKillzone: kz.label,
-    structureShift: hasMss
-      ? structureShift
-      : displacementDetected
-      ? `${bullishBias ? 'Bullish' : 'Bearish'} Displacement Expansion (${timeframe})`
-      : `Consolidation / No MSS (${timeframe})`,
+    structureShift: freshStructureLabel,
     mssIndex: mssBullishCandle?.index ?? mssBearishCandle?.index ?? null,
     displacementDetected,
     liquiditySweep,
@@ -1428,7 +1863,7 @@ export async function runIctMarketAnalysis(
       projectedRrToDol: realRrToDol,
       confluences,
     },
-    candles,
+    candles: allCandles,
     ictReferenceChannel: ictChannelId,
     dataSource: 'tradingview_live',
     lastUpdated: tvData.fetchedAt,

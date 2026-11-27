@@ -3640,8 +3640,11 @@ app.get('/api/analyzer/scan', requireAuth, async (req: AuthedRequest, res) => {
     }
     const symbol = sanitizeText(req.query.symbol || 'EURUSD', 12).toUpperCase();
     const timeframe = normalizeServerTimeframe(sanitizeText(req.query.timeframe || '1M', 8));
+    const forceReset = req.query.forceReset === 'true' || req.query.forceReset === '1';
     const settings = getSettingsMap();
-    const analysis = await runIctMarketAnalysis(symbol, timeframe, settings.ict_youtube_channel_id);
+    const analysis = await runIctMarketAnalysis(symbol, timeframe, settings.ict_youtube_channel_id, {
+      forceReset,
+    });
     res.json({ analysis });
   } catch (err) {
     console.error('Analyzer scan error:', err);
