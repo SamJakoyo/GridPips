@@ -430,24 +430,27 @@ export async function runIctMarketAnalysis(
     }
   }
 
-  // Liquidity Sweep check (Turtle Soup / Stop Run)
+  // Liquidity Sweep check (Turtle Soup / Stop Run — requires meaningful rejection wick >= 0.25 ATR)
   let liquiditySweep = 'No recent external stop run detected';
   let recentSweepBias: 'Bullish' | 'Bearish' | null = null;
   let sweepIndex: number | null = null;
+  const minSweepWick = Math.max(atr * 0.25, Math.pow(10, -digits) * 2);
   for (let i = candles.length - 1; i >= Math.max(3, candles.length - 14); i--) {
     const c = candles[i];
     const prevSwingsH = swingHighs.filter((s) => s.index < i - 1);
     const prevSwingsL = swingLows.filter((s) => s.index < i - 1);
     const prevHigh = prevSwingsH[prevSwingsH.length - 1];
     const prevLow = prevSwingsL[prevSwingsL.length - 1];
+    const lowerWick = Math.min(c.open, c.close) - c.low;
+    const upperWick = c.high - Math.max(c.open, c.close);
 
-    if (prevLow && c.low < prevLow.price && c.close > prevLow.price) {
+    if (prevLow && c.low < prevLow.price && c.close > prevLow.price && lowerWick >= minSweepWick) {
       liquiditySweep = `SSL Stop Hunt below ${prevLow.price.toFixed(digits)} reclaimed at ${c.time}`;
       recentSweepBias = 'Bullish';
       sweepIndex = i;
       break;
     }
-    if (prevHigh && c.high > prevHigh.price && c.close < prevHigh.price) {
+    if (prevHigh && c.high > prevHigh.price && c.close < prevHigh.price && upperWick >= minSweepWick) {
       liquiditySweep = `BSL Stop Hunt above ${prevHigh.price.toFixed(digits)} rejected at ${c.time}`;
       recentSweepBias = 'Bearish';
       sweepIndex = i;
@@ -1073,6 +1076,7 @@ export async function runIctMarketAnalysis(
   // 7. Strict Institutional Confluence Gate & 3-State Trade Verdict
   // 4 Hard "No Trade" Blockers + 1 Positioning Gate (Wait for Setup vs Actionable Trade)
   const MIN_REAL_RR_TO_DOL = 2.5;
+  const ENTRY_APPROACH_ATR_MULT = 2.0;
 
   const hasMss = Boolean(mssBullishCandle || mssBearishCandle);
   const mssDirection: 'Bullish' | 'Bearish' | null = mssBullishCandle
@@ -1080,12 +1084,22 @@ export async function runIctMarketAnalysis(
     : mssBearishCandle
     ? 'Bearish'
     : null;
+  const mssBarIndex = mssBullishCandle?.index ?? mssBearishCandle?.index ?? null;
 
   // Hard Gate 1: Structure Shift (MSS) or Institutional Displacement
   const passMssOrDisplacement = hasMss || displacementDetected;
 
-  // Hard Gate 2: Conflicting Signals (Recent Liquidity Sweep vs MSS pointing opposite directions)
-  const signalsConflict = Boolean(mssDirection && recentSweepBias && mssDirection !== recentSweepBias);
+  // Hard Gate 2: Chronological Signal Alignment
+  // Only a conflict when an opposing Liquidity Sweep occurs AFTER (or on the same bar as) the MSS.
+  // If a newer closed-candle MSS broke cleanly past an older sweep, the newer MSS supersedes it.
+  const sweepSupersedesConflict =
+    sweepIndex !== null && mssBarIndex !== null && sweepIndex < mssBarIndex;
+  const signalsConflict = Boolean(
+    mssDirection &&
+      recentSweepBias &&
+      mssDirection !== recentSweepBias &&
+      !sweepSupersedesConflict
+  );
   const passSignalAlignment = !signalsConflict;
 
   // Preferred directional zone
@@ -1151,17 +1165,24 @@ export async function runIctMarketAnalysis(
     candidateEntryZoneStr = `${bestEntryArray.bottom.toFixed(digits)} - ${bestEntryArray.top.toFixed(digits)}`;
     candidateEntryArrayName = `${bestEntryArray.zone} ${bestEntryArray.category}`;
 
-    // Anchor invalidation stop beyond the structural swing protecting the entry PD Array
-    // (never unrealistically tight inside normal volatility noise, and never beyond the opposite extreme unnecessarily)
+    // Anchor invalidation stop beyond the LOCAL structural swing protecting the entry PD Array leg
     const stopBuffer = Math.max(atr * 0.3, minStep * 0.25);
-    const minRiskFloor = Math.max(atr * 1.0, dealingSpan * 0.08, Math.pow(10, -digits) * 3);
+    const minRiskFloor = Math.max(atr * 1.0, Math.pow(10, -digits) * 3);
 
     const protectingSwing = bullishBias
       ? swingLows
-          .filter((s) => s.price <= bestEntryArray.bottom)
+          .filter(
+            (s) =>
+              s.price <= bestEntryArray.bottom &&
+              Math.abs(s.index - bestEntryArray.startIndex) <= 14
+          )
           .sort((a, b) => b.price - a.price)[0]
       : swingHighs
-          .filter((s) => s.price >= bestEntryArray.top)
+          .filter(
+            (s) =>
+              s.price >= bestEntryArray.top &&
+              Math.abs(s.index - bestEntryArray.startIndex) <= 14
+          )
           .sort((a, b) => a.price - b.price)[0];
 
     const structuralAnchor = bullishBias
@@ -1203,13 +1224,23 @@ export async function runIctMarketAnalysis(
   const passMinRrToDol =
     passPdArrayInZone && realRrToDol !== null && realRrToDol >= MIN_REAL_RR_TO_DOL;
 
-  // Soft Positioning Check (50% Equilibrium Alignment — determines Actionable Trade vs Wait for Setup)
+  // Soft Positioning Check (50% Equilibrium OR Early 2.0x ATR Approach to Entry PD Array -> Actionable Trade)
+  const distToBestEntry = bestEntryArray
+    ? currentPrice >= bestEntryArray.bottom && currentPrice <= bestEntryArray.top
+      ? 0
+      : Math.min(Math.abs(currentPrice - bestEntryArray.top), Math.abs(currentPrice - bestEntryArray.bottom))
+    : Infinity;
+  const withinEarlyApproachBand = Boolean(
+    bestEntryArray && distToBestEntry <= atr * ENTRY_APPROACH_ATR_MULT
+  );
+
   const alignedWithBias =
-    currentZone === 'Equilibrium'
+    withinEarlyApproachBand ||
+    (currentZone === 'Equilibrium'
       ? true
       : bullishBias
       ? currentZone === 'Discount'
-      : currentZone === 'Premium';
+      : currentZone === 'Premium');
 
   // Assemble explicit Confluence Gate Checklist & Hard No-Trade Reasons
   const noTradeReasons: string[] = [];
@@ -1227,14 +1258,16 @@ export async function runIctMarketAnalysis(
   }
 
   const alignmentDetail = passSignalAlignment
-    ? mssDirection && recentSweepBias
+    ? mssDirection && recentSweepBias && mssDirection !== recentSweepBias && sweepSupersedesConflict
+      ? `Newer ${mssDirection} MSS superseded earlier ${recentSweepBias} wick sweep — orderflow aligned.`
+      : mssDirection && recentSweepBias
       ? `${recentSweepBias} liquidity sweep aligns cleanly with ${mssDirection} MSS.`
       : mssDirection
       ? `${mssDirection} MSS has no opposing liquidity sweep conflict.`
       : recentSweepBias
       ? `Recent ${recentSweepBias} liquidity sweep without conflicting counter-MSS.`
       : `No conflicting MSS vs. liquidity sweep signals.`
-    : `Conflicting signals: recent ${recentSweepBias} liquidity sweep (${liquiditySweep}) opposes ${mssDirection} MSS.`;
+    : `Conflicting signals: fresh post-MSS ${recentSweepBias} liquidity sweep (${liquiditySweep}) opposes ${mssDirection} MSS.`;
 
   if (!passSignalAlignment) {
     noTradeReasons.push(alignmentDetail);
@@ -1259,8 +1292,12 @@ export async function runIctMarketAnalysis(
   }
 
   const equilibriumDetail = alignedWithBias
-    ? `Price (${currentPositionPct}%) is positioned in ${currentZone}, aligned for ${preferredDir} execution.`
-    : `Price (${currentPositionPct}%) is in ${currentZone} (wrong side of 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT market-enter; wait for retracement into ${preferredArrayZone}.`;
+    ? withinEarlyApproachBand &&
+      currentZone !== 'Equilibrium' &&
+      ((bullishBias && currentZone !== 'Discount') || (!bullishBias && currentZone !== 'Premium'))
+      ? `Price (${currentPositionPct}%) is within ${ENTRY_APPROACH_ATR_MULT} ATR of the mapped ${preferredArrayZone} PD Array (${candidateEntryZoneStr}) — early Actionable signal.`
+      : `Price (${currentPositionPct}%) is positioned in ${currentZone}, aligned for ${preferredDir} execution.`
+    : `Price (${currentPositionPct}%) is in ${currentZone} (> ${ENTRY_APPROACH_ATR_MULT} ATR from ${preferredArrayZone} PD Array) — do NOT market-enter; wait for retracement.`;
 
   const confluenceChecks: IctConfluenceCheck[] = [
     {
@@ -1542,16 +1579,31 @@ export async function runIctMarketAnalysis(
       currentPrice >= activeLock.entryBottom - atr * 0.15 &&
       currentPrice <= activeLock.entryTop + atr * 0.15;
 
-    // Hysteresis around 50% Equilibrium prevents Wait <-> Actionable bouncing on 0.5-pip ticks
+    const distToLockedEntry =
+      currentPrice >= activeLock.entryBottom && currentPrice <= activeLock.entryTop
+        ? 0
+        : Math.min(
+            Math.abs(currentPrice - activeLock.entryTop),
+            Math.abs(currentPrice - activeLock.entryBottom)
+          );
+    const withinLockedApproach = distToLockedEntry <= atr * ENTRY_APPROACH_ATR_MULT;
+    const farFromLockedEntry = distToLockedEntry > atr * (ENTRY_APPROACH_ATR_MULT + 0.5);
+
+    // Hysteresis around 50% Equilibrium & 2.0x ATR early-approach band prevents Wait <-> Actionable bouncing
     let lockedVerdict: 'Actionable Trade' | 'Wait for Setup' = activeLock.lastVerdict;
     if (activeLock.lastVerdict === 'Wait for Setup') {
-      if (inEntryZoneNow || (isLockedLong ? lockPosPct <= 48.0 : lockPosPct >= 52.0)) {
+      if (
+        inEntryZoneNow ||
+        withinLockedApproach ||
+        (isLockedLong ? lockPosPct <= 48.0 : lockPosPct >= 52.0)
+      ) {
         lockedVerdict = 'Actionable Trade';
       }
     } else {
       if (
         !inEntryZoneNow &&
         !activeLock.entryTapped &&
+        farFromLockedEntry &&
         (isLockedLong ? lockPosPct >= 55.0 : lockPosPct <= 45.0)
       ) {
         lockedVerdict = 'Wait for Setup';
