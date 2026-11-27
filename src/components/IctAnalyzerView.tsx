@@ -1066,9 +1066,31 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   )}
 
                   <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
-                    <span className="text-slate-400 shrink-0">Power of 3 / Sweep</span>
-                    <span className="text-xs font-medium text-slate-200 text-right">
+                    <span className="text-slate-400 shrink-0">Power of 3 (AMD)</span>
+                    <span
+                      className={`text-xs font-semibold text-right ${
+                        analysis.po3Phase.startsWith('Manipulation')
+                          ? 'text-[#F5B82E]'
+                          : analysis.po3Phase === 'Distribution'
+                          ? 'text-[#16E563]'
+                          : 'text-sky-300'
+                      }`}
+                    >
                       {analysis.po3Phase}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-3">
+                    <span className="text-slate-400 shrink-0">Liquidity Sweep</span>
+                    <span
+                      className={`text-xs font-medium text-right leading-snug ${
+                        analysis.liquiditySweep?.startsWith('SSL')
+                          ? 'text-[#16E563]'
+                          : analysis.liquiditySweep?.startsWith('BSL')
+                          ? 'text-rose-400'
+                          : 'text-slate-400'
+                      }`}
+                    >
+                      {analysis.liquiditySweep || 'No recent external stop run detected'}
                     </span>
                   </div>
                   {analysis.lastUpdated && (

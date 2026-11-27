@@ -1275,13 +1275,52 @@ export async function runIctMarketAnalysis(
       ? `Price is at ${currentPositionPct}% (${currentZone} vs 50% Equilibrium ${equilibrium.toFixed(digits)}) — aligned to execute ${candidateEntryArrayName} targeting SSL.`
       : `Price is at ${currentPositionPct}% (Discount below 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT market-enter shorts; wait for rally into ${candidateEntryArrayName} (${candidateEntryZoneStr}).`;
 
-  const prevClose = candles[candles.length - 2]?.close ?? currentPrice;
-  const po3Phase: IctAnalysisResult['po3Phase'] =
-    recentSweepBias && ((recentSweepBias === 'Bullish') === bullishBias)
-      ? 'Manipulation (Judas Swing)'
-      : (currentPrice >= prevClose) === bullishBias
-      ? 'Distribution'
-      : 'Accumulation';
+  // Tightened ICT Power of 3 (AMD) Phase Detection:
+  // 1. Manipulation (Judas Swing): Fresh liquidity sweep within the last 6 bars before full mid-range expansion
+  // 2. Accumulation: No MSS/displacement yet, or recent 6-bar range is tightly compressed
+  // 3. Distribution: Confirmed MSS/displacement actively expanding away from origin toward Draw on Liquidity
+  const lastIdx = candles.length - 1;
+  const recent6 = candles.slice(-6);
+  const recent6Range =
+    recent6.length > 0
+      ? Math.max(...recent6.map((c) => c.high)) - Math.min(...recent6.map((c) => c.low))
+      : 0;
+  const isCompressed = recent6Range <= atr * 2.2;
+
+  const sweepBarsAgo = sweepIndex !== null ? lastIdx - sweepIndex : Infinity;
+  const isFreshSweep = sweepIndex !== null && sweepBarsAgo <= 6;
+  const sweepCandle = sweepIndex !== null ? candles[sweepIndex] : null;
+  const mssBarIdx = mssBullishCandle?.index ?? mssBearishCandle?.index ?? null;
+  const sweepExpansion =
+    sweepCandle && recentSweepBias
+      ? recentSweepBias === 'Bullish'
+        ? currentPrice - sweepCandle.low
+        : sweepCandle.high - currentPrice
+      : 0;
+  const alreadyExpandedAfterSweep =
+    sweepIndex !== null &&
+    mssBarIdx !== null &&
+    mssBarIdx > sweepIndex &&
+    sweepExpansion >= dealingSpan * 0.45;
+
+  const anchor5Close = candles[Math.max(0, candles.length - 6)]?.close ?? currentPrice;
+  const multiBarExpandingWithBias = bullishBias
+    ? currentPrice > anchor5Close
+    : currentPrice < anchor5Close;
+
+  let po3Phase: IctAnalysisResult['po3Phase'];
+  if (isFreshSweep && !alreadyExpandedAfterSweep) {
+    po3Phase = 'Manipulation (Judas Swing)';
+  } else if (!passMssOrDisplacement || isCompressed) {
+    po3Phase = 'Accumulation';
+  } else if (
+    (hasMss && mssBarIdx !== null && lastIdx - mssBarIdx <= 12) ||
+    multiBarExpandingWithBias
+  ) {
+    po3Phase = 'Distribution';
+  } else {
+    po3Phase = 'Accumulation';
+  }
 
   const kz = getNewYorkKillzone();
 
