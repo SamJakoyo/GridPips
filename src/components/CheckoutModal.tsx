@@ -462,12 +462,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl max-w-lg w-full shadow-2xl max-h-[92vh] overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-lg w-full shadow-2xl max-h-[92vh] overflow-y-auto">
         {/* Institutional Checkout Header */}
-        <div className="px-6 py-5 border-b border-emerald-500/20 flex items-start justify-between gap-4 bg-[#070D0A]/80 rounded-t-xl">
+        <div className="px-6 py-5 border-b border-slate-200 flex items-start justify-between gap-4 bg-[#FAF9F6] rounded-t-2xl">
           <div>
-            <div className="flex items-center gap-2 text-xs font-medium text-slate-300 mb-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#16E563]" />
+            <div className="flex items-center gap-2 text-xs font-medium text-slate-500 mb-1">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#D97706]" />
               <span>GRIDPIPs Subscription Billing</span>
               <span aria-hidden="true">·</span>
               <span>
@@ -478,12 +478,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   : `${cyclePricing.spec.label} Plan`}
               </span>
             </div>
-            <h2 className="text-lg font-bold text-white tracking-tight">{title}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>
+            <h2 className="text-lg font-bold text-slate-950 tracking-tight">{title}</h2>
+            <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-white rounded-lg cursor-pointer shrink-0"
+            className="p-1.5 text-slate-400 hover:text-slate-900 rounded-lg cursor-pointer shrink-0"
             aria-label="Close checkout"
           >
             <X className="w-5 h-5" />
@@ -495,9 +495,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {stkPhase !== 'paid' && stkPhase !== 'submitted' && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-slate-200">Subscription Billing Cycle</span>
+                <span className="font-semibold text-slate-700">Subscription Billing Cycle</span>
                 {isRenewal && currentExpiry && (
-                  <span className="font-mono text-[11px] text-[#16E563]">
+                  <span className="font-mono text-[11px] text-emerald-700 font-semibold">
                     Extends +{cyclePricing.spec.durationDays}d from {formatShortDate(currentExpiry)}
                   </span>
                 )}
@@ -518,10 +518,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           setOrder(null);
                         }
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer disabled:opacity-60 ${
+                      className={`p-2.5 rounded-xl border text-left transition-colors cursor-pointer disabled:opacity-60 ${
                         active
-                          ? 'bg-[#0B0F19] border-[#0B0F19] text-white'
-                          : 'bg-[#0B120E] border-emerald-500/20 hover:border-emerald-500/45 text-slate-100'
+                          ? 'bg-[#0B0F19] border-[#0B0F19] text-white shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-amber-300 text-slate-900'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1">
@@ -529,7 +529,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         {plan.savingsBadge && (
                           <span
                             className={`text-[10px] font-mono font-bold ${
-                              active ? 'text-[#E5A93C]' : 'text-[#16E563]'
+                              active ? 'text-[#E5A93C]' : 'text-emerald-700'
                             }`}
                           >
                             -{plan.discountPct}%
@@ -541,7 +541,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
                       <div
                         className={`text-[10px] font-mono tabular-nums mt-0.5 ${
-                          active ? 'text-slate-300' : 'text-slate-400'
+                          active ? 'text-slate-300' : 'text-slate-500'
                         }`}
                       >
                         {plan.durationDays}d · KES {quote.amountKes.toLocaleString()}
@@ -554,18 +554,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           )}
 
           {/* Amount & FX Conversion Ledger */}
-          <div className="p-4 bg-[#070D0A] border border-emerald-500/20 rounded-lg flex items-center justify-between gap-4">
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-4">
             <div>
-              <div className="text-xs font-medium text-slate-400">
+              <div className="text-xs font-semibold text-slate-700">
                 {cyclePricing.spec.label} Subscription ({cyclePricing.spec.durationDays} Days)
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 font-mono tabular-nums">
+              <div className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">
                 1 USD = KES {usdKesRate.toFixed(0)} · ${cyclePricing.effectiveMonthlyUsd.toFixed(2)}/mo equiv.
               </div>
             </div>
             <div className="text-right font-mono tabular-nums">
-              <div className="text-lg font-bold text-white">${priceUsd.toFixed(2)} USD</div>
-              <div className="text-xs font-semibold text-[#16E563]">
+              <div className="text-lg font-bold text-slate-950">${priceUsd.toFixed(2)} USD</div>
+              <div className="text-xs font-semibold text-emerald-700">
                 KES {priceKes.toLocaleString()} via M-Pesa
               </div>
             </div>
@@ -573,47 +573,47 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           {/* Success / Confirmed State */}
           {stkPhase === 'paid' && order ? (
-            <div className="p-5 bg-emerald-500/12 border border-emerald-500/30 rounded-xl space-y-4">
+            <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl space-y-4">
               <div className="flex items-start gap-3">
-                <CheckCircle2 className="w-6 h-6 text-[#16E563] shrink-0 mt-0.5" />
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-base font-bold text-emerald-100">
+                  <h3 className="text-base font-bold text-emerald-950">
                     Subscription Confirmed &amp; Active
                   </h3>
-                  <p className="text-xs text-emerald-300 mt-1">
+                  <p className="text-xs text-emerald-800 mt-1">
                     {stkStatusMessage || 'Your GRIDPIPs subscription is now active on your account.'}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-[#0B120E] border border-emerald-500/30 rounded-lg divide-y divide-emerald-500/10 text-xs">
+              <div className="bg-white border border-emerald-200 rounded-lg divide-y divide-slate-100 text-xs">
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Invoice Reference</span>
-                  <span className="font-mono font-semibold text-white">{order.order_number}</span>
+                  <span className="text-slate-500">Invoice Reference</span>
+                  <span className="font-mono font-semibold text-slate-950">{order.order_number}</span>
                 </div>
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Subscription Plan</span>
-                  <span className="font-semibold text-white">
+                  <span className="text-slate-500">Subscription Plan</span>
+                  <span className="font-semibold text-slate-950">
                     {getPlanSpec(order.billing_cycle).label} ({order.duration_days || cyclePricing.spec.durationDays} days)
                   </span>
                 </div>
                 {order.subscription_ends_at && (
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
-                    <span className="text-slate-400">Valid Through</span>
-                    <span className="font-mono font-semibold text-[#16E563]">
+                    <span className="text-slate-500">Valid Through</span>
+                    <span className="font-mono font-semibold text-emerald-700">
                       {formatShortDate(order.subscription_ends_at)}
                     </span>
                   </div>
                 )}
                 {order.mpesa_receipt && (
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
-                    <span className="text-slate-400">M-Pesa Receipt</span>
-                    <span className="font-mono font-semibold text-[#16E563]">{order.mpesa_receipt}</span>
+                    <span className="text-slate-500">M-Pesa Receipt</span>
+                    <span className="font-mono font-semibold text-emerald-700">{order.mpesa_receipt}</span>
                   </div>
                 )}
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Amount Settled</span>
-                  <span className="font-mono font-semibold tabular-nums text-white">
+                  <span className="text-slate-500">Amount Settled</span>
+                  <span className="font-mono font-semibold tabular-nums text-slate-950">
                     ${Number(order.amount_usd).toFixed(2)} USD (KES {Number(order.amount_kes).toLocaleString()})
                   </span>
                 </div>
@@ -635,41 +635,41 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </button>
             </div>
           ) : stkPhase === 'submitted' && order ? (
-            <div className="p-5 bg-sky-500/12 border border-sky-500/30 rounded-xl space-y-4">
+            <div className="p-5 bg-amber-50/70 border border-amber-200 rounded-xl space-y-4">
               <div className="flex items-start gap-3">
-                <Clock className="w-5 h-5 text-[#16E563] shrink-0 mt-0.5" />
+                <Clock className="w-5 h-5 text-[#B45309] shrink-0 mt-0.5" />
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-950">
                     Payment Reference Submitted for Verification
                   </h3>
-                  <p className="text-xs text-slate-200 mt-1 leading-relaxed">
+                  <p className="text-xs text-slate-700 mt-1 leading-relaxed">
                     {stkStatusMessage}
                   </p>
                 </div>
               </div>
 
-              <div className="bg-[#0B120E] border border-sky-500/30 rounded-lg divide-y divide-emerald-500/10 text-xs">
+              <div className="bg-white border border-slate-200 rounded-lg divide-y divide-slate-100 text-xs">
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Order Reference</span>
-                  <span className="font-mono font-semibold text-white">{order.order_number}</span>
+                  <span className="text-slate-500">Order Reference</span>
+                  <span className="font-mono font-semibold text-slate-950">{order.order_number}</span>
                 </div>
                 {order.payment_method === 'crypto' && order.crypto_network && (
                   <div className="px-3.5 py-2.5 flex items-center justify-between">
-                    <span className="text-slate-400">Asset &amp; Network</span>
-                    <span className="font-mono font-semibold text-white">
+                    <span className="text-slate-500">Asset &amp; Network</span>
+                    <span className="font-mono font-semibold text-slate-950">
                       {order.crypto_currency || 'USDT'} ({order.crypto_network})
                     </span>
                   </div>
                 )}
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Submitted Reference</span>
-                  <span className="font-mono font-semibold text-white truncate max-w-[200px]">
+                  <span className="text-slate-500">Submitted Reference</span>
+                  <span className="font-mono font-semibold text-slate-950 truncate max-w-[200px]">
                     {order.mpesa_receipt || order.crypto_tx_hash}
                   </span>
                 </div>
                 <div className="px-3.5 py-2.5 flex items-center justify-between">
-                  <span className="text-slate-400">Status</span>
-                  <span className="font-semibold text-[#F5B82E]">
+                  <span className="text-slate-500">Status</span>
+                  <span className="font-semibold text-[#B45309]">
                     {order.payment_method === 'crypto' ? 'Awaiting Block Confirmation' : 'Awaiting Settlement Review'}
                   </span>
                 </div>
@@ -681,7 +681,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     type="button"
                     disabled={checkingStatus}
                     onClick={() => void handleCheckCryptoStatus()}
-                    className="flex-1 py-2.5 px-3 bg-[#16E563] text-[#041108] font-bold hover:bg-[#2BF074] text-xs rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                    className="flex-1 py-2.5 px-3 bg-[#E5A93C] text-[#090806] font-bold hover:bg-[#d6982b] text-xs rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus ? 'animate-spin' : ''}`} />
                     <span>{checkingStatus ? 'Verifying On-Chain...' : 'Check On-Chain Confirmation'}</span>
@@ -691,7 +691,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       href={cryptoExplorerUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="py-2.5 px-3 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-200 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
+                      className="py-2.5 px-3 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg inline-flex items-center gap-1"
                     >
                       <span>Explorer</span>
                       <ExternalLink className="w-3.5 h-3.5" />
@@ -703,7 +703,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full py-2.5 px-4 bg-slate-950 hover:bg-slate-800 text-white text-sm font-semibold rounded-lg cursor-pointer"
+                className="w-full py-2.5 px-4 bg-[#0B0F19] hover:bg-slate-800 text-white text-sm font-semibold rounded-lg cursor-pointer"
               >
                 Return to Subscriptions &amp; Billing
               </button>
@@ -711,20 +711,20 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           ) : (
             <>
               {/* Payment Method Segmented Switcher */}
-              <div className="grid grid-cols-2 gap-1 p-1 bg-[#0E1712] rounded-lg">
+              <div className="grid grid-cols-2 gap-1 p-1 bg-slate-100 border border-slate-200 rounded-xl">
                 <button
                   type="button"
                   onClick={() => {
                     setPaymentMethod('mpesa');
                     setError('');
                   }}
-                  className={`py-2 px-3 text-xs font-semibold rounded-md inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
                     paymentMethod === 'mpesa'
-                      ? 'bg-[#16E563] text-[#041108] font-bold'
-                      : 'text-slate-300 hover:text-white'
+                      ? 'bg-[#0B0F19] text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
-                  <Smartphone className="w-3.5 h-3.5 text-[#16E563]" />
+                  <Smartphone className={`w-3.5 h-3.5 ${paymentMethod === 'mpesa' ? 'text-[#E5A93C]' : 'text-emerald-600'}`} />
                   <span>M-Pesa Daraja</span>
                 </button>
                 <button
@@ -735,19 +735,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     setPaymentMethod('crypto');
                     setError('');
                   }}
-                  className={`py-2 px-3 text-xs font-semibold rounded-md inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
+                  className={`py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap ${
                     paymentMethod === 'crypto'
-                      ? 'bg-[#16E563] text-[#041108] font-bold'
-                      : 'text-slate-300 hover:text-white'
+                      ? 'bg-[#0B0F19] text-white font-bold shadow-xs'
+                      : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
-                  <Coins className="w-3.5 h-3.5 text-[#16E563]" />
+                  <Coins className={`w-3.5 h-3.5 ${paymentMethod === 'crypto' ? 'text-[#E5A93C]' : 'text-[#D97706]'}`} />
                   <span>Crypto (USDT / BTC)</span>
                 </button>
               </div>
 
               {error && (
-                <div className="p-3 bg-rose-500/12 border border-rose-500/30 text-rose-400 text-xs rounded-lg flex items-start gap-2">
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
@@ -757,40 +757,40 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <div className="space-y-4">
                   {/* Live Daraja Polling View */}
                   {stkPhase === 'polling' && order ? (
-                    <div className="p-4 bg-[#070D0A] border border-emerald-500/20 rounded-xl space-y-4">
+                    <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2.5">
-                          <Loader2 className="w-5 h-5 text-[#16E563] animate-spin shrink-0 mt-0.5" />
+                          <Loader2 className="w-5 h-5 text-[#D97706] animate-spin shrink-0 mt-0.5" />
                           <div>
-                            <div className="text-sm font-bold text-white">
+                            <div className="text-sm font-bold text-slate-950">
                               Check Your Handset (+{order.mpesa_phone || mpesaPhone})
                             </div>
-                            <p className="text-xs text-slate-300 mt-0.5">
+                            <p className="text-xs text-slate-600 mt-0.5">
                               {stkStatusMessage ||
                                 `Enter your M-Pesa PIN to pay KES ${priceKes.toLocaleString()} to ${config.mpesaMerchantName}.`}
                             </p>
                           </div>
                         </div>
-                        <span className="font-mono text-xs font-semibold tabular-nums text-slate-400 shrink-0">
+                        <span className="font-mono text-xs font-semibold tabular-nums text-slate-500 shrink-0">
                           {pollSecondsLeft > 0 ? `${pollSecondsLeft}s` : 'Timeout'}
                         </span>
                       </div>
 
                       {/* 3-Step Verification Progress */}
                       <div className="grid grid-cols-3 gap-2 pt-1 text-[11px]">
-                        <div className="p-2 bg-emerald-500/12 border border-emerald-500/30 rounded-md text-emerald-300 font-medium">
+                        <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-md text-emerald-800 font-medium">
                           1. STK Sent
                         </div>
-                        <div className="p-2 bg-[#0B120E] border border-sky-500/40 rounded-md text-sky-300 font-semibold">
+                        <div className="p-2 bg-amber-50 border border-amber-300 rounded-md text-amber-900 font-semibold">
                           2. Enter PIN
                         </div>
-                        <div className="p-2 bg-[#0B120E] border border-emerald-500/20 rounded-md text-slate-400">
+                        <div className="p-2 bg-white border border-slate-200 rounded-md text-slate-500">
                           3. Unlock
                         </div>
                       </div>
 
                       {order.mpesa_checkout_id && (
-                        <div className="text-[11px] font-mono text-slate-400 truncate">
+                        <div className="text-[11px] font-mono text-slate-500 truncate">
                           Daraja Checkout ID: {order.mpesa_checkout_id}
                         </div>
                       )}
@@ -800,7 +800,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           type="button"
                           disabled={checkingStatus}
                           onClick={() => void pollMpesaStatus(order.id, true)}
-                          className="flex-1 py-2 px-3 bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                          className="flex-1 py-2 px-3 bg-[#0B0F19] hover:bg-slate-800 text-white text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${checkingStatus ? 'animate-spin' : ''}`} />
                           <span>{checkingStatus ? 'Querying Daraja...' : 'Check Payment Status'}</span>
@@ -822,7 +822,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                               // allow retry even if reset call fails
                             }
                           }}
-                          className="py-2 px-3 border border-emerald-500/25 bg-[#0B120E] hover:bg-emerald-500/10 text-slate-200 text-xs font-semibold rounded-lg cursor-pointer"
+                          className="py-2 px-3 border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-lg cursor-pointer"
                         >
                           Restart / Change Number
                         </button>
@@ -832,19 +832,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <>
                       {/* Failed STK feedback */}
                       {stkPhase === 'failed' && (
-                        <div className="p-3.5 bg-[#F5B82E]/12 border border-[#F5B82E]/30 rounded-lg text-xs text-amber-200 space-y-1">
+                        <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
                           <div className="font-semibold">Previous STK Push Not Completed</div>
                           <p>{stkStatusMessage || 'The prompt timed out or was cancelled on the handset.'}</p>
                         </div>
                       )}
 
                       {/* Merchant Info Bar */}
-                      <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between gap-3">
+                      <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-xs font-semibold text-emerald-100">
+                          <div className="text-xs font-semibold text-emerald-950">
                             {tillOrPaybillLabel} · {config.mpesaMerchantName}
                           </div>
-                          <div className="font-mono text-xs text-emerald-300 mt-0.5 tabular-nums">
+                          <div className="font-mono text-xs text-emerald-800 mt-0.5 tabular-nums">
                             Number: <span className="font-bold">{tillOrPaybillNumber}</span> · KES{' '}
                             {priceKes.toLocaleString()}
                           </div>
@@ -852,7 +852,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <button
                           type="button"
                           onClick={() => copyValue('till', tillOrPaybillNumber)}
-                          className="inline-flex items-center gap-1 text-xs text-[#16E563] font-semibold hover:underline cursor-pointer shrink-0"
+                          className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold hover:underline cursor-pointer shrink-0"
                         >
                           {copiedKey === 'till' ? (
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -864,7 +864,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
 
                       {!config.mpesaConfigured && (
-                        <div className="p-3 bg-[#F5B82E]/12 border border-[#F5B82E]/30 text-amber-200 text-xs rounded-lg leading-relaxed">
+                        <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-lg leading-relaxed">
                           Safaricom Daraja STK Push credentials (<span className="font-mono">MPESA_CONSUMER_KEY</span>,{' '}
                           <span className="font-mono">MPESA_CONSUMER_SECRET</span>,{' '}
                           <span className="font-mono">MPESA_PASSKEY</span>,{' '}
@@ -875,9 +875,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       )}
 
                       {Number(user?.walletBalanceKes || 0) >= priceKes && (
-                        <div className="p-3.5 bg-slate-950 text-white rounded-lg flex items-center justify-between gap-3">
+                        <div className="p-3.5 bg-[#0B0F19] text-white rounded-xl flex items-center justify-between gap-3">
                           <div className="text-xs">
-                            <div className="font-semibold text-emerald-400">
+                            <div className="font-semibold text-[#E5A93C]">
                               KES Wallet Available: KES {Number(user?.walletBalanceKes || 0).toLocaleString()}
                             </div>
                             <div className="text-slate-300 mt-0.5">
@@ -888,7 +888,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             type="button"
                             disabled={loading}
                             onClick={() => void handlePayWithWallet()}
-                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-md cursor-pointer shrink-0 disabled:opacity-60"
+                            className="px-3 py-1.5 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-xs font-bold rounded-md cursor-pointer shrink-0 disabled:opacity-60"
                           >
                             Pay KES {priceKes.toLocaleString()}
                           </button>
@@ -898,7 +898,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       {/* Daraja STK Express Form */}
                       <form onSubmit={handleSendDarajaStk} className="space-y-3">
                         <div>
-                          <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                             Safaricom M-Pesa Phone Number
                           </label>
                           <input
@@ -907,7 +907,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             value={mpesaPhone}
                             onChange={(e) => setMpesaPhone(e.target.value)}
                             placeholder="0712 345 678 or 254712345678"
-                            className="w-full px-3.5 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
+                            className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:border-amber-500"
                           />
                         </div>
                         <button
@@ -929,11 +929,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   )}
 
                   {/* Collapsible Manual Till / Paybill Code Submission */}
-                  <div className="pt-3 border-t border-emerald-500/20">
+                  <div className="pt-3 border-t border-slate-200">
                     <button
                       type="button"
                       onClick={() => setShowManualMpesa((v) => !v)}
-                      className="w-full flex items-center justify-between text-xs font-semibold text-slate-200 hover:text-white py-1 cursor-pointer"
+                      className="w-full flex items-center justify-between text-xs font-semibold text-slate-700 hover:text-slate-950 py-1 cursor-pointer"
                     >
                       <span>Already paid directly via Till / Paybill? Submit M-Pesa SMS Code</span>
                       {showManualMpesa ? (
@@ -946,7 +946,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     {showManualMpesa && (
                       <form onSubmit={handleSubmitManualMpesa} className="mt-3 space-y-3">
                         <div>
-                          <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                          <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                             M-Pesa Confirmation Code (from Safaricom SMS)
                           </label>
                           <input
@@ -955,13 +955,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                             value={mpesaReceipt}
                             onChange={(e) => setMpesaReceipt(e.target.value.toUpperCase())}
                             placeholder="e.g. UAJ8K4M92P"
-                            className="w-full px-3.5 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none uppercase focus:outline-none focus:border-[#16E563]"
+                            className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 font-mono uppercase focus:outline-none focus:border-amber-500"
                           />
                         </div>
                         <button
                           type="submit"
                           disabled={loading || mpesaReceipt.trim().length < 8}
-                          className="w-full py-2.5 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] disabled:opacity-50 cursor-pointer"
+                          className="w-full py-2.5 bg-[#0B0F19] text-[#E5A93C] text-xs font-bold rounded-lg hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
                         >
                           {loading ? 'Submitting Receipt...' : 'Submit M-Pesa Confirmation Code'}
                         </button>
@@ -973,7 +973,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 <form onSubmit={handleCryptoSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-slate-200 mb-1.5">Asset</label>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Asset</label>
                       <select
                         value={cryptoCurrency}
                         onChange={(e) => {
@@ -981,19 +981,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           setCryptoCurrency(val);
                           setCryptoNetwork(val === 'BTC' ? 'BTC' : 'TRC20');
                         }}
-                        className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 focus:border-amber-500 focus:outline-none"
                       >
                         <option value="USDT">USDT</option>
                         <option value="BTC">Bitcoin (BTC)</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-slate-200 mb-1.5">Network</label>
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">Network</label>
                       <select
                         value={cryptoCurrency === 'BTC' ? 'BTC' : cryptoNetwork}
                         disabled={cryptoCurrency === 'BTC'}
                         onChange={(e) => setCryptoNetwork(e.target.value as 'TRC20' | 'ERC20')}
-                        className="w-full px-3 py-2 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none"
+                        className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 focus:border-amber-500 focus:outline-none"
                       >
                         {cryptoCurrency === 'BTC' ? (
                           <option value="BTC">Bitcoin Mainnet</option>
@@ -1007,15 +1007,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="p-4 bg-[#070D0A] border border-emerald-500/20 rounded-xl space-y-3">
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1">
-                        <div className="text-xs font-semibold text-white">
+                        <div className="text-xs font-semibold text-slate-950">
                           {cryptoCurrency === 'BTC' && btcQuote
                             ? `Send ${btcQuote.btcAmountFormatted} BTC (≈ $${priceUsd.toFixed(2)} USD)`
                             : `Send exactly ${priceUsd.toFixed(2)} USDT (${cryptoNetwork})`}
                         </div>
-                        <div className="text-[11px] text-[#F5B82E] font-medium">
+                        <div className="text-[11px] text-[#B45309] font-medium">
                           {cryptoCurrency === 'BTC'
                             ? `Bitcoin Mainnet only (1 BTC ≈ $${btcQuote ? btcQuote.btcUsd.toLocaleString() : '—'})`
                             : cryptoNetwork === 'ERC20'
@@ -1027,10 +1027,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                         <button
                           type="button"
                           onClick={() => copyValue('btcAmount', btcQuote.btcAmountFormatted)}
-                          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[#16E563] hover:text-[#16E563] cursor-pointer"
+                          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-[#B45309] hover:underline cursor-pointer"
                         >
                           {copiedKey === 'btcAmount' ? (
-                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                           ) : (
                             <Copy className="w-3.5 h-3.5" />
                           )}
@@ -1039,8 +1039,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       )}
                     </div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-3.5 bg-[#0B120E] p-3 rounded-lg border border-emerald-500/20">
-                      <div className="shrink-0 w-28 h-28 rounded-md border border-emerald-500/20 bg-[#0B120E] flex items-center justify-center p-1">
+                    <div className="flex flex-col sm:flex-row items-center gap-3.5 bg-white p-3 rounded-lg border border-slate-200">
+                      <div className="shrink-0 w-28 h-28 rounded-md border border-slate-200 bg-white flex items-center justify-center p-1">
                         {qrDataUrl ? (
                           <img
                             src={qrDataUrl}
@@ -1053,23 +1053,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       </div>
                       <div className="flex-1 min-w-0 w-full space-y-2">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+                          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
                             {cryptoCurrency === 'BTC' ? 'BTC Deposit Address' : `USDT ${cryptoNetwork} Address`}
                           </span>
                           <button
                             type="button"
                             onClick={() => copyValue('crypto', activeAddress)}
-                            className="inline-flex items-center gap-1 text-xs font-semibold text-[#16E563] hover:text-[#16E563] cursor-pointer"
+                            className="inline-flex items-center gap-1 text-xs font-semibold text-[#B45309] hover:underline cursor-pointer"
                           >
                             {copiedKey === 'crypto' ? (
-                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                             ) : (
                               <Copy className="w-3.5 h-3.5" />
                             )}
                             <span>{copiedKey === 'crypto' ? 'Copied' : 'Copy address'}</span>
                           </button>
                         </div>
-                        <div className="font-mono text-xs text-white break-all bg-[#070D0A] p-2 rounded border border-emerald-500/20 select-all">
+                        <div className="font-mono text-xs text-slate-900 break-all bg-slate-50 p-2 rounded border border-slate-200 select-all">
                           {activeAddress}
                         </div>
                       </div>
@@ -1077,7 +1077,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-semibold text-slate-200 mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                       Blockchain Transaction Hash (TXID)
                     </label>
                     <input
@@ -1092,14 +1092,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                           ? 'Paste 0x... Ethereum transaction hash'
                           : 'Paste 64-character TRON TRC20 TXID'
                       }
-                      className="w-full px-3.5 py-2.5 text-sm border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 font-mono focus:border-[#16E563] focus:outline-none focus:outline-none focus:border-[#16E563]"
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:border-amber-500"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading || txHash.trim().length < 20}
-                    className="w-full py-2.5 bg-[#16E563] text-[#041108] font-bold text-sm font-semibold rounded-lg hover:bg-[#2BF074] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-2.5 bg-[#E5A93C] text-[#090806] font-bold text-sm rounded-lg hover:bg-[#d6982b] disabled:opacity-50 cursor-pointer"
                   >
                     {loading ? 'Verifying On-Chain...' : 'Verify TX Hash & Unlock'}
                   </button>

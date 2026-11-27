@@ -154,8 +154,8 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
   return (
     <div className="space-y-6">
       {/* ICT Official YouTube Channel Integration */}
-      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
-        <div className="lg:col-span-7 bg-[#050907] aspect-video lg:aspect-auto min-h-[300px]">
+      <div className="bg-white border border-slate-200 shadow-xs rounded-2xl overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+        <div className="lg:col-span-7 bg-[#0B0F19] aspect-video lg:aspect-auto min-h-[300px]">
           <iframe
             className="w-full h-full min-h-[300px]"
             src={`https://www.youtube.com/embed/videoseries?list=${uploadsPlaylistId}`}
@@ -166,23 +166,23 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
         </div>
         <div className="lg:col-span-5 p-6 flex flex-col justify-between">
           <div>
-            <div className="text-xs font-semibold text-[#16E563] mb-1">
+            <div className="text-xs font-semibold text-[#B45309] mb-1">
               Official ICT YouTube Channel · {config.ictYoutubeChannelId}
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">
+            <h2 className="text-xl font-bold text-slate-950 mb-2">
               Inner Circle Trader (ICT) &amp; Smart Money Concepts Academy
             </h2>
-            <p className="text-sm text-slate-300 leading-relaxed mb-4">
+            <p className="text-sm text-slate-600 leading-relaxed mb-4">
               Watch the latest mentorship uploads directly from the official ICT channel alongside our structured Smart Money Concepts (SMC) breakdowns below—100% free for all Exness-verified members.
             </p>
           </div>
 
-          <div className="space-y-2.5 pt-4 border-t border-emerald-500/15">
+          <div className="space-y-2.5 pt-4 border-t border-slate-200">
             <a
               href={channelUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 bg-[#16E563] text-[#041108] text-xs font-bold rounded-xl hover:bg-[#2BF074] inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2.5 px-4 bg-[#E5A93C] text-[#090806] text-xs font-bold rounded-xl hover:bg-[#d6982b] inline-flex items-center justify-center gap-2 transition-colors"
             >
               Open Full ICT YouTube Channel
               <ArrowUpRight className="w-4 h-4" />
@@ -192,20 +192,20 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
                 href={config.drtYoutubeChannelUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 px-4 bg-[#F5B82E]/15 border border-[#F5B82E]/40 text-[#F5B82E] text-xs font-semibold rounded-xl hover:bg-[#F5B82E]/25 inline-flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2.5 px-4 bg-amber-50 border border-amber-200 text-amber-900 text-xs font-semibold rounded-xl hover:bg-amber-100 inline-flex items-center justify-center gap-2 transition-colors"
               >
                 Open Ali Khan ICT (DRT Strategy)
-                <ArrowUpRight className="w-4 h-4" />
+                <ArrowUpRight className="w-4 h-4 text-[#B45309]" />
               </a>
             )}
             <a
               href={config.telegramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-2.5 px-4 bg-[#0E1712] border border-emerald-500/25 text-slate-200 text-xs font-semibold rounded-xl hover:border-[#16E563] hover:text-white inline-flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-2.5 px-4 bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl hover:border-amber-300 hover:bg-amber-50/40 inline-flex items-center justify-center gap-2 transition-colors"
             >
               Discuss Setups in JakoyoFX Telegram
-              <ArrowUpRight className="w-4 h-4 text-[#16E563]" />
+              <ArrowUpRight className="w-4 h-4 text-[#B45309]" />
             </a>
           </div>
         </div>
@@ -213,15 +213,15 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
 
       {/* Filter & Curriculum */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0B120E] border border-emerald-500/20 rounded-xl">
+        <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-xl">
           {(['All', 'ICT Core', 'SMC Strategy', 'Risk & Psychology'] as const).map((t) => (
             <button
               key={t}
               onClick={() => setSelectedTrack(t)}
               className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
                 selectedTrack === t
-                  ? 'bg-[#16E563] text-[#041108] font-bold'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-[#0B0F19] text-white font-bold shadow-xs'
+                  : 'text-slate-600 hover:text-slate-950'
               }`}
             >
               {t}
@@ -240,37 +240,39 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
                 onClick={() => setActiveLesson(lesson)}
                 className={`w-full text-left p-4 rounded-xl border transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-[#102218] text-white border-[#16E563]/60 shadow-[0_0_20px_rgba(22,229,99,0.12)]'
-                    : 'bg-[#0B120E] text-slate-200 border-emerald-500/15 hover:border-emerald-500/40'
+                    ? 'bg-[#0B0F19] text-white border-[#0B0F19] shadow-sm'
+                    : 'bg-white text-slate-800 border-slate-200 hover:border-amber-300 hover:bg-amber-50/30'
                 }`}
               >
-                <div className={`text-xs mb-1 ${isActive ? 'text-[#16E563]' : 'text-slate-400'}`}>
+                <div className={`text-xs mb-1 font-semibold ${isActive ? 'text-[#E5A93C]' : 'text-slate-500'}`}>
                   {lesson.track} · {lesson.duration}
                 </div>
-                <div className="text-sm font-bold leading-snug text-white">{lesson.title}</div>
+                <div className={`text-sm font-bold leading-snug ${isActive ? 'text-white' : 'text-slate-950'}`}>
+                  {lesson.title}
+                </div>
               </button>
             );
           })}
         </div>
 
-        <div className="lg:col-span-7 bg-[#0B120E] border border-emerald-500/20 rounded-2xl p-6">
-          <div className="text-xs font-semibold text-[#16E563] mb-1">
+        <div className="lg:col-span-7 bg-white border border-slate-200 shadow-xs rounded-2xl p-6">
+          <div className="text-xs font-semibold text-[#B45309] mb-1">
             {activeLesson.track} · {activeLesson.duration}
           </div>
-          <h3 className="text-xl font-bold text-white mb-3">{activeLesson.title}</h3>
-          <p className="text-sm text-slate-300 leading-relaxed mb-6">{activeLesson.summary}</p>
+          <h3 className="text-xl font-bold text-slate-950 mb-3">{activeLesson.title}</h3>
+          <p className="text-sm text-slate-600 leading-relaxed mb-6">{activeLesson.summary}</p>
 
-          <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-            <BookOpen className="w-4 h-4 text-[#16E563]" />
+          <h4 className="text-sm font-bold text-slate-950 mb-3 flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-[#D97706]" />
             Execution Rules &amp; Checklist
           </h4>
           <ul className="space-y-3 mb-6">
             {activeLesson.keyPoints.map((kp, i) => (
               <li
                 key={i}
-                className="p-3 bg-[#070D0A] border border-emerald-500/15 rounded-xl text-sm text-slate-200"
+                className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700"
               >
-                <span className="font-mono font-semibold text-[#16E563] mr-2">0{i + 1}.</span>
+                <span className="font-mono font-semibold text-[#B45309] mr-2">0{i + 1}.</span>
                 {kp}
               </li>
             ))}
@@ -282,7 +284,7 @@ export const EducationView: React.FC<EducationViewProps> = ({ config }) => {
             )}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#16E563] text-[#041108] text-xs font-bold rounded-xl hover:bg-[#2BF074] transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#0B0F19] text-[#E5A93C] text-xs font-bold rounded-xl hover:bg-slate-800 transition-colors"
           >
             <PlayCircle className="w-4 h-4" />
             Watch Topic Breakdown on YouTube

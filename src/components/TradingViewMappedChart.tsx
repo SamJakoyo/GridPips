@@ -327,7 +327,7 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
   const [showPremiumDiscount, setShowPremiumDiscount] = useState(true);
   const [showPdArrays, setShowPdArrays] = useState(true);
   const [showExecutionLevels, setShowExecutionLevels] = useState(true);
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copiedPine, setCopiedPine] = useState(false);
 
@@ -717,10 +717,16 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
             <span
               className={`text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
                 analysis.tradeVerdict === 'Actionable Trade'
-                  ? 'border-emerald-500/40 bg-emerald-500/15 text-[#16E563]'
+                  ? isDark
+                    ? 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
+                    : 'border-emerald-300 bg-emerald-50 text-emerald-800'
                   : analysis.tradeVerdict === 'Wait for Setup'
-                  ? 'border-amber-500/40 bg-amber-500/15 text-[#F5B82E]'
-                  : 'border-rose-500/40 bg-rose-500/15 text-rose-400'
+                  ? isDark
+                    ? 'border-amber-500/40 bg-amber-500/15 text-amber-300'
+                    : 'border-amber-300 bg-amber-50 text-amber-800'
+                  : isDark
+                  ? 'border-rose-500/40 bg-rose-500/15 text-rose-300'
+                  : 'border-rose-300 bg-rose-50 text-rose-700'
               }`}
             >
               {analysis.tradeVerdict === 'Actionable Trade'

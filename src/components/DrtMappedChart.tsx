@@ -313,7 +313,7 @@ export const DrtMappedChart: React.FC<DrtMappedChartProps> = ({
   const [showQuadrants, setShowQuadrants] = useState(true);
   const [showPdArrays, setShowPdArrays] = useState(true);
   const [showTargets, setShowTargets] = useState(true);
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [copiedPine, setCopiedPine] = useState(false);
 

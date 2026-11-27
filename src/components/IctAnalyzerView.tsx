@@ -357,42 +357,42 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </div>
         </div>
 
-        <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-emerald-500/20 flex flex-wrap items-center justify-between gap-2">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs">
+          <div className="px-6 py-4 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 bg-slate-50/70">
             <div>
-              <h3 className="text-sm font-bold text-white">Included in Your ICT Analyzer Subscription</h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <h3 className="text-sm font-bold text-slate-950">Included in Your ICT Analyzer Subscription</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Calibrated to ICT methodology ({config.ictYoutubeChannelId}) with flexible Monthly, Quarterly (-10%), and Annual (-20%) billing.
               </p>
             </div>
-            <span className="text-xs font-mono text-slate-400">12 Major FX, Gold, Indices &amp; Crypto Pairs</span>
+            <span className="text-xs font-mono text-slate-500">70+ FX, Gold, Indices, Stocks &amp; Crypto Pairs</span>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-emerald-500/15">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200">
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">01 · DEALING RANGE</div>
-              <div className="text-sm font-bold text-white">Premium &amp; Discount Matrix</div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#B45309]">01 · DEALING RANGE</div>
+              <div className="text-sm font-bold text-slate-950">Premium &amp; Discount Matrix</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
                 Automatic 50% equilibrium, deep discount longs, and premium short zones mapped across every timeframe.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">02 · PD ARRAYS</div>
-              <div className="text-sm font-bold text-white">Order Blocks &amp; FVG Detection</div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#B45309]">02 · PD ARRAYS</div>
+              <div className="text-sm font-bold text-slate-950">Order Blocks &amp; FVG Detection</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
                 Identifies unmitigated Bullish/Bearish Order Blocks, Fair Value Gaps, Breaker/Mitigation blocks, and Voids.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">03 · LIQUIDITY</div>
-              <div className="text-sm font-bold text-white">BSL / SSL &amp; Structure Shifts</div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#B45309]">03 · LIQUIDITY</div>
+              <div className="text-sm font-bold text-slate-950">BSL / SSL &amp; Structure Shifts</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
                 Plots Buy-Side and Sell-Side Liquidity pools, equal highs/lows, displacement candles, and MSS confirmations.
               </p>
             </div>
             <div className="p-5 space-y-1.5">
-              <div className="text-[11px] font-mono font-semibold text-[#F5B82E]">04 · EXECUTION</div>
-              <div className="text-sm font-bold text-white">OTE Entry, SL &amp; TP Targets</div>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <div className="text-[11px] font-mono font-semibold text-[#B45309]">04 · EXECUTION</div>
+              <div className="text-sm font-bold text-slate-950">OTE Entry, SL &amp; TP Targets</div>
+              <p className="text-xs text-slate-600 leading-relaxed">
                 Generates exact 0.618–0.786 OTE entry coordinates, invalidation stops, multi-target take profits, and cloud setups.
               </p>
             </div>
@@ -418,13 +418,13 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Synchronized Live Chart + ICT Analyzer Toolbar */}
-      <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xs">
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={symbol}
             onChange={(e) => onSymbolChange(e.target.value)}
             aria-label="Select trading pair"
-            className="px-3 py-2 text-sm font-mono font-semibold border border-emerald-500/25 rounded-lg bg-[#0E1712] text-white placeholder:text-slate-500 focus:border-[#16E563] focus:outline-none max-w-[230px]"
+            className="px-3 py-2 text-sm font-mono font-semibold border border-slate-300 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 focus:border-amber-500 focus:outline-none max-w-[230px]"
           >
             {isCustomSymbol && (
               <optgroup label="Custom">
@@ -442,14 +442,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             ))}
           </select>
 
-          <div className="flex flex-wrap items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
+          <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
             {ANALYZER_TIMEFRAMES.map((tf) => (
               <button
                 key={tf}
                 type="button"
                 onClick={() => onTimeframeChange(tf)}
                 className={`px-2.5 py-1.5 text-xs font-mono font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  activeTimeframe === tf ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
+                  activeTimeframe === tf ? 'bg-[#0B0F19] text-white font-bold' : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
                 {tf}
@@ -457,7 +457,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             ))}
           </div>
 
-          <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
+          <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
             {(
               [
                 ['split', 'Dual Charts'],
@@ -470,7 +470,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 type="button"
                 onClick={() => setChartViewMode(mode)}
                 className={`px-2.5 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  chartViewMode === mode ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
+                  chartViewMode === mode ? 'bg-[#0B0F19] text-white font-bold' : 'text-slate-600 hover:text-slate-950'
                 }`}
               >
                 {label}
@@ -483,9 +483,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           <button
             type="button"
             onClick={onOpenFreeChart}
-            className="px-3 py-2 border border-emerald-500/20 text-slate-200 text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+            className="px-3 py-2 border border-slate-200 bg-slate-50 text-slate-700 text-xs font-semibold rounded-lg hover:border-amber-400 hover:text-slate-950 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
           >
-            <CandlestickChart className="w-3.5 h-3.5 text-[#16E563]" />
+            <CandlestickChart className="w-3.5 h-3.5 text-[#D97706]" />
             Free Full Chart
           </button>
           <button
@@ -493,8 +493,8 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             onClick={() => setAutoSync((v) => !v)}
             className={`px-3 py-2 border text-xs font-semibold rounded-lg cursor-pointer whitespace-nowrap shrink-0 ${
               autoSync
-                ? 'border-emerald-500/40 bg-emerald-500/12 text-emerald-300'
-                : 'border-emerald-500/20 bg-[#0B120E] text-slate-300'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                : 'border-slate-200 bg-white text-slate-600'
             }`}
           >
             {autoSync ? 'Live Sync On' : 'Live Sync Off'}
@@ -503,9 +503,9 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             <button
               type="button"
               onClick={handleSaveSetup}
-              className="px-3.5 py-2 border border-emerald-500/25 text-slate-100 text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="px-3.5 py-2 border border-slate-300 bg-white text-slate-800 text-xs font-semibold rounded-lg hover:bg-slate-50 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
-              <BookmarkPlus className="w-3.5 h-3.5 text-[#16E563]" />
+              <BookmarkPlus className="w-3.5 h-3.5 text-[#D97706]" />
               {analysis.tradeVerdict === 'Wait for Setup' ? 'Save Limit Setup' : 'Save Setup'}
             </button>
           )}
@@ -515,7 +515,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               onClick={() => runScan(true)}
               disabled={loading}
               title={`Unlock current ${activeTimeframe} setup and re-evaluate fresh closed candles`}
-              className="px-3 py-2 border border-amber-500/35 bg-amber-500/10 text-[#F5B82E] text-xs font-semibold rounded-lg hover:bg-amber-500/20 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
+              className="px-3 py-2 border border-amber-300 bg-amber-50 text-amber-900 text-xs font-semibold rounded-lg hover:bg-amber-100 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
               Re-evaluate
@@ -525,7 +525,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             type="button"
             onClick={() => runScan(false)}
             disabled={loading}
-            className="px-4 py-2 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+            className="px-4 py-2 bg-[#0B0F19] text-[#E5A93C] text-xs font-bold rounded-lg hover:bg-slate-800 inline-flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             Scan {activeTimeframe}
@@ -534,7 +534,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
       </div>
 
       {error && (
-        <div className="p-3 bg-rose-500/12 border border-rose-500/30 text-rose-400 text-xs rounded-lg flex flex-wrap items-center justify-between gap-2">
+        <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg flex flex-wrap items-center justify-between gap-2">
           <span>{error}</span>
           <button
             type="button"
@@ -546,20 +546,20 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         </div>
       )}
       {cloudNotice && (
-        <div className="p-3 bg-emerald-500/12 border border-emerald-500/30 text-[#16E563] text-xs rounded-lg">
+        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg">
           {cloudNotice}
         </div>
       )}
 
       {!analysis && (
         <div className="space-y-5">
-          <div className="bg-[#070D0A] border border-emerald-500/20 rounded-xl p-4 text-white">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 text-slate-900 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <div>
-                <h3 className="text-sm font-bold text-white">
+                <h3 className="text-sm font-bold text-slate-950">
                   {symbol} ({activeTimeframe}) — Fresh TradingView Chart
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500">
                   {loading
                     ? `Scanning ${symbol} (${activeTimeframe}) Premium/Discount & PD Array Matrix...`
                     : `Live interactive TradingView chart for ${symbol} (${activeTimeframe})`}
@@ -569,7 +569,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 type="button"
                 onClick={() => runScan(false)}
                 disabled={loading}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-md inline-flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs font-semibold rounded-md inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
                 {loading ? 'Scanning...' : 'Load ICT Map'}
@@ -578,7 +578,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             <LiveTradingViewChart
               symbol={symbol}
               timeframe={activeTimeframe}
-              theme="dark"
+              theme="light"
               heightClass="h-[460px]"
             />
           </div>
@@ -589,12 +589,12 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         <>
           {/* 3-State Trade Verdict & Confluence Gate Banner */}
           <div
-            className={`rounded-xl border p-5 space-y-4 ${
+            className={`rounded-xl border p-5 space-y-4 shadow-xs ${
               analysis.tradeVerdict === 'Actionable Trade'
-                ? 'bg-[#08160F] border-emerald-500/40'
+                ? 'bg-emerald-50/75 border-emerald-200'
                 : analysis.tradeVerdict === 'Wait for Setup'
-                ? 'bg-[#151107] border-amber-500/40'
-                : 'bg-[#17090D] border-rose-500/40'
+                ? 'bg-amber-50/80 border-amber-200'
+                : 'bg-rose-50/75 border-rose-200'
             }`}
           >
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -602,10 +602,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 <div
                   className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
                     analysis.tradeVerdict === 'Actionable Trade'
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-[#16E563]'
+                      ? 'bg-emerald-100 border-emerald-300 text-emerald-700'
                       : analysis.tradeVerdict === 'Wait for Setup'
-                      ? 'bg-amber-500/15 border-amber-500/40 text-[#F5B82E]'
-                      : 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                      ? 'bg-amber-100 border-amber-300 text-amber-800'
+                      : 'bg-rose-100 border-rose-300 text-rose-700'
                   }`}
                 >
                   {analysis.tradeVerdict === 'Actionable Trade' ? (
@@ -621,22 +621,22 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     <span
                       className={`text-[11px] font-mono font-bold uppercase tracking-[0.14em] ${
                         analysis.tradeVerdict === 'Actionable Trade'
-                          ? 'text-[#16E563]'
+                          ? 'text-emerald-800'
                           : analysis.tradeVerdict === 'Wait for Setup'
-                          ? 'text-[#F5B82E]'
-                          : 'text-rose-400'
+                          ? 'text-amber-800'
+                          : 'text-rose-700'
                       }`}
                     >
                       ICT Confluence Gate · {analysis.symbol} ({analysis.timeframe})
                     </span>
-                    <span className="text-xs font-mono text-slate-400">
+                    <span className="text-xs font-mono text-slate-600">
                       {analysis.confluenceChecks.filter((c) => c.required && c.passed).length}/4 Hard Gates Passed
                     </span>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-950 tracking-tight">
                     {analysis.verdictHeadline}
                   </h3>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed max-w-4xl">
                     {analysis.verdictSummary}
                   </p>
                 </div>
@@ -647,8 +647,8 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   <span
                     className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-mono font-semibold inline-flex items-center gap-1.5 ${
                       analysis.lifecycle.isLocked
-                        ? 'bg-[#0B120E] border-emerald-500/35 text-emerald-300'
-                        : 'bg-[#0B120E] border-slate-700 text-slate-300'
+                        ? 'bg-white border-amber-300 text-amber-900'
+                        : 'bg-white border-slate-200 text-slate-700'
                     }`}
                   >
                     <Lock className="w-3 h-3" />
@@ -662,10 +662,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 <span
                   className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold uppercase tracking-wider ${
                     analysis.tradeVerdict === 'Actionable Trade'
-                      ? 'bg-[#16E563] text-[#041108] border-[#16E563]'
+                      ? 'bg-emerald-600 text-white border-emerald-700'
                       : analysis.tradeVerdict === 'Wait for Setup'
-                      ? 'bg-amber-500/20 text-[#F5B82E] border-amber-500/45'
-                      : 'bg-rose-500/20 text-rose-300 border-rose-500/45'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-rose-100 text-rose-800 border-rose-300'
                   }`}
                 >
                   {analysis.tradeVerdict === 'Actionable Trade'
@@ -681,67 +681,67 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             {analysis.lifecycle && (
               <div className="space-y-2.5">
                 {analysis.lifecycle.lastTransitionEvent && (
-                  <div className="px-3.5 py-2 rounded-lg bg-sky-950/40 border border-sky-500/35 text-xs text-sky-200 flex items-center gap-2">
-                    <AlertTriangle className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                  <div className="px-3.5 py-2 rounded-lg bg-sky-50 border border-sky-200 text-xs text-sky-900 flex items-center gap-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-sky-600 shrink-0" />
                     <span>
-                      <strong className="text-white">State Transition: </strong>
+                      <strong className="text-slate-950">State Transition: </strong>
                       {analysis.lifecycle.lastTransitionEvent}
                     </span>
                   </div>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                  <div className="rounded-lg border border-emerald-500/20 bg-[#0B120E]/85 p-3 space-y-1">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                         Validation Trigger
                       </span>
-                      <span className="text-[10px] font-mono font-bold text-[#16E563]">
+                      <span className="text-[10px] font-mono font-bold text-emerald-700">
                         {analysis.lifecycle.liveProximity}
                       </span>
                     </div>
-                    <div className="text-xs font-mono font-bold text-white">
+                    <div className="text-xs font-mono font-bold text-slate-950">
                       {analysis.lifecycle.validationZone
                         ? `${analysis.lifecycle.validationZone}`
                         : 'Awaiting Qualified Setup'}
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
+                    <p className="text-[11px] text-slate-600 leading-snug">
                       {analysis.lifecycle.validationRule}
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-rose-500/25 bg-[#0B120E]/85 p-3 space-y-1">
+                  <div className="rounded-lg border border-rose-200 bg-white p-3 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                         Strict Invalidation (Candle Close)
                       </span>
-                      <span className="text-[10px] font-mono font-bold text-rose-400">
+                      <span className="text-[10px] font-mono font-bold text-rose-700">
                         {analysis.timeframe} CLOSE ONLY
                       </span>
                     </div>
-                    <div className="text-xs font-mono font-bold text-rose-300">
+                    <div className="text-xs font-mono font-bold text-rose-700">
                       {analysis.lifecycle.invalidationLevel != null
                         ? `${analysis.dailyBias === 'Bullish' ? 'Close <' : 'Close >'} ${analysis.lifecycle.invalidationLevel}`
                         : 'None Locked'}
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
+                    <p className="text-[11px] text-slate-600 leading-snug">
                       {analysis.lifecycle.invalidationRule} (wicks alone do not flip bias).
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-emerald-500/20 bg-[#0B120E]/85 p-3 space-y-1">
+                  <div className="rounded-lg border border-amber-200 bg-white p-3 space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
                         Fractal Timeframe Lock
                       </span>
-                      <span className="text-[10px] font-mono font-bold text-[#F5B82E]">
+                      <span className="text-[10px] font-mono font-bold text-[#B45309]">
                         {analysis.timeframe} INDEPENDENT
                       </span>
                     </div>
-                    <div className="text-xs font-mono font-bold text-white truncate">
+                    <div className="text-xs font-mono font-bold text-slate-950 truncate">
                       {analysis.lifecycle.fractalRole}
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-snug">
+                    <p className="text-[11px] text-slate-600 leading-snug">
                       {analysis.lifecycle.targetDolLevel != null
                         ? `Unlocks automatically on DOL hit (${analysis.lifecycle.targetDolLevel}), ${analysis.timeframe} invalidation close, or opposing closed MSS.`
                         : `Evaluates strictly on closed ${analysis.timeframe} candles (last close: ${analysis.lifecycle.lastClosedBarTime}).`}
@@ -759,34 +759,34 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 return (
                   <div
                     key={check.id}
-                    className={`rounded-lg border p-3 space-y-1 ${
+                    className={`rounded-lg border p-3 space-y-1 bg-white ${
                       check.passed
-                        ? 'bg-[#0B120E]/80 border-emerald-500/25'
+                        ? 'border-emerald-200'
                         : isHardFail
-                        ? 'bg-rose-950/35 border-rose-500/40'
-                        : 'bg-amber-950/30 border-amber-500/40'
+                        ? 'border-rose-200'
+                        : 'border-amber-200'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold text-white leading-tight">
+                      <span className="text-[11px] font-bold text-slate-950 leading-tight">
                         {check.label}
                       </span>
                       {check.passed ? (
-                        <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       ) : isHardFail ? (
-                        <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                       ) : (
-                        <Clock className="w-4 h-4 text-[#F5B82E] shrink-0" />
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0" />
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       <span
                         className={`text-[10px] font-mono font-bold uppercase ${
                           check.passed
-                            ? 'text-[#16E563]'
+                            ? 'text-emerald-700'
                             : isHardFail
-                            ? 'text-rose-400'
-                            : 'text-[#F5B82E]'
+                            ? 'text-rose-700'
+                            : 'text-amber-700'
                         }`}
                       >
                         {check.passed
@@ -798,7 +798,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                           : 'FAIL'}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-300 leading-snug">{check.detail}</p>
+                    <p className="text-[11px] text-slate-600 leading-snug">{check.detail}</p>
                   </div>
                 );
               })}
@@ -807,17 +807,17 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
           {/* Summary Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">Verdict &amp; Bias ({analysis.timeframe})</div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <div className="text-xs text-slate-500">Verdict &amp; Bias ({analysis.timeframe})</div>
               <div
                 className={`text-lg font-bold mt-1 ${
                   analysis.tradeVerdict === 'No Trade'
-                    ? 'text-rose-400'
+                    ? 'text-rose-600'
                     : analysis.tradeVerdict === 'Wait for Setup'
-                    ? 'text-[#F5B82E]'
+                    ? 'text-amber-700'
                     : analysis.dailyBias === 'Bullish'
-                    ? 'text-[#16E563]'
-                    : 'text-rose-400'
+                    ? 'text-emerald-700'
+                    : 'text-rose-600'
                 }`}
               >
                 {analysis.tradeVerdict === 'No Trade'
@@ -826,55 +826,55 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   ? `Wait · ${analysis.setup.direction}`
                   : `${analysis.dailyBias} · ${analysis.setup.direction}`}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 truncate">{analysis.structureShift}</div>
+              <div className="text-xs text-slate-500 mt-0.5 truncate">{analysis.structureShift}</div>
             </div>
 
-            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">Dealing Range Position</div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <div className="text-xs text-slate-500">Dealing Range Position</div>
               <div
                 className={`text-lg font-bold font-mono tabular-nums mt-1 ${
                   pd?.currentZone === 'Premium'
-                    ? 'text-rose-400'
+                    ? 'text-rose-600'
                     : pd?.currentZone === 'Discount'
-                    ? 'text-[#16E563]'
-                    : 'text-[#F5B82E]'
+                    ? 'text-emerald-700'
+                    : 'text-amber-700'
                 }`}
               >
                 {pd ? `${pd.currentZone} (${pd.currentPositionPct}%)` : 'Equilibrium'}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 truncate">
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
                 {pd?.quadrant || '50% Equilibrium'}
               </div>
             </div>
 
-            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">50% Equilibrium &amp; Draw</div>
-              <div className="text-sm font-mono tabular-nums font-bold text-white mt-1">
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <div className="text-xs text-slate-500">50% Equilibrium &amp; Draw</div>
+              <div className="text-sm font-mono tabular-nums font-bold text-slate-950 mt-1">
                 EQ {pd ? pd.equilibrium : '-'} · DOL {analysis.drawOnLiquidity?.price ?? analysis.bslLevel}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 truncate">
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
                 {analysis.drawOnLiquidity
                   ? `${analysis.drawOnLiquidity.side}: ${analysis.drawOnLiquidity.label}`
                   : `BSL ${analysis.bslLevel} / SSL ${analysis.sslLevel}`}
               </div>
             </div>
 
-            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">Real Risk : Reward to DOL</div>
+            <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+              <div className="text-xs text-slate-500">Real Risk : Reward to DOL</div>
               <div
                 className={`text-lg font-bold font-mono tabular-nums mt-1 ${
                   analysis.tradeVerdict === 'No Trade'
-                    ? 'text-rose-400'
+                    ? 'text-rose-600'
                     : analysis.tradeVerdict === 'Wait for Setup'
-                    ? 'text-[#F5B82E]'
-                    : 'text-[#16E563]'
+                    ? 'text-amber-700'
+                    : 'text-emerald-700'
                 }`}
               >
                 {analysis.tradeVerdict === 'No Trade'
                   ? 'Locked (No Trade)'
                   : `1 : ${analysis.setup.rrRatio}`}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 truncate">
+              <div className="text-xs text-slate-500 mt-0.5 truncate">
                 {analysis.tradeVerdict === 'No Trade' && typeof analysis.setup.projectedRrToDol === 'number'
                   ? `Measured 1:${analysis.setup.projectedRrToDol.toFixed(2)} (Min 1:2.5 required)`
                   : analysis.activeKillzone}
@@ -884,31 +884,31 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
           {/* Premium vs. Discount Dealing Range Gauge */}
           {pd && (
-            <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-sm font-bold text-white">
+                  <h3 className="text-sm font-bold text-slate-950">
                     ICT Premium vs. Discount Dealing Range (50% Equilibrium)
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-slate-500 mt-0.5">
                     Institutional delivery buys Bullish PD Arrays below 50% Equilibrium (Discount) and sells Bearish PD Arrays above 50% Equilibrium (Premium).
                   </p>
                 </div>
                 <div
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
                     analysis.tradeVerdict === 'No Trade'
-                      ? 'text-rose-400'
+                      ? 'text-rose-600'
                       : pd.alignedWithBias
-                      ? 'text-[#16E563]'
-                      : 'text-[#F5B82E]'
+                      ? 'text-emerald-700'
+                      : 'text-amber-700'
                   }`}
                 >
                   {analysis.tradeVerdict === 'No Trade' ? (
-                    <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   ) : pd.alignedWithBias ? (
-                    <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                   ) : (
-                    <AlertTriangle className="w-4 h-4 text-[#F5B82E] shrink-0" />
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                   )}
                   <span>
                     {analysis.tradeVerdict === 'No Trade'
@@ -922,21 +922,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
               {/* Dealing Range Horizontal Bar */}
               <div className="space-y-1.5 pt-1">
-                <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-300">
+                <div className="flex items-center justify-between text-xs font-mono tabular-nums text-slate-600">
                   <span>0% Discount Low · {pd.rangeLow}</span>
-                  <span className="font-bold text-white">50% Equilibrium · {pd.equilibrium}</span>
+                  <span className="font-bold text-slate-950">50% Equilibrium · {pd.equilibrium}</span>
                   <span>100% Premium High · {pd.rangeHigh}</span>
                 </div>
 
-                <div className="relative h-6 w-full rounded-md overflow-hidden border border-emerald-500/20 flex">
+                <div className="relative h-6 w-full rounded-md overflow-hidden border border-slate-200 flex">
                   <div
-                    className="w-1/2 h-full bg-emerald-500/12 border-r border-dashed border-emerald-500/35 flex items-center pl-3 text-xs font-semibold text-emerald-300"
+                    className="w-1/2 h-full bg-emerald-50 border-r border-dashed border-slate-400 flex items-center pl-3 text-xs font-semibold text-emerald-800"
                     title="Discount Zone (0% - 50%)"
                   >
                     Discount Zone (Buy PD Arrays)
                   </div>
                   <div
-                    className="w-1/2 h-full bg-rose-500/12 flex items-center justify-end pr-3 text-xs font-semibold text-rose-300"
+                    className="w-1/2 h-full bg-rose-50 flex items-center justify-end pr-3 text-xs font-semibold text-rose-800"
                     title="Premium Zone (50% - 100%)"
                   >
                     Premium Zone (Sell PD Arrays)
@@ -945,7 +945,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   {/* OTE Sweet Spot Band (shown when bias is active) */}
                   {analysis.tradeVerdict !== 'No Trade' && (
                     <div
-                      className="absolute top-0 bottom-0 bg-amber-400/25 border-x border-amber-500/60 pointer-events-none"
+                      className="absolute top-0 bottom-0 bg-amber-300/40 border-x border-amber-500/70 pointer-events-none"
                       style={
                         analysis.oteLevels.zone === 'Discount'
                           ? { left: '21.4%', width: '16.8%' }
@@ -957,14 +957,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
                   {/* Current Price Marker */}
                   <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-[#0B120E] shadow-[0_0_8px_rgba(255,255,255,0.9)] z-10 pointer-events-none"
+                    className="absolute top-0 bottom-0 w-1 bg-[#0B0F19] shadow-xs z-10 pointer-events-none"
                     style={{ left: `${Math.min(99, Math.max(1, pd.currentPositionPct))}%` }}
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
                   <span>{pd.guidance}</span>
-                  <span className="font-mono tabular-nums text-slate-400">
+                  <span className="font-mono tabular-nums text-slate-500">
                     OTE 0.618–0.786 ({analysis.oteLevels.zone || (analysis.dailyBias === 'Bullish' ? 'Discount' : 'Premium')}):{' '}
                     {Math.min(analysis.oteLevels.fib618, analysis.oteLevels.fib786)} –{' '}
                     {Math.max(analysis.oteLevels.fib618, analysis.oteLevels.fib786)}
@@ -978,13 +978,13 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             {/* Dual TradingView Charts: Fresh TradingView Chart + ICT Mapped Chart */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-5' : 'lg:col-span-8 space-y-5'}>
               {(chartViewMode === 'split' || chartViewMode === 'live') && (
-                <div className="bg-[#070D0A] border border-emerald-500/20 rounded-xl p-4 text-white">
+                <div className="bg-white border border-slate-200 rounded-xl p-4 text-slate-900 shadow-xs">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                     <div>
-                      <h3 className="text-sm font-bold text-white">
+                      <h3 className="text-sm font-bold text-slate-950">
                         {symbol} ({activeTimeframe}) — Fresh TradingView Chart
                       </h3>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-slate-500">
                         Live interactive TradingView chart with drawing tools &amp; indicators synchronized to {symbol} {activeTimeframe}
                       </p>
                     </div>
@@ -992,7 +992,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                       href={`https://www.youtube.com/channel/${config.ictYoutubeChannelId}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs font-medium text-blue-400 hover:underline inline-flex items-center gap-1"
+                      className="text-xs font-medium text-[#B45309] hover:underline inline-flex items-center gap-1"
                     >
                       ICT Channel ({config.ictYoutubeChannelId})
                       <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1001,7 +1001,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   <LiveTradingViewChart
                     symbol={symbol}
                     timeframe={activeTimeframe}
-                    theme="dark"
+                    theme="light"
                     heightClass={chartViewMode === 'live' ? 'h-[560px]' : 'h-[430px]'}
                   />
                 </div>
@@ -1018,24 +1018,24 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             {/* Actionable ICT Setup Card */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-4' : 'lg:col-span-4 space-y-4'}>
               <div
-                className={`rounded-xl p-5 border ${
+                className={`rounded-xl p-5 border shadow-xs bg-white ${
                   analysis.tradeVerdict === 'No Trade'
-                    ? 'bg-[#14090C] border-rose-500/35'
+                    ? 'border-rose-200'
                     : analysis.tradeVerdict === 'Wait for Setup'
-                    ? 'bg-[#120F07] border-amber-500/35'
-                    : 'bg-[#0B120E] border-emerald-500/25'
+                    ? 'border-amber-300'
+                    : 'border-slate-200'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 mb-4">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-white">Execution Parameters</h3>
+                    <h3 className="text-base font-bold text-slate-950">Execution Parameters</h3>
                     {analysis.tradeVerdict === 'Wait for Setup' && (
-                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-[#F5B82E] border border-amber-500/40">
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300">
                         Limit Only
                       </span>
                     )}
                     {analysis.tradeVerdict === 'No Trade' && (
-                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300">
                         Locked
                       </span>
                     )}
@@ -1047,7 +1047,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     }
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs font-mono font-semibold text-[#16E563] hover:underline inline-flex items-center gap-1"
+                    className="text-xs font-mono font-semibold text-[#B45309] hover:underline inline-flex items-center gap-1"
                   >
                     <span>{analysis.tvSymbol || 'TradingView'}</span>
                     <ArrowUpRight className="w-3.5 h-3.5" />
@@ -1055,8 +1055,8 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 </div>
 
                 {analysis.tradeVerdict === 'Wait for Setup' && (
-                  <div className="mb-3.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/35 text-xs text-amber-200 leading-relaxed flex items-start gap-2">
-                    <Clock className="w-4 h-4 text-[#F5B82E] shrink-0 mt-0.5" />
+                  <div className="mb-3.5 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-950 leading-relaxed flex items-start gap-2">
+                    <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                     <span>
                       Do <strong>not</strong> market-enter now. Price is on the wrong side of 50% Equilibrium — wait for retracement into the mapped PD Array below.
                     </span>
@@ -1064,14 +1064,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 )}
 
                 <div className="space-y-2.5 text-sm">
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">Live Price</span>
-                    <span className="font-mono tabular-nums font-bold text-white">
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Live Price</span>
+                    <span className="font-mono tabular-nums font-bold text-slate-950">
                       {analysis.currentPrice}
                       {typeof analysis.changePct === 'number' && (
                         <span
                           className={`ml-1.5 text-xs font-semibold ${
-                            analysis.changePct >= 0 ? 'text-[#16E563]' : 'text-rose-400'
+                            analysis.changePct >= 0 ? 'text-emerald-600' : 'text-rose-600'
                           }`}
                         >
                           ({analysis.changePct >= 0 ? '+' : ''}
@@ -1081,24 +1081,24 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </span>
                   </div>
                   {typeof analysis.bid === 'number' && typeof analysis.ask === 'number' && (
-                    <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                      <span className="text-slate-400">Bid / Ask</span>
-                      <span className="font-mono tabular-nums text-xs font-semibold text-slate-200">
+                    <div className="flex justify-between py-2 border-b border-slate-100">
+                      <span className="text-slate-500">Bid / Ask</span>
+                      <span className="font-mono tabular-nums text-xs font-semibold text-slate-700">
                         {analysis.bid} / {analysis.ask}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">Trade Verdict</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100">
+                    <span className="text-slate-500">Trade Verdict</span>
                     <span
                       className={`font-semibold ${
                         analysis.tradeVerdict === 'No Trade'
-                          ? 'text-rose-400'
+                          ? 'text-rose-600'
                           : analysis.tradeVerdict === 'Wait for Setup'
-                          ? 'text-[#F5B82E]'
+                          ? 'text-amber-700'
                           : analysis.dailyBias === 'Bullish'
-                          ? 'text-[#16E563]'
-                          : 'text-rose-400'
+                          ? 'text-emerald-700'
+                          : 'text-rose-600'
                       }`}
                     >
                       {analysis.tradeVerdict === 'No Trade'
@@ -1110,18 +1110,18 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   </div>
 
                   {analysis.tradeVerdict === 'No Trade' ? (
-                    <div className="mt-3 p-4 rounded-lg bg-rose-950/40 border border-rose-500/35 space-y-3">
-                      <div className="flex items-center gap-2 text-rose-300 font-bold text-xs uppercase tracking-wider">
-                        <Lock className="w-4 h-4 text-rose-400 shrink-0" />
+                    <div className="mt-3 p-4 rounded-lg bg-rose-50 border border-rose-200 space-y-3">
+                      <div className="flex items-center gap-2 text-rose-800 font-bold text-xs uppercase tracking-wider">
+                        <Lock className="w-4 h-4 text-rose-600 shrink-0" />
                         <span>Execution Levels Hidden · Stand Aside</span>
                       </div>
-                      <p className="text-xs text-slate-300 leading-relaxed">
+                      <p className="text-xs text-slate-700 leading-relaxed">
                         Entry, Stop Loss, and Take Profit coordinates are intentionally locked until all 4 required ICT confluence rules align:
                       </p>
-                      <ul className="space-y-2 text-xs text-rose-200">
+                      <ul className="space-y-2 text-xs text-rose-800">
                         {analysis.noTradeReasons.map((reason, idx) => (
                           <li key={idx} className="flex items-start gap-2">
-                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                            <XCircle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                             <span>{reason}</span>
                           </li>
                         ))}
@@ -1129,79 +1129,79 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </div>
                   ) : (
                     <>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
-                        <span className="text-slate-400 shrink-0">Anchor PD Array</span>
-                        <span className="font-semibold text-white text-right truncate">
+                      <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
+                        <span className="text-slate-500 shrink-0">Anchor PD Array</span>
+                        <span className="font-semibold text-slate-950 text-right truncate">
                           {analysis.setup.entryArrayName || 'Unmitigated PD Array'}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                        <span className="text-slate-400">
+                      <div className="flex justify-between py-2 border-b border-slate-100">
+                        <span className="text-slate-500">
                           {analysis.tradeVerdict === 'Wait for Setup' ? 'Limit Entry Zone' : 'Entry Zone'}
                         </span>
-                        <span className="font-mono tabular-nums font-semibold text-white">
+                        <span className="font-mono tabular-nums font-semibold text-slate-950">
                           {analysis.setup.entryZone}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                        <span className="text-slate-400">50% Equilibrium</span>
-                        <span className="font-mono tabular-nums font-semibold text-slate-200">
+                      <div className="flex justify-between py-2 border-b border-slate-100">
+                        <span className="text-slate-500">50% Equilibrium</span>
+                        <span className="font-mono tabular-nums font-semibold text-slate-800">
                           {pd ? pd.equilibrium : '-'}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                        <span className="text-slate-400">Invalidation Stop Loss</span>
-                        <span className="font-mono tabular-nums font-semibold text-rose-400">
+                      <div className="flex justify-between py-2 border-b border-slate-100">
+                        <span className="text-slate-500">Invalidation Stop Loss</span>
+                        <span className="font-mono tabular-nums font-semibold text-rose-600">
                           {analysis.setup.stopLoss}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                        <span className="text-slate-400">TP1 (Partial / Equilibrium)</span>
-                        <span className="font-mono tabular-nums font-semibold text-[#16E563]">
+                      <div className="flex justify-between py-2 border-b border-slate-100">
+                        <span className="text-slate-500">TP1 (Partial / Equilibrium)</span>
+                        <span className="font-mono tabular-nums font-semibold text-emerald-700">
                           {analysis.setup.tp1}
                         </span>
                       </div>
-                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                        <span className="text-slate-400">
+                      <div className="flex justify-between py-2 border-b border-slate-100">
+                        <span className="text-slate-500">
                           TP2 (External DOL · 1:{analysis.setup.rrRatio})
                         </span>
-                        <span className="font-mono tabular-nums font-semibold text-[#16E563]">
+                        <span className="font-mono tabular-nums font-semibold text-emerald-700">
                           {analysis.setup.tp2}
                         </span>
                       </div>
                     </>
                   )}
 
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
-                    <span className="text-slate-400 shrink-0">Power of 3 (AMD)</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100 gap-2">
+                    <span className="text-slate-500 shrink-0">Power of 3 (AMD)</span>
                     <span
                       className={`text-xs font-semibold text-right ${
                         analysis.po3Phase.startsWith('Manipulation')
-                          ? 'text-[#F5B82E]'
+                          ? 'text-amber-700'
                           : analysis.po3Phase === 'Distribution'
-                          ? 'text-[#16E563]'
-                          : 'text-sky-300'
+                          ? 'text-emerald-700'
+                          : 'text-sky-700'
                       }`}
                     >
                       {analysis.po3Phase}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-3">
-                    <span className="text-slate-400 shrink-0">Liquidity Sweep</span>
+                  <div className="flex justify-between py-2 border-b border-slate-100 gap-3">
+                    <span className="text-slate-500 shrink-0">Liquidity Sweep</span>
                     <span
                       className={`text-xs font-medium text-right leading-snug ${
                         analysis.liquiditySweep?.startsWith('SSL')
-                          ? 'text-[#16E563]'
+                          ? 'text-emerald-700'
                           : analysis.liquiditySweep?.startsWith('BSL')
-                          ? 'text-rose-400'
-                          : 'text-slate-400'
+                          ? 'text-rose-600'
+                          : 'text-slate-500'
                       }`}
                     >
                       {analysis.liquiditySweep || 'No recent external stop run detected'}
                     </span>
                   </div>
                   {analysis.lastUpdated && (
-                    <div className="flex justify-between pt-1 text-xs text-slate-400">
+                    <div className="flex justify-between pt-1 text-xs text-slate-500">
                       <span>TradingView Feed Sync</span>
                       <span className="font-mono tabular-nums">
                         {new Date(analysis.lastUpdated).toLocaleTimeString([], {
@@ -1215,21 +1215,21 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 </div>
               </div>
 
-              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-white mb-3">ICT Confluence Audit</h3>
-                <ul className="space-y-2.5 text-xs text-slate-200">
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+                <h3 className="text-sm font-bold text-slate-950 mb-3">ICT Confluence Audit</h3>
+                <ul className="space-y-2.5 text-xs text-slate-700">
                   {analysis.confluenceChecks.map((check) => (
                     <li key={check.id} className="flex items-start gap-2">
                       {check.passed ? (
-                        <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0 mt-0.5" />
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                       ) : check.required ? (
-                        <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                        <XCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                       ) : (
-                        <Clock className="w-4 h-4 text-[#F5B82E] shrink-0 mt-0.5" />
+                        <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                       )}
                       <div>
-                        <span className="font-semibold text-white">{check.label}: </span>
-                        <span className="text-slate-300">{check.detail}</span>
+                        <span className="font-semibold text-slate-950">{check.label}: </span>
+                        <span className="text-slate-600">{check.detail}</span>
                       </div>
                     </li>
                   ))}
@@ -1239,22 +1239,22 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </div>
 
           {/* ICT PD Array Matrix (Premium vs Discount Hierarchy) */}
-          <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-bold text-white">
+                <h3 className="text-base font-bold text-slate-950">
                   ICT PD Array Matrix — Premium vs. Discount Hierarchy
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Derived directly from live {analysis.symbol} ({analysis.timeframe}) OHLC price delivery: Old High/Low (BSL/SSL), Equal Highs/Lows, Rejection Blocks, Order Blocks, FVGs (50% CE), Liquidity Voids, Breaker Blocks &amp; Mitigation Blocks.
                 </p>
               </div>
-              <div className="flex items-center gap-1 p-1 bg-[#0E1712] rounded-lg">
+              <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
                 <button
                   type="button"
                   onClick={() => setPdFilter('active')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                    pdFilter === 'active' ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
+                    pdFilter === 'active' ? 'bg-[#0B0F19] text-white font-bold' : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
                   Unmitigated &amp; Active
@@ -1263,7 +1263,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                   type="button"
                   onClick={() => setPdFilter('all')}
                   className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                    pdFilter === 'all' ? 'bg-[#16E563] text-[#041108] font-bold' : 'text-slate-300 hover:text-white'
+                    pdFilter === 'all' ? 'bg-[#0B0F19] text-white font-bold' : 'text-slate-600 hover:text-slate-950'
                   }`}
                 >
                   All Arrays ({allPdArrays.length})
@@ -1291,27 +1291,27 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
       {/* Supabase Synced Setups & Strategy Playbooks */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <BookmarkPlus className="w-4 h-4 text-[#16E563]" />
+            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+              <BookmarkPlus className="w-4 h-4 text-[#D97706]" />
               Saved ICT Setups
             </h3>
           </div>
           {savedSetups.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4">
+            <p className="text-xs text-slate-500 py-4">
               No saved setups yet. Click &quot;Save Setup&quot; on any scan to save it to your account.
             </p>
           ) : (
-            <div className="divide-y divide-emerald-500/10">
+            <div className="divide-y divide-slate-100">
               {savedSetups.map((s) => (
                 <div key={s.id} className="py-2.5 flex items-center justify-between gap-3 text-xs">
                   <div>
-                    <div className="font-mono font-bold text-white">
+                    <div className="font-mono font-bold text-slate-950">
                       {s.symbol} · {s.timeframe} ·{' '}
-                      <span className={s.bias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'}>{s.bias}</span>
+                      <span className={s.bias === 'Bullish' ? 'text-emerald-700' : 'text-rose-600'}>{s.bias}</span>
                     </div>
-                    <div className="text-slate-300 font-mono tabular-nums">
+                    <div className="text-slate-600 font-mono tabular-nums">
                       Entry {s.entryZone} · SL {s.stopLoss} · TP1 {s.tp1}
                     </div>
                   </div>
@@ -1329,10 +1329,10 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           )}
         </div>
 
-        <div className="lg:col-span-6 bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5 space-y-4">
+        <div className="lg:col-span-6 bg-white border border-slate-200 rounded-xl p-5 space-y-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <BookMarked className="w-4 h-4 text-[#16E563]" />
+            <h3 className="text-sm font-bold text-slate-950 flex items-center gap-2">
+              <BookMarked className="w-4 h-4 text-[#D97706]" />
               Strategy Playbooks
             </h3>
           </div>
@@ -1343,7 +1343,7 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
               placeholder={`Playbook title (e.g. ${symbol} ${activeTimeframe} Discount OTE + FVG)`}
               value={playbookTitle}
               onChange={(e) => setPlaybookTitle(e.target.value)}
-              className="w-full px-3 py-2 text-xs border border-emerald-500/25 rounded-lg focus:outline-none focus:border-[#16E563]"
+              className="w-full px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
             />
             <div className="flex gap-2">
               <input
@@ -1351,11 +1351,11 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 placeholder="PD Array trigger, Equilibrium filter, & Killzone rules..."
                 value={playbookRules}
                 onChange={(e) => setPlaybookRules(e.target.value)}
-                className="flex-1 px-3 py-2 text-xs border border-emerald-500/25 rounded-lg focus:outline-none focus:border-[#16E563]"
+                className="flex-1 px-3 py-2 text-xs bg-white text-slate-900 placeholder:text-slate-400 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500"
               />
               <button
                 type="submit"
-                className="px-4 py-2 bg-[#16E563] text-[#041108] text-xs font-bold rounded-lg hover:bg-[#2BF074] cursor-pointer whitespace-nowrap shrink-0"
+                className="px-4 py-2 bg-[#0B0F19] text-[#E5A93C] text-xs font-bold rounded-lg hover:bg-slate-800 cursor-pointer whitespace-nowrap shrink-0"
               >
                 Save Playbook
               </button>
@@ -1363,17 +1363,17 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           </form>
 
           {playbooks.length > 0 && (
-            <div className="divide-y divide-emerald-500/10">
+            <div className="divide-y divide-slate-100">
               {playbooks.map((p) => (
                 <div key={p.id} className="py-2 flex items-start justify-between gap-3 text-xs">
                   <div>
-                    <div className="font-semibold text-white">
+                    <div className="font-semibold text-slate-950">
                       {p.title}{' '}
-                      <span className="font-mono text-slate-400">
+                      <span className="font-mono text-slate-500">
                         ({p.pair} · {p.timeframe})
                       </span>
                     </div>
-                    <div className="text-slate-300">{p.rulesSummary}</div>
+                    <div className="text-slate-600">{p.rulesSummary}</div>
                   </div>
                   <button
                     type="button"
@@ -1400,57 +1400,57 @@ const PdArrayColumn: React.FC<{
   items: PdArrayItem[];
 }> = ({ title, subtitle, tone, items }) => {
   return (
-    <div className="border border-emerald-500/20 rounded-lg overflow-hidden">
+    <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
       <div
-        className={`px-4 py-3 border-b border-emerald-500/20 ${
-          tone === 'premium' ? 'bg-rose-500/10' : 'bg-emerald-500/10'
+        className={`px-4 py-3 border-b border-slate-200 ${
+          tone === 'premium' ? 'bg-rose-50/70' : 'bg-emerald-50/70'
         }`}
       >
         <div
           className={`text-sm font-bold ${
-            tone === 'premium' ? 'text-rose-300' : 'text-emerald-300'
+            tone === 'premium' ? 'text-rose-800' : 'text-emerald-800'
           }`}
         >
           {title}
         </div>
-        <div className="text-xs text-slate-300">{subtitle}</div>
+        <div className="text-xs text-slate-600">{subtitle}</div>
       </div>
 
       {items.length === 0 ? (
-        <div className="px-4 py-6 text-xs text-slate-400">
+        <div className="px-4 py-6 text-xs text-slate-500">
           No active {tone === 'premium' ? 'Premium' : 'Discount'} PD arrays detected in this filter view.
         </div>
       ) : (
-        <div className="divide-y divide-emerald-500/10">
+        <div className="divide-y divide-slate-100">
           {items.map((item) => {
             const statusColor =
               item.status === 'In Zone'
-                ? 'text-sky-400 font-bold'
+                ? 'text-sky-700 font-bold'
                 : item.status === 'Target Liquidity'
-                ? 'text-[#F5B82E] font-semibold'
+                ? 'text-amber-700 font-semibold'
                 : item.status === 'Mitigated'
                 ? 'text-slate-400'
-                : 'text-[#16E563] font-semibold';
+                : 'text-emerald-700 font-semibold';
             const bandLabel =
               item.top === item.bottom
                 ? `${item.midpoint}`
                 : `${item.bottom} – ${item.top} (Mid ${item.midpoint})`;
             return (
-              <div key={item.id} className="px-4 py-3 hover:bg-emerald-500/10 transition-colors">
+              <div key={item.id} className="px-4 py-3 hover:bg-amber-50/40 transition-colors">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold text-white truncate">
+                    <div className="text-xs font-semibold text-slate-950 truncate">
                       <span className="font-mono text-slate-400 mr-1.5">P{item.priority}</span>
                       {item.name}
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">{item.description}</div>
+                    <div className="text-xs text-slate-500 mt-0.5">{item.description}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-xs font-mono tabular-nums font-semibold text-white">
+                    <div className="text-xs font-mono tabular-nums font-semibold text-slate-950">
                       {bandLabel}
                     </div>
                     <div className="text-xs font-mono tabular-nums mt-0.5 flex items-center justify-end gap-1.5">
-                      <span className="text-slate-400">
+                      <span className="text-slate-500">
                         {item.distancePct >= 0 ? `+${item.distancePct}%` : `${item.distancePct}%`}
                       </span>
                       <span aria-hidden="true" className="text-slate-300">·</span>

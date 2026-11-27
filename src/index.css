@@ -5,21 +5,21 @@
     --font-display: 'Sora', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-body: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
-    --gp-bg: #050907;
-    --gp-surface: #0b120e;
-    --gp-surface-elevated: #101a14;
-    --gp-emerald: #16e563;
-    --gp-emerald-hover: #2bf074;
-    --gp-gold: #f5b82e;
-    color-scheme: dark;
+    --gp-bg: #faf9f6;
+    --gp-surface: #ffffff;
+    --gp-surface-elevated: #f8fafc;
+    --gp-ink: #0b0f19;
+    --gp-gold: #e5a93c;
+    --gp-gold-hover: #d6982b;
+    color-scheme: light;
   }
 
   body {
     font-family: var(--font-body);
     font-weight: 400;
     line-height: 1.6;
-    color: #f1f5f9;
-    background-color: #050907;
+    color: #0f172a;
+    background-color: #faf9f6;
   }
 
   h1, h2 {
@@ -52,24 +52,24 @@
   select,
   input,
   textarea {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   select,
   textarea,
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']) {
-    background-color: #0e1712;
-    color: #f8fafc;
+    background-color: #ffffff;
+    color: #0f172a;
   }
 
   select option,
   select optgroup {
-    background-color: #0b120e;
-    color: #f1f5f9;
+    background-color: #ffffff;
+    color: #0f172a;
   }
 
   select optgroup {
-    color: #16e563;
+    color: #b45309;
     font-weight: 700;
   }
 }
@@ -155,8 +155,8 @@
 
 @keyframes price-flash-up {
   0% {
-    color: #16e563;
-    text-shadow: 0 0 12px rgba(22, 229, 99, 0.5);
+    color: #059669;
+    text-shadow: 0 0 10px rgba(5, 150, 105, 0.25);
   }
   100% {
     color: inherit;
@@ -166,8 +166,8 @@
 
 @keyframes price-flash-down {
   0% {
-    color: #fb7185;
-    text-shadow: 0 0 12px rgba(251, 113, 133, 0.45);
+    color: #e11d48;
+    text-shadow: 0 0 10px rgba(225, 29, 72, 0.22);
   }
   100% {
     color: inherit;

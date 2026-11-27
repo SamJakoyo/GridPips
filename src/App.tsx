@@ -315,7 +315,7 @@ export default function App() {
 
   if (booting) {
     return (
-      <div className="min-h-screen bg-[#050907] flex items-center justify-center text-sm font-mono text-[#16E563]">
+      <div className="min-h-screen bg-[#FAF9F6] flex items-center justify-center text-sm font-mono text-slate-700">
         Initializing Grid Pips...
       </div>
     );
@@ -453,40 +453,34 @@ export default function App() {
     : 'Checking live TradingView market sessions...';
 
   const marketStatusStyle = !marketStatus
-    ? 'bg-[#0E1712] border-emerald-500/20 text-slate-400'
+    ? 'bg-slate-50 border-slate-200 text-slate-500'
     : marketStatus.traditionalOpen
-    ? 'bg-[#0C1E14] border-[#16E563]/35 text-[#16E563]'
+    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
     : marketStatus.cryptoOpen
-    ? 'bg-[#1A1508] border-[#F5B82E]/35 text-[#F5B82E]'
-    : 'bg-rose-950/50 border-rose-500/30 text-rose-300';
+    ? 'bg-amber-50 border-amber-200 text-amber-800'
+    : 'bg-rose-50 border-rose-200 text-rose-700';
 
   const pendingOrdersCount = orders.filter(
     (o) => o.payment_status === 'pending' || o.payment_status === 'processing'
   ).length;
 
   return (
-    <div
-      className="min-h-screen bg-[#050907] text-slate-100 flex"
-      style={{
-        backgroundImage:
-          'radial-gradient(circle at 80% 0%, rgba(22, 229, 99, 0.1), transparent 40%)',
-      }}
-    >
-      {/* Desktop Obsidian Emerald Sidebar matching the exact artwork */}
-      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-[#080E0B] border-r border-emerald-500/15 sticky top-0 h-screen shrink-0">
-        <div className="h-16 px-4 border-b border-emerald-500/15 flex items-center justify-between gap-2">
+    <div className="min-h-screen bg-[#FAF9F6] text-slate-900 flex">
+      {/* Desktop Crisp White & Gold Sidebar */}
+      <aside className="hidden lg:flex lg:w-64 lg:flex-col bg-white border-r border-slate-200 sticky top-0 h-screen shrink-0">
+        <div className="h-16 px-4 border-b border-slate-200 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => setScreen('landing')}
             className="cursor-pointer shrink-0"
           >
-            <BrandLogo variant="light" size="sm" />
+            <BrandLogo variant="dark" size="sm" />
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('account')}
             title="View my account information"
-            className="text-[11px] font-mono text-slate-400 hover:text-[#16E563] truncate cursor-pointer"
+            className="text-[11px] font-mono text-slate-500 hover:text-[#B45309] truncate cursor-pointer"
           >
             {user.exnessAccountId}
           </button>
@@ -495,7 +489,7 @@ export default function App() {
         <nav className="flex-1 overflow-y-auto p-3 space-y-5">
           {navGroups.map((group) => (
             <div key={group.label}>
-              <div className="px-3 text-[11px] font-medium text-slate-500 mb-1.5">{group.label}</div>
+              <div className="px-3 text-[11px] font-medium text-slate-400 mb-1.5">{group.label}</div>
               <div className="space-y-1">
                 {group.items.map((item) => {
                   const isActive = activeTab === item.id;
@@ -504,14 +498,14 @@ export default function App() {
                       type="button"
                       key={item.id}
                       onClick={() => setActiveTab(item.id)}
-                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs transition-colors cursor-pointer ${
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
                         isActive
-                          ? 'bg-[#16E563] text-[#041108] font-bold shadow-[0_0_22px_rgba(22,229,99,0.25)]'
-                          : 'text-slate-300 font-medium hover:text-white hover:bg-emerald-500/10'
+                          ? 'bg-amber-50/90 border border-amber-300/80 text-slate-950 font-semibold shadow-2xs'
+                          : 'border border-transparent text-slate-700 font-medium hover:text-slate-950 hover:bg-slate-50'
                       }`}
                     >
                       <span className="flex items-center gap-2.5 min-w-0">
-                        <span className={isActive ? 'text-[#041108]' : 'text-slate-400'}>
+                        <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
                           {item.icon}
                         </span>
                         <span className="truncate">{item.name}</span>
@@ -519,11 +513,11 @@ export default function App() {
                       {item.tag && (
                         <span
                           className={`font-mono text-[10px] shrink-0 ${
-                            isActive
-                              ? 'text-[#041108] font-bold'
-                              : item.tag === 'Active'
-                              ? 'text-[#16E563]'
-                              : 'text-slate-400'
+                            item.tag === 'Active'
+                              ? 'px-1.5 py-0.5 rounded bg-amber-100/80 text-amber-800 font-semibold'
+                              : isActive
+                              ? 'text-slate-900 font-semibold'
+                              : 'text-slate-500'
                           }`}
                         >
                           {item.tag}
@@ -537,18 +531,18 @@ export default function App() {
           ))}
         </nav>
 
-        {/* Bottom VIP Gold "Go Pro" Card matching the exact sidebar artwork */}
-        <div className="p-3.5 border-t border-emerald-500/15 space-y-2.5">
-          <div className="rounded-xl p-3.5 bg-gradient-to-br from-[#241A08] via-[#151108] to-[#0A0F0C] border border-[#F5B82E]/40 space-y-2.5">
+        {/* Bottom Obsidian & Gold "Go Pro" Card */}
+        <div className="p-3.5 border-t border-slate-200 space-y-2.5">
+          <div className="rounded-xl p-3.5 bg-[#0B0F19] border border-slate-900 space-y-2.5">
             <div className="flex items-center gap-2.5">
-              <span className="w-8 h-8 rounded-lg bg-[#F5B82E]/15 border border-[#F5B82E]/40 flex items-center justify-center shrink-0">
-                <Crown className="w-4 h-4 text-[#F5B82E]" />
+              <span className="w-8 h-8 rounded-lg bg-[#E5A93C]/15 border border-[#E5A93C]/40 flex items-center justify-center shrink-0">
+                <Crown className="w-4 h-4 text-[#E5A93C]" />
               </span>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-white leading-tight">
                   {bothProActive ? 'Pro VIP Active' : 'Go Pro'}
                 </div>
-                <div className="text-[11px] text-amber-200/75 truncate">
+                <div className="text-[11px] text-amber-200/80 truncate">
                   {bothProActive ? 'ICT & DRT Unlocked' : 'Unlock ICT & DRT'}
                 </div>
               </div>
@@ -564,7 +558,7 @@ export default function App() {
                   setActiveTab('orders');
                 }
               }}
-              className="w-full py-2 px-3 rounded-lg bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-xs font-bold transition-colors cursor-pointer"
+              className="w-full py-2 px-3 rounded-lg bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-xs font-bold transition-colors cursor-pointer"
             >
               {bothProActive ? 'Manage Plans →' : 'Upgrade Now →'}
             </button>
@@ -573,7 +567,7 @@ export default function App() {
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full py-1.5 px-3 text-xs font-medium text-slate-400 hover:text-rose-400 flex items-center gap-2 cursor-pointer transition-colors"
+            className="w-full py-1.5 px-3 text-xs font-medium text-slate-500 hover:text-rose-600 flex items-center gap-2 cursor-pointer transition-colors"
           >
             <LogOut className="w-3.5 h-3.5" />
             Sign out ({firstName})
@@ -585,17 +579,17 @@ export default function App() {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden flex">
           <div
-            className="fixed inset-0 bg-black/75"
+            className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-72 bg-[#080E0B] border-r border-emerald-500/20 h-full overflow-y-auto p-4 z-10 flex flex-col justify-between">
+          <div className="relative w-72 bg-white border-r border-slate-200 h-full overflow-y-auto p-4 z-10 flex flex-col justify-between shadow-xl">
             <div>
-              <div className="flex items-center justify-between pb-4 mb-4 border-b border-emerald-500/15">
-                <BrandLogo variant="light" size="sm" />
+              <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+                <BrandLogo variant="dark" size="sm" />
                 <button
                   type="button"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="p-1.5 text-slate-400 hover:text-white"
+                  className="p-1.5 text-slate-500 hover:text-slate-950"
                   aria-label="Close menu"
                 >
                   <X className="w-5 h-5" />
@@ -604,7 +598,7 @@ export default function App() {
               <div className="space-y-4">
                 {navGroups.map((group) => (
                   <div key={group.label}>
-                    <div className="px-2 text-[11px] font-medium text-slate-500 mb-1">
+                    <div className="px-2 text-[11px] font-medium text-slate-400 mb-1">
                       {group.label}
                     </div>
                     {group.items.map((item) => {
@@ -619,18 +613,18 @@ export default function App() {
                           }}
                           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs ${
                             isActive
-                              ? 'bg-[#16E563] text-[#041108] font-bold'
-                              : 'text-slate-300 font-medium hover:text-white'
+                              ? 'bg-amber-50 border border-amber-300/80 text-slate-950 font-semibold'
+                              : 'text-slate-700 font-medium hover:bg-slate-50 hover:text-slate-950'
                           }`}
                         >
                           <span className="flex items-center gap-2.5">
-                            <span className={isActive ? 'text-[#041108]' : 'text-slate-400'}>
+                            <span className={isActive ? 'text-amber-600' : 'text-slate-400'}>
                               {item.icon}
                             </span>
                             <span>{item.name}</span>
                           </span>
                           {item.tag && (
-                            <span className={`font-mono text-[10px] ${isActive ? 'text-[#041108]' : 'text-[#16E563]'}`}>
+                            <span className={`font-mono text-[10px] ${item.tag === 'Active' ? 'text-amber-700 font-semibold' : 'text-slate-500'}`}>
                               {item.tag}
                             </span>
                           )}
@@ -644,7 +638,7 @@ export default function App() {
             <button
               type="button"
               onClick={handleLogout}
-              className="mt-6 w-full py-2.5 border border-rose-500/30 bg-rose-950/30 rounded-xl text-xs font-semibold text-rose-300"
+              className="mt-6 w-full py-2.5 border border-rose-200 bg-rose-50 rounded-xl text-xs font-semibold text-rose-700"
             >
               Sign out
             </button>
@@ -654,13 +648,13 @@ export default function App() {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Obsidian Context Header matching the exact dashboard top bar */}
-        <header className="sticky top-0 z-30 h-16 bg-[#080E0B]/95 backdrop-blur-md border-b border-emerald-500/15 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
+        {/* Top White Context Header */}
+        <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-3 flex-1 min-w-0 max-w-md">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              className="lg:hidden p-2 -ml-2 text-slate-300 hover:text-white"
+              className="lg:hidden p-2 -ml-2 text-slate-600 hover:text-slate-950"
               aria-label="Open navigation"
             >
               <Menu className="w-5 h-5" />
@@ -686,10 +680,10 @@ export default function App() {
                 }}
                 placeholder="Search 70+ markets (EURUSD, XAUUSD, USOIL, SPY, NVDA, BTCUSD)..."
                 aria-label="Search assets and markets"
-                className="w-full pl-9 pr-3 py-2 text-xs bg-[#0E1712] border border-emerald-500/20 focus:border-[#16E563] text-white placeholder:text-slate-500 rounded-xl focus:outline-none transition-colors"
+                className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 border border-slate-200 focus:border-amber-500 text-slate-900 placeholder:text-slate-400 rounded-xl focus:outline-none transition-colors"
               />
               {searchFocused && filteredSearchQuotes.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 bg-[#0B120E] border border-emerald-500/30 rounded-xl shadow-2xl overflow-hidden max-h-80 overflow-y-auto z-40">
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-80 overflow-y-auto z-40">
                   {filteredSearchQuotes.map((item) => {
                     const up = item.chgPct >= 0;
                     return (
@@ -702,18 +696,18 @@ export default function App() {
                           setAssetSearch('');
                           setSearchFocused(false);
                         }}
-                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs hover:bg-emerald-500/10 cursor-pointer border-b last:border-b-0 border-emerald-500/10"
+                        className="w-full px-3.5 py-2.5 flex items-center justify-between text-xs hover:bg-amber-50/70 cursor-pointer border-b last:border-b-0 border-slate-100"
                       >
                         <span className="flex items-center gap-2 min-w-0">
-                          <span className="font-mono font-bold text-white">{item.sym}</span>
-                          <span className="text-[10px] font-mono text-[#16E563]/80 uppercase shrink-0">
+                          <span className="font-mono font-bold text-slate-950">{item.sym}</span>
+                          <span className="text-[10px] font-mono text-amber-700 uppercase shrink-0">
                             {ASSET_CLASS_SHORT_LABELS[item.assetClass] || item.assetClass}
                           </span>
-                          <span className="text-slate-400 truncate">{item.name}</span>
+                          <span className="text-slate-500 truncate">{item.name}</span>
                         </span>
                         <span className="font-mono tabular-nums flex items-center gap-2 shrink-0">
-                          <span className="text-slate-200">{item.price.toFixed(item.digits)}</span>
-                          <span className={up ? 'text-[#16E563]' : 'text-rose-400'}>
+                          <span className="text-slate-800">{item.price.toFixed(item.digits)}</span>
+                          <span className={up ? 'text-emerald-600' : 'text-rose-600'}>
                             {up ? '+' : ''}
                             {item.chgPct.toFixed(2)}%
                           </span>
@@ -740,7 +734,7 @@ export default function App() {
               type="button"
               onClick={() => setActiveTab('emails')}
               title="Notifications & Email Inbox"
-              className="relative p-2 rounded-xl bg-[#0E1712] border border-emerald-500/20 hover:border-[#16E563] text-slate-300 hover:text-white cursor-pointer transition-colors"
+              className="relative p-2 rounded-xl bg-slate-50 border border-slate-200 hover:border-amber-400 text-slate-600 hover:text-slate-950 cursor-pointer transition-colors"
               aria-label="Open notifications inbox"
             >
               <Bell className="w-4 h-4" />
@@ -757,11 +751,11 @@ export default function App() {
               title="My Information"
               className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap ${
                 activeTab === 'account'
-                  ? 'bg-[#16E563]/15 border-[#16E563] text-white'
-                  : 'bg-[#0E1712] border-emerald-500/20 hover:border-[#16E563] text-slate-200'
+                  ? 'bg-amber-50 border-amber-400 text-slate-950'
+                  : 'bg-slate-50 border-slate-200 hover:border-amber-400 text-slate-900'
               }`}
             >
-              <span className="w-6 h-6 rounded-full bg-[#16E563] text-[#041108] font-bold text-[10px] flex items-center justify-center">
+              <span className="w-6 h-6 rounded-md bg-[#E5A93C] text-[#090806] font-bold text-[10px] flex items-center justify-center">
                 {userInitials || 'GP'}
               </span>
               <span className="hidden sm:inline max-w-[120px] truncate">{user.name || firstName}</span>
@@ -1129,50 +1123,50 @@ const WorkspaceOverview: React.FC<{
 
   return (
     <div className="space-y-5">
-      {/* Welcome Banner + Exact Brand Artwork Card matching the exact dashboard header */}
+      {/* Welcome Banner — Crisp White & Institutional Gold */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-emerald-500/25 bg-[#0B120E] p-5 sm:p-6"
+        className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 sm:p-6 shadow-xs"
         style={{
           backgroundImage:
-            'radial-gradient(circle at 18% 0%, rgba(22, 229, 99, 0.18), transparent 52%)',
+            'radial-gradient(circle at 90% 10%, rgba(229, 169, 60, 0.14), transparent 46%)',
         }}
       >
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
           <div className="lg:col-span-7 space-y-4">
             <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-full bg-[#16E563]/15 border-2 border-[#16E563] text-[#16E563] font-bold text-base flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-[#0B0F19] border border-[#E5A93C]/50 text-[#E5A93C] font-bold text-base flex items-center justify-center shrink-0">
                 {userInitials || 'GP'}
               </div>
               <div className="min-w-0">
-                <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight leading-tight">
+                <h1 className="text-2xl sm:text-3xl font-bold text-slate-950 tracking-tight leading-tight">
                   Welcome back, {firstName}!
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                   Here&apos;s what&apos;s happening with your ICT &amp; DRT trading desk today.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-600">
               <button
                 type="button"
                 onClick={() => onNavigate('account')}
-                className="hover:text-white transition-colors cursor-pointer"
+                className="hover:text-slate-950 transition-colors cursor-pointer"
               >
-                Exness ID <span className="font-mono font-semibold text-[#16E563] ml-1">{user.exnessAccountId}</span>
-                <span className="text-slate-600 mx-1.5">·</span>
-                <span className={user.exnessVerified ? 'text-[#16E563]' : 'text-[#F5B82E]'}>
+                Exness ID <span className="font-mono font-semibold text-slate-950 ml-1">{user.exnessAccountId}</span>
+                <span className="text-slate-300 mx-1.5">·</span>
+                <span className={user.exnessVerified ? 'text-emerald-700 font-semibold' : 'text-amber-700 font-semibold'}>
                   {user.exnessVerified ? 'Verified Partner' : 'Pending IB Review'}
                 </span>
               </button>
-              <span aria-hidden="true" className="text-slate-700">|</span>
+              <span aria-hidden="true" className="text-slate-300">|</span>
               <button
                 type="button"
                 onClick={() => onNavigate('referrals')}
-                className="hover:text-white transition-colors cursor-pointer"
+                className="hover:text-slate-950 transition-colors cursor-pointer"
               >
-                Referral <span className="font-mono font-semibold text-white ml-1">{user.referralCode}</span>
-                <span className="text-[#F5B82E] ml-1.5">({config.commissionPct}% payout)</span>
+                Referral <span className="font-mono font-semibold text-slate-950 ml-1">{user.referralCode}</span>
+                <span className="text-[#B45309] font-semibold ml-1.5">({config.commissionPct}% payout)</span>
               </button>
             </div>
 
@@ -1180,7 +1174,7 @@ const WorkspaceOverview: React.FC<{
               <button
                 type="button"
                 onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-                className="px-5 py-2.5 rounded-xl bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[#0B0F19] hover:bg-slate-800 text-[#E5A93C] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
                 <Activity className="w-4 h-4" />
                 {user.hasAnalyzer
@@ -1190,7 +1184,7 @@ const WorkspaceOverview: React.FC<{
               <button
                 type="button"
                 onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
-                className="px-5 py-2.5 rounded-xl bg-[#F5B82E] hover:bg-[#F8C957] text-[#090806] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-xs sm:text-sm font-bold transition-colors cursor-pointer whitespace-nowrap shrink-0 inline-flex items-center gap-2"
               >
                 <Layers className="w-4 h-4" />
                 {hasDrt
@@ -1201,54 +1195,53 @@ const WorkspaceOverview: React.FC<{
                 href={config.exnessIbUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-4 py-2.5 rounded-xl bg-white/5 border border-emerald-500/25 hover:border-[#16E563] text-xs sm:text-sm font-semibold text-slate-200 hover:text-white transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                className="px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-amber-400 text-xs sm:text-sm font-semibold text-slate-700 hover:text-slate-950 transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
               >
                 Exness Portal
-                <ArrowUpRight className="w-3.5 h-3.5 text-[#16E563]" />
+                <ArrowUpRight className="w-3.5 h-3.5 text-[#B45309]" />
               </a>
             </div>
           </div>
 
           <div className="lg:col-span-5 flex flex-col items-stretch lg:items-end gap-2">
-            <div className="text-xs sm:text-sm italic text-emerald-200/90 font-medium lg:text-right">
+            <div className="text-xs sm:text-sm italic text-amber-800/90 font-medium lg:text-right">
               &ldquo;Dream it. Trade it. Achieve it.&rdquo;
             </div>
-            <div className="w-full rounded-xl overflow-hidden border border-emerald-500/30 bg-[#050907]">
+            <div className="w-full rounded-xl overflow-hidden border border-slate-200 bg-[#0B0F19]">
               <img
-                src={LANDING_IMAGES.brandHeroArtwork}
-                alt="Grid Pips Trade Invest Prosper desk visual"
-                referrerPolicy="no-referrer"
-                className="w-full h-36 sm:h-40 object-cover object-top"
+                src={LANDING_IMAGES.heroTrader3d}
+                alt="Grid Pips institutional trading desk"
+                className="w-full h-36 sm:h-40 object-cover object-center"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* 4 Dark Emerald KPI Cards matching the exact picture layout */}
+      {/* 4 Crisp White KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* KPI 1: ICT Analyzer */}
         <button
           type="button"
           onClick={() => (user.hasAnalyzer ? onNavigate('analyzer') : onUnlock('analyzer'))}
-          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-[#16E563]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+          className="text-left rounded-2xl bg-white border border-slate-200 hover:border-amber-400 transition-colors p-4 flex items-center gap-4 cursor-pointer shadow-xs"
         >
-          <span className="w-11 h-11 rounded-xl bg-[#16E563]/15 border border-[#16E563]/35 text-[#16E563] flex items-center justify-center shrink-0">
+          <span className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center shrink-0">
             <Wallet className="w-5 h-5" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-400">ICT Strategy Analyzer</span>
-              {user.hasAnalyzer && <Check className="w-3.5 h-3.5 text-[#16E563] shrink-0" />}
+              <span className="text-xs text-slate-500">ICT Strategy Analyzer</span>
+              {user.hasAnalyzer && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
             </div>
-            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+            <div className="text-lg font-bold text-slate-950 font-mono tabular-nums truncate mt-0.5">
               {user.hasAnalyzer
                 ? user.analyzerDaysRemaining != null
                   ? `${user.analyzerDaysRemaining}d Active`
                   : 'Active Plan'
                 : `$${config.analyzerPriceUsd.toFixed(2)}/mo`}
             </div>
-            <div className="text-xs font-medium text-[#16E563] mt-0.5 truncate">
+            <div className="text-xs font-semibold text-[#B45309] mt-0.5 truncate">
               {user.hasAnalyzer ? 'Open live scanner →' : 'Subscribe now →'}
             </div>
           </div>
@@ -1258,17 +1251,17 @@ const WorkspaceOverview: React.FC<{
         <button
           type="button"
           onClick={() => (hasDrt ? onNavigate('drt') : onUnlock('drt_analyzer'))}
-          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-[#16E563]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+          className="text-left rounded-2xl bg-white border border-slate-200 hover:border-amber-400 transition-colors p-4 flex items-center gap-4 cursor-pointer shadow-xs"
         >
-          <span className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-400/35 text-emerald-300 flex items-center justify-center shrink-0">
+          <span className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
             <Layers className="w-5 h-5" />
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs text-slate-400">DRT Strategy Analyzer</span>
-              {hasDrt && <Check className="w-3.5 h-3.5 text-[#16E563] shrink-0" />}
+              <span className="text-xs text-slate-500">DRT Strategy Analyzer</span>
+              {hasDrt && <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
             </div>
-            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+            <div className="text-lg font-bold text-slate-950 font-mono tabular-nums truncate mt-0.5">
               {hasDrt
                 ? drtDaysRemaining != null
                   ? `${drtDaysRemaining}d Active`
@@ -1277,7 +1270,7 @@ const WorkspaceOverview: React.FC<{
                 ? 'Expired'
                 : `$${drtPriceUsd.toFixed(2)}/mo`}
             </div>
-            <div className="text-xs font-medium text-[#16E563] mt-0.5 truncate">
+            <div className="text-xs font-semibold text-emerald-700 mt-0.5 truncate">
               {hasDrt ? 'Open DRT scanner →' : 'Subscribe DRT →'}
             </div>
           </div>
@@ -1287,67 +1280,67 @@ const WorkspaceOverview: React.FC<{
         <button
           type="button"
           onClick={() => onNavigate('journal')}
-          className="text-left rounded-2xl bg-[#0B120E] border border-emerald-500/20 hover:border-indigo-400/50 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+          className="text-left rounded-2xl bg-white border border-slate-200 hover:border-amber-400 transition-colors p-4 flex items-center gap-4 cursor-pointer shadow-xs"
         >
-          <span className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-400/35 text-indigo-300 flex items-center justify-center shrink-0">
+          <span className="w-11 h-11 rounded-xl bg-slate-100 border border-slate-200 text-slate-800 flex items-center justify-center shrink-0">
             <TrendingUp className="w-5 h-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-xs text-slate-400">Journal Net P&amp;L</div>
+            <div className="text-xs text-slate-500">Journal Net P&amp;L</div>
             <div
               className={`text-lg font-bold font-mono tabular-nums truncate mt-0.5 ${
-                totalPnl >= 0 ? 'text-white' : 'text-rose-400'
+                totalPnl >= 0 ? 'text-slate-950' : 'text-rose-600'
               }`}
             >
               {totalPnl >= 0 ? '+' : '-'}${Math.abs(totalPnl).toFixed(2)}
             </div>
-            <div className="text-xs font-medium text-[#16E563] mt-0.5 font-mono tabular-nums">
+            <div className="text-xs font-medium text-emerald-700 mt-0.5 font-mono tabular-nums">
               {journal.length} logged trade{journal.length === 1 ? '' : 's'}
             </div>
           </div>
         </button>
 
-        {/* KPI 4: Win Rate & 35% Referrals (Gold Trophy tile matching artwork) */}
+        {/* KPI 4: Win Rate & 35% Referrals */}
         <button
           type="button"
           onClick={() => onNavigate(journal.length > 0 ? 'analytics' : 'referrals')}
-          className="text-left rounded-2xl bg-[#0B120E] border border-amber-400/25 hover:border-[#F5B82E]/60 transition-colors p-4 flex items-center gap-4 cursor-pointer"
+          className="text-left rounded-2xl bg-white border border-amber-200 hover:border-[#E5A93C] transition-colors p-4 flex items-center gap-4 cursor-pointer shadow-xs"
         >
-          <span className="w-11 h-11 rounded-xl bg-[#F5B82E]/15 border border-[#F5B82E]/35 text-[#F5B82E] flex items-center justify-center shrink-0">
+          <span className="w-11 h-11 rounded-xl bg-[#0B0F19] border border-[#E5A93C]/40 text-[#E5A93C] flex items-center justify-center shrink-0">
             <Trophy className="w-5 h-5" />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="text-xs text-slate-400">
+            <div className="text-xs text-slate-500">
               {journal.length > 0 ? 'Journal Win Rate' : 'Partner Payouts'}
             </div>
-            <div className="text-lg font-bold text-white font-mono tabular-nums truncate mt-0.5">
+            <div className="text-lg font-bold text-slate-950 font-mono tabular-nums truncate mt-0.5">
               {journal.length > 0 ? `${winRatePct}%` : `${config.commissionPct}%`}
             </div>
-            <div className="text-xs font-medium text-[#F5B82E] mt-0.5 truncate">
+            <div className="text-xs font-semibold text-[#B45309] mt-0.5 truncate">
               {orders.length} order{orders.length === 1 ? '' : 's'} · {config.commissionPct}% partner hub →
             </div>
           </div>
         </button>
       </div>
 
-      {/* Main 8/4 Split matching the exact dashboard artwork: Market Overview Chart + Top Assets */}
+      {/* Main 8/4 Split: Market Overview Chart + Top Assets */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Left 8 Cols: Dark Emerald Market Overview Candlestick Chart + Quotes Table */}
+        {/* Left 8 Cols: Crisp White Market Overview Candlestick Chart + Quotes Table */}
         <div className="lg:col-span-8 space-y-5">
-          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5 sm:p-6">
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 sm:p-6 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h2 className="text-base font-bold text-white">Market Overview</h2>
+                <h2 className="text-base font-bold text-slate-950">Market Overview</h2>
                 <select
                   value={overviewSym}
                   onChange={(e) => setOverviewSym(e.target.value)}
                   aria-label="Market overview chart symbol"
-                  className="px-2.5 py-1 text-xs font-mono font-bold bg-[#070D0A] border border-emerald-500/25 text-[#16E563] rounded-lg focus:outline-none focus:border-[#16E563] max-w-[200px]"
+                  className="px-2.5 py-1 text-xs font-mono font-bold bg-slate-50 border border-slate-300 text-slate-900 rounded-lg focus:outline-none focus:border-amber-500 max-w-[200px]"
                 >
                   {MARKET_CATALOG_GROUPS.map((group) => (
-                    <optgroup key={group.assetClass} label={group.label} className="bg-[#080E0B] text-emerald-300">
+                    <optgroup key={group.assetClass} label={group.label}>
                       {group.items.map((item) => (
-                        <option key={item.sym} value={item.sym} className="bg-[#0B120E] text-white">
+                        <option key={item.sym} value={item.sym}>
                           {item.sym} · {item.name}
                         </option>
                       ))}
@@ -1355,9 +1348,9 @@ const WorkspaceOverview: React.FC<{
                   ))}
                 </select>
                 {selectedQuote && (
-                  <span className="text-xs font-mono tabular-nums text-slate-300">
+                  <span className="text-xs font-mono tabular-nums text-slate-700">
                     {selectedQuote.price.toFixed(selectedQuote.digits)}{' '}
-                    <span className={selectedQuote.chgPct >= 0 ? 'text-[#16E563]' : 'text-rose-400'}>
+                    <span className={selectedQuote.chgPct >= 0 ? 'text-emerald-600 font-semibold' : 'text-rose-600 font-semibold'}>
                       ({selectedQuote.chgPct >= 0 ? '+' : ''}
                       {selectedQuote.chgPct.toFixed(2)}%)
                     </span>
@@ -1365,8 +1358,8 @@ const WorkspaceOverview: React.FC<{
                 )}
               </div>
 
-              {/* 1D 1W 1M 3M 1Y Segmented Filter matching the picture */}
-              <div className="flex items-center gap-1 p-1 bg-[#070D0A] border border-emerald-500/20 rounded-lg">
+              {/* 1D 1W 1M 3M 1Y Segmented Filter */}
+              <div className="flex items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-lg">
                 {(['1D', '1W', '1M', '3M', '1Y'] as const).map((tf) => (
                   <button
                     key={tf}
@@ -1374,8 +1367,8 @@ const WorkspaceOverview: React.FC<{
                     onClick={() => setOverviewTf(tf)}
                     className={`px-2.5 py-1 text-xs font-mono font-bold rounded-md transition-colors cursor-pointer ${
                       overviewTf === tf
-                        ? 'bg-[#16E563] text-[#041108]'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-[#0B0F19] text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-950'
                     }`}
                   >
                     {tf}
@@ -1384,10 +1377,10 @@ const WorkspaceOverview: React.FC<{
               </div>
             </div>
 
-            {/* Dark Emerald Candlestick & Trendline Chart */}
-            <div className="relative rounded-xl bg-[#070D0A] border border-emerald-500/15 p-3">
+            {/* Clean Light Candlestick & Gold Trendline Chart */}
+            <div className="relative rounded-xl bg-slate-50 border border-slate-200 p-3">
               {selectedQuote && (
-                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-[#0E1A13] border border-emerald-500/30 font-mono text-xs tabular-nums font-bold text-white">
+                <div className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-white border border-slate-200 shadow-2xs font-mono text-xs tabular-nums font-bold text-slate-950">
                   {selectedQuote.price.toLocaleString(undefined, {
                     minimumFractionDigits: selectedQuote.digits,
                     maximumFractionDigits: selectedQuote.digits,
@@ -1396,9 +1389,9 @@ const WorkspaceOverview: React.FC<{
               )}
               <svg viewBox="0 0 600 190" className="w-full h-48 sm:h-52">
                 <defs>
-                  <linearGradient id="overviewEmeraldArea" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#16E563" stopOpacity="0.24" />
-                    <stop offset="100%" stopColor="#16E563" stopOpacity="0" />
+                  <linearGradient id="overviewGoldArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#E5A93C" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#E5A93C" stopOpacity="0" />
                   </linearGradient>
                 </defs>
                 {chartGeometry ? (
@@ -1410,7 +1403,7 @@ const WorkspaceOverview: React.FC<{
                           y1={g.y}
                           x2="592"
                           y2={g.y}
-                          stroke="rgba(22, 229, 99, 0.09)"
+                          stroke="rgba(15, 23, 42, 0.08)"
                           strokeWidth="1"
                         />
                         <text
@@ -1424,16 +1417,16 @@ const WorkspaceOverview: React.FC<{
                         </text>
                       </g>
                     ))}
-                    <polygon points={chartGeometry.areaPoints} fill="url(#overviewEmeraldArea)" />
+                    <polygon points={chartGeometry.areaPoints} fill="url(#overviewGoldArea)" />
                     <polyline
                       fill="none"
-                      stroke="#16E563"
+                      stroke="#D97706"
                       strokeWidth="1.6"
                       strokeOpacity="0.85"
                       points={chartGeometry.smoothPoints}
                     />
                     {chartGeometry.candles.map((c, idx) => {
-                      const col = c.bull ? '#16E563' : '#EF4444';
+                      const col = c.bull ? '#059669' : '#E11D48';
                       const top = Math.min(c.yOpen, c.yClose);
                       const h = Math.max(3, Math.abs(c.yClose - c.yOpen));
                       return (
@@ -1463,7 +1456,7 @@ const WorkspaceOverview: React.FC<{
                     x="300"
                     y="98"
                     textAnchor="middle"
-                    fill="#94A3B8"
+                    fill="#64748B"
                     fontSize="12"
                     fontFamily="IBM Plex Mono, monospace"
                   >
@@ -1478,7 +1471,7 @@ const WorkspaceOverview: React.FC<{
             {/* Live Market Quotes Table with Asset-Class Filters */}
             <div className="mt-5 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs font-mono text-slate-400">
+                <div className="text-xs font-mono text-slate-500">
                   {marketStatus
                     ? `Live TradingView Feeds · ${marketStatus.openCount}/${marketStatus.totalCount} open`
                     : `Live TradingView Feeds · ${quotes.length} markets`}
@@ -1486,14 +1479,14 @@ const WorkspaceOverview: React.FC<{
                 <button
                   type="button"
                   onClick={() => onNavigate('charts')}
-                  className="text-xs font-semibold text-[#16E563] hover:underline cursor-pointer"
+                  className="text-xs font-semibold text-[#B45309] hover:underline cursor-pointer"
                 >
                   Open full TradingView terminal →
                 </button>
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2.5">
-                <div className="flex flex-wrap items-center gap-1 p-1 bg-[#070D0A] border border-emerald-500/15 rounded-xl">
+                <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100 border border-slate-200 rounded-xl">
                   {(
                     [
                       ['all', 'All'],
@@ -1513,12 +1506,12 @@ const WorkspaceOverview: React.FC<{
                         onClick={() => setAssetCategoryFilter(catKey)}
                         className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer whitespace-nowrap ${
                           active
-                            ? 'bg-[#16E563] text-[#041108]'
-                            : 'text-slate-400 hover:text-white'
+                            ? 'bg-[#0B0F19] text-white'
+                            : 'text-slate-600 hover:text-slate-950'
                         }`}
                       >
                         {catLabel}{' '}
-                        <span className={`font-mono text-[10px] ${active ? 'text-[#041108]/80' : 'text-slate-500'}`}>
+                        <span className={`font-mono text-[10px] ${active ? 'text-[#E5A93C]' : 'text-slate-400'}`}>
                           {categoryCounts[catKey] ?? 0}
                         </span>
                       </button>
@@ -1532,24 +1525,24 @@ const WorkspaceOverview: React.FC<{
                   onChange={(e) => setTableSearch(e.target.value)}
                   placeholder="Filter ticker..."
                   aria-label="Filter market quotes table"
-                  className="w-36 sm:w-44 px-3 py-1.5 text-xs bg-[#070D0A] border border-emerald-500/20 focus:border-[#16E563] text-white placeholder:text-slate-500 rounded-lg focus:outline-none"
+                  className="w-36 sm:w-44 px-3 py-1.5 text-xs bg-white border border-slate-300 focus:border-amber-500 text-slate-900 placeholder:text-slate-400 rounded-lg focus:outline-none"
                 />
               </div>
 
-              <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-emerald-500/10">
+              <div className="overflow-x-auto max-h-[420px] overflow-y-auto rounded-xl border border-slate-200">
                 <table className="w-full text-left text-sm">
-                  <thead className="sticky top-0 bg-[#0B120E] z-10">
-                    <tr className="border-b border-emerald-500/15 text-xs text-slate-500">
-                      <th className="py-2.5 pl-3 pr-4 font-medium">Symbol</th>
-                      <th className="py-2.5 pr-4 font-medium">Instrument</th>
-                      <th className="py-2.5 pr-4 font-medium">Class</th>
-                      <th className="py-2.5 pr-4 font-medium">Session</th>
-                      <th className="py-2.5 pr-4 text-right font-medium">Price</th>
-                      <th className="py-2.5 pr-4 text-right font-medium">24h</th>
-                      <th className="py-2.5 pr-3 text-right font-medium">Trend</th>
+                  <thead className="sticky top-0 bg-slate-50 z-10">
+                    <tr className="border-b border-slate-200 text-xs text-slate-500">
+                      <th className="py-2.5 pl-3 pr-4 font-semibold">Symbol</th>
+                      <th className="py-2.5 pr-4 font-semibold">Instrument</th>
+                      <th className="py-2.5 pr-4 font-semibold">Class</th>
+                      <th className="py-2.5 pr-4 font-semibold">Session</th>
+                      <th className="py-2.5 pr-4 text-right font-semibold">Price</th>
+                      <th className="py-2.5 pr-4 text-right font-semibold">24h</th>
+                      <th className="py-2.5 pr-3 text-right font-semibold">Trend</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-emerald-500/10">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredTableQuotes.map((q, idx) => {
                       const up = q.chgPct >= 0;
                       const sparkPoints = getSparklinePoints(q.chgPct, idx + 1);
@@ -1560,23 +1553,23 @@ const WorkspaceOverview: React.FC<{
                         <tr
                           key={q.sym}
                           onClick={() => onOpenSymbolChart(q.sym)}
-                          className="group hover:bg-emerald-500/5 transition-colors cursor-pointer"
+                          className="group hover:bg-amber-50/50 transition-colors cursor-pointer"
                         >
-                          <td className="py-2.5 pl-3 pr-4 font-mono font-bold text-white group-hover:text-[#16E563] transition-colors whitespace-nowrap">
+                          <td className="py-2.5 pl-3 pr-4 font-mono font-bold text-slate-950 group-hover:text-[#B45309] transition-colors whitespace-nowrap">
                             {q.sym}
                           </td>
-                          <td className="py-2.5 pr-4 text-slate-400 text-xs whitespace-nowrap">{q.name}</td>
-                          <td className="py-2.5 pr-4 font-mono text-[11px] text-emerald-300/80 whitespace-nowrap">
+                          <td className="py-2.5 pr-4 text-slate-600 text-xs whitespace-nowrap">{q.name}</td>
+                          <td className="py-2.5 pr-4 font-mono text-[11px] text-amber-700 whitespace-nowrap">
                             {ASSET_CLASS_SHORT_LABELS[q.assetClass] || q.assetClass}
                           </td>
                           <td
                             className={`py-2.5 pr-4 text-xs font-medium whitespace-nowrap ${
-                              q.isMarketOpen === true ? 'text-[#16E563]' : 'text-slate-500'
+                              q.isMarketOpen === true ? 'text-emerald-700' : 'text-slate-400'
                             }`}
                           >
                             {statusLabel}
                           </td>
-                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums font-semibold text-slate-100 whitespace-nowrap">
+                          <td className="py-2.5 pr-4 text-right font-mono tabular-nums font-semibold text-slate-900 whitespace-nowrap">
                             <span
                               key={dir ? `${q.sym}-${tickSeq}` : q.sym}
                               className={
@@ -1595,7 +1588,7 @@ const WorkspaceOverview: React.FC<{
                           </td>
                           <td
                             className={`py-2.5 pr-4 text-right font-mono tabular-nums font-semibold whitespace-nowrap ${
-                              up ? 'text-[#16E563]' : 'text-rose-400'
+                              up ? 'text-emerald-600' : 'text-rose-600'
                             }`}
                           >
                             {up ? '+' : ''}
@@ -1609,7 +1602,7 @@ const WorkspaceOverview: React.FC<{
                             >
                               <polyline
                                 fill="none"
-                                stroke={up ? '#16E563' : '#EF4444'}
+                                stroke={up ? '#059669' : '#E11D48'}
                                 strokeWidth="1.6"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
@@ -1634,21 +1627,21 @@ const WorkspaceOverview: React.FC<{
           </div>
         </div>
 
-        {/* Right 4 Cols: Top Assets + Trade Anywhere Exact Picture Card + Killzones */}
+        {/* Right 4 Cols: Top Assets + JakoyoFX Community Card + Killzones */}
         <div className="lg:col-span-4 space-y-5">
-          {/* Top Assets List matching the exact bottom-right panel in the picture */}
-          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5">
+          {/* Top Assets Card */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-xs">
             <div className="flex items-center justify-between gap-2 mb-3.5">
-              <h3 className="text-sm font-bold text-white">Top Assets</h3>
+              <h3 className="text-sm font-bold text-slate-950">Top Assets</h3>
               <button
                 type="button"
                 onClick={() => onNavigate('charts')}
-                className="text-xs font-semibold text-[#16E563] hover:underline cursor-pointer"
+                className="text-xs font-semibold text-[#B45309] hover:underline cursor-pointer"
               >
                 View All →
               </button>
             </div>
-            <div className="divide-y divide-emerald-500/10">
+            <div className="divide-y divide-slate-100">
               {topAssets.map((asset) => {
                 const up = asset.chgPct >= 0;
                 return (
@@ -1656,25 +1649,25 @@ const WorkspaceOverview: React.FC<{
                     type="button"
                     key={asset.sym}
                     onClick={() => onOpenSymbolChart(asset.sym)}
-                    className="w-full py-3 flex items-center justify-between gap-3 hover:bg-emerald-500/5 rounded-lg px-1.5 -mx-1.5 transition-colors cursor-pointer text-left"
+                    className="w-full py-3 flex items-center justify-between gap-3 hover:bg-amber-50/50 rounded-lg px-1.5 -mx-1.5 transition-colors cursor-pointer text-left"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="w-9 h-9 rounded-full bg-[#101C15] border border-emerald-500/25 text-[#16E563] font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
+                      <span className="w-9 h-9 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-mono font-bold text-[11px] flex items-center justify-center shrink-0">
                         {asset.sym.slice(0, 3)}
                       </span>
                       <div className="min-w-0">
-                        <div className="text-xs font-bold text-white truncate">{asset.name}</div>
-                        <div className="text-[11px] font-mono text-slate-400">{asset.sym}</div>
+                        <div className="text-xs font-bold text-slate-950 truncate">{asset.name}</div>
+                        <div className="text-[11px] font-mono text-slate-500">{asset.sym}</div>
                       </div>
                     </div>
                     <div className="text-right font-mono tabular-nums shrink-0">
-                      <div className="text-xs font-bold text-white">
+                      <div className="text-xs font-bold text-slate-950">
                         {asset.price.toLocaleString(undefined, {
                           minimumFractionDigits: asset.digits,
                           maximumFractionDigits: asset.digits,
                         })}
                       </div>
-                      <div className={`text-[11px] font-semibold ${up ? 'text-[#16E563]' : 'text-rose-400'}`}>
+                      <div className={`text-[11px] font-semibold ${up ? 'text-emerald-600' : 'text-rose-600'}`}>
                         {up ? '↑ +' : '↓ '}
                         {asset.chgPct.toFixed(2)}%
                       </div>
@@ -1685,20 +1678,19 @@ const WorkspaceOverview: React.FC<{
             </div>
           </div>
 
-          {/* Trade Anywhere / JakoyoFX Community Card featuring the exact brand artwork */}
-          <div className="rounded-2xl bg-gradient-to-b from-[#0E1E15] to-[#08100C] border border-[#16E563]/35 overflow-hidden">
-            <div className="relative h-36 bg-[#050907] overflow-hidden">
+          {/* JakoyoFX Community Obsidian & Gold Card */}
+          <div className="rounded-2xl bg-[#0B0F19] border border-slate-900 overflow-hidden shadow-sm">
+            <div className="relative h-36 bg-[#0B0F19] overflow-hidden">
               <img
-                src={LANDING_IMAGES.brandHeroArtwork}
+                src={LANDING_IMAGES.mentorCommunity3d}
                 alt="Trade anywhere anytime on Grid Pips"
-                referrerPolicy="no-referrer"
-                className="w-full h-full object-cover object-bottom"
+                className="w-full h-full object-cover object-top"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0B1710] via-[#0B1710]/30 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19]/40 to-transparent" />
             </div>
             <div className="p-5 pt-3 space-y-3">
               <div>
-                <div className="text-xs font-semibold text-[#16E563]">JakoyoFX Trading Desk</div>
+                <div className="text-xs font-semibold text-[#E5A93C]">JakoyoFX Trading Desk</div>
                 <h3 className="text-base font-bold text-white mt-0.5">Trade Anywhere, Anytime</h3>
                 <p className="text-xs text-slate-300 leading-relaxed mt-1">
                   Join fellow ICT, DRT, and SMC traders on web &amp; mobile, review live killzone setups, and refine Premium/Discount PD Array entries.
@@ -1708,7 +1700,7 @@ const WorkspaceOverview: React.FC<{
                 href={config.telegramUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-2.5 px-4 bg-[#16E563] hover:bg-[#2BF074] text-[#041108] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-2.5 px-4 bg-[#E5A93C] hover:bg-[#d6982b] text-[#090806] text-xs font-bold rounded-xl inline-flex items-center justify-center gap-2 transition-colors"
               >
                 <Send className="w-3.5 h-3.5" />
                 Open t.me/JakoyoFx
@@ -1716,11 +1708,11 @@ const WorkspaceOverview: React.FC<{
             </div>
           </div>
 
-          {/* Killzones (NY time) Dark Emerald Card */}
-          <div className="rounded-2xl bg-[#0B120E] border border-emerald-500/20 p-5 space-y-3.5">
+          {/* Killzones (NY time) Crisp White Card */}
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 space-y-3.5 shadow-xs">
             <div className="flex items-center justify-between gap-2">
-              <h3 className="text-sm font-bold text-white">Killzones (NY time)</h3>
-              <span className="text-xs font-mono tabular-nums text-[#16E563]">{killzone.nyTimeFormatted} NY</span>
+              <h3 className="text-sm font-bold text-slate-950">Killzones (NY time)</h3>
+              <span className="text-xs font-mono tabular-nums font-semibold text-[#B45309]">{killzone.nyTimeFormatted} NY</span>
             </div>
 
             <div className="grid grid-cols-4 gap-1.5">
@@ -1737,19 +1729,19 @@ const WorkspaceOverview: React.FC<{
                   <div key={seg.key} className="space-y-1.5">
                     <div
                       className={`relative overflow-hidden h-2 rounded-sm ${
-                        isActive ? 'bg-[#16E563]' : 'bg-[#16231B]'
+                        isActive ? 'bg-[#E5A93C]' : 'bg-slate-200'
                       }`}
                     >
                       {isActive && (
                         <div
                           aria-hidden="true"
-                          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/55 to-transparent animate-killzone-shimmer"
+                          className="absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-killzone-shimmer"
                         />
                       )}
                     </div>
                     <div
                       className={`text-[11px] font-medium ${
-                        isActive ? 'text-white' : 'text-slate-500'
+                        isActive ? 'text-slate-950 font-semibold' : 'text-slate-500'
                       }`}
                     >
                       {seg.label}
@@ -1759,7 +1751,7 @@ const WorkspaceOverview: React.FC<{
               })}
             </div>
 
-            <div className="text-xs text-slate-400 pt-0.5 font-mono tabular-nums">
+            <div className="text-xs text-slate-500 pt-0.5 font-mono tabular-nums">
               {killzone.detail}
             </div>
           </div>
