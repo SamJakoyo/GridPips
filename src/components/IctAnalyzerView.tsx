@@ -9,6 +9,9 @@ import {
   BookMarked,
   CandlestickChart,
   AlertTriangle,
+  XCircle,
+  Clock,
+  ShieldAlert,
 } from 'lucide-react';
 import { apiFetch } from '../lib/api';
 import {
@@ -133,7 +136,15 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
   }, [user.hasAnalyzer, autoSync, activeTimeframe, runScan]);
 
   async function handleSaveSetup() {
-    if (!analysis) return;
+    if (
+      !analysis ||
+      analysis.tradeVerdict === 'No Trade' ||
+      !analysis.setup.entryZone ||
+      analysis.setup.stopLoss == null ||
+      analysis.setup.tp1 == null
+    ) {
+      return;
+    }
     setError('');
     setCloudNotice('');
     try {
@@ -142,11 +153,11 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
         body: JSON.stringify({
           symbol: analysis.symbol,
           timeframe: analysis.timeframe,
-          bias: analysis.dailyBias,
+          bias: analysis.dailyBias === 'Neutral' ? 'Bullish' : analysis.dailyBias,
           entryZone: analysis.setup.entryZone,
           stopLoss: analysis.setup.stopLoss,
           tp1: analysis.setup.tp1,
-          notes: `${analysis.structureShift} · ${analysis.premiumDiscount?.currentZone || ''} · ${analysis.activeKillzone}`,
+          notes: `${analysis.verdictHeadline} · ${analysis.structureShift} · ${analysis.premiumDiscount?.currentZone || ''} · R:R 1:${analysis.setup.rrRatio ?? '-'}`,
         }),
       });
       setCloudNotice(`Saved ${analysis.symbol} (${analysis.timeframe}) setup to your account.`);
@@ -483,14 +494,14 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
           >
             {autoSync ? 'Live Sync On' : 'Live Sync Off'}
           </button>
-          {analysis && (
+          {analysis && analysis.tradeVerdict !== 'No Trade' && analysis.setup.entryZone && (
             <button
               type="button"
               onClick={handleSaveSetup}
               className="px-3.5 py-2 border border-emerald-500/25 text-slate-100 text-xs font-semibold rounded-lg hover:bg-emerald-500/10 inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
               <BookmarkPlus className="w-3.5 h-3.5 text-[#16E563]" />
-              Save Setup
+              {analysis.tradeVerdict === 'Wait for Setup' ? 'Save Limit Setup' : 'Save Setup'}
             </button>
           )}
           <button
@@ -559,16 +570,154 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
       {analysis && (
         <>
+          {/* 3-State Trade Verdict & Confluence Gate Banner */}
+          <div
+            className={`rounded-xl border p-5 space-y-4 ${
+              analysis.tradeVerdict === 'Actionable Trade'
+                ? 'bg-[#08160F] border-emerald-500/40'
+                : analysis.tradeVerdict === 'Wait for Setup'
+                ? 'bg-[#151107] border-amber-500/40'
+                : 'bg-[#17090D] border-rose-500/40'
+            }`}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div
+                  className={`w-10 h-10 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 ${
+                    analysis.tradeVerdict === 'Actionable Trade'
+                      ? 'bg-emerald-500/15 border-emerald-500/40 text-[#16E563]'
+                      : analysis.tradeVerdict === 'Wait for Setup'
+                      ? 'bg-amber-500/15 border-amber-500/40 text-[#F5B82E]'
+                      : 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                  }`}
+                >
+                  {analysis.tradeVerdict === 'Actionable Trade' ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : analysis.tradeVerdict === 'Wait for Setup' ? (
+                    <Clock className="w-5 h-5" />
+                  ) : (
+                    <ShieldAlert className="w-5 h-5" />
+                  )}
+                </div>
+                <div className="space-y-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`text-[11px] font-mono font-bold uppercase tracking-[0.14em] ${
+                        analysis.tradeVerdict === 'Actionable Trade'
+                          ? 'text-[#16E563]'
+                          : analysis.tradeVerdict === 'Wait for Setup'
+                          ? 'text-[#F5B82E]'
+                          : 'text-rose-400'
+                      }`}
+                    >
+                      ICT Confluence Gate · {analysis.symbol} ({analysis.timeframe})
+                    </span>
+                    <span className="text-xs font-mono text-slate-400">
+                      {analysis.confluenceChecks.filter((c) => c.required && c.passed).length}/4 Hard Gates Passed
+                    </span>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-white tracking-tight">
+                    {analysis.verdictHeadline}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-4xl">
+                    {analysis.verdictSummary}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-mono font-bold uppercase tracking-wider ${
+                    analysis.tradeVerdict === 'Actionable Trade'
+                      ? 'bg-[#16E563] text-[#041108] border-[#16E563]'
+                      : analysis.tradeVerdict === 'Wait for Setup'
+                      ? 'bg-amber-500/20 text-[#F5B82E] border-amber-500/45'
+                      : 'bg-rose-500/20 text-rose-300 border-rose-500/45'
+                  }`}
+                >
+                  {analysis.tradeVerdict === 'Actionable Trade'
+                    ? analysis.setup.direction
+                    : analysis.tradeVerdict === 'Wait for Setup'
+                    ? 'Wait · Limit Only'
+                    : 'Stand Aside'}
+                </span>
+              </div>
+            </div>
+
+            {/* 5-Gate Audit Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2.5 pt-1">
+              {analysis.confluenceChecks.map((check) => {
+                const isHardFail = !check.passed && check.required;
+                const isWaitWarn = !check.passed && !check.required;
+                return (
+                  <div
+                    key={check.id}
+                    className={`rounded-lg border p-3 space-y-1 ${
+                      check.passed
+                        ? 'bg-[#0B120E]/80 border-emerald-500/25'
+                        : isHardFail
+                        ? 'bg-rose-950/35 border-rose-500/40'
+                        : 'bg-amber-950/30 border-amber-500/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold text-white leading-tight">
+                        {check.label}
+                      </span>
+                      {check.passed ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
+                      ) : isHardFail ? (
+                        <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-[#F5B82E] shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`text-[10px] font-mono font-bold uppercase ${
+                          check.passed
+                            ? 'text-[#16E563]'
+                            : isHardFail
+                            ? 'text-rose-400'
+                            : 'text-[#F5B82E]'
+                        }`}
+                      >
+                        {check.passed
+                          ? 'PASS'
+                          : isHardFail
+                          ? 'BLOCKER FAILED'
+                          : isWaitWarn
+                          ? 'WAIT FOR RETRACE'
+                          : 'FAIL'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 leading-snug">{check.detail}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Summary Strip */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">Bias &amp; Execution ({analysis.timeframe})</div>
+              <div className="text-xs text-slate-400">Verdict &amp; Bias ({analysis.timeframe})</div>
               <div
                 className={`text-lg font-bold mt-1 ${
-                  analysis.dailyBias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'
+                  analysis.tradeVerdict === 'No Trade'
+                    ? 'text-rose-400'
+                    : analysis.tradeVerdict === 'Wait for Setup'
+                    ? 'text-[#F5B82E]'
+                    : analysis.dailyBias === 'Bullish'
+                    ? 'text-[#16E563]'
+                    : 'text-rose-400'
                 }`}
               >
-                {analysis.dailyBias} · {analysis.setup.direction}
+                {analysis.tradeVerdict === 'No Trade'
+                  ? 'No Trade · Stand Aside'
+                  : analysis.tradeVerdict === 'Wait for Setup'
+                  ? `Wait · ${analysis.setup.direction}`
+                  : `${analysis.dailyBias} · ${analysis.setup.direction}`}
               </div>
               <div className="text-xs text-slate-400 mt-0.5 truncate">{analysis.structureShift}</div>
             </div>
@@ -604,11 +753,25 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
             </div>
 
             <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-4">
-              <div className="text-xs text-slate-400">Projected Risk : Reward</div>
-              <div className="text-lg font-bold font-mono tabular-nums text-[#16E563] mt-1">
-                1 : {analysis.setup.rrRatio}
+              <div className="text-xs text-slate-400">Real Risk : Reward to DOL</div>
+              <div
+                className={`text-lg font-bold font-mono tabular-nums mt-1 ${
+                  analysis.tradeVerdict === 'No Trade'
+                    ? 'text-rose-400'
+                    : analysis.tradeVerdict === 'Wait for Setup'
+                    ? 'text-[#F5B82E]'
+                    : 'text-[#16E563]'
+                }`}
+              >
+                {analysis.tradeVerdict === 'No Trade'
+                  ? 'Locked (No Trade)'
+                  : `1 : ${analysis.setup.rrRatio}`}
               </div>
-              <div className="text-xs text-slate-400 mt-0.5 truncate">{analysis.activeKillzone}</div>
+              <div className="text-xs text-slate-400 mt-0.5 truncate">
+                {analysis.tradeVerdict === 'No Trade' && typeof analysis.setup.projectedRrToDol === 'number'
+                  ? `Measured 1:${analysis.setup.projectedRrToDol.toFixed(2)} (Min 1:2.5 required)`
+                  : analysis.activeKillzone}
+              </div>
             </div>
           </div>
 
@@ -626,18 +789,26 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                 </div>
                 <div
                   className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                    pd.alignedWithBias ? 'text-[#16E563]' : 'text-[#F5B82E]'
+                    analysis.tradeVerdict === 'No Trade'
+                      ? 'text-rose-400'
+                      : pd.alignedWithBias
+                      ? 'text-[#16E563]'
+                      : 'text-[#F5B82E]'
                   }`}
                 >
-                  {pd.alignedWithBias ? (
+                  {analysis.tradeVerdict === 'No Trade' ? (
+                    <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  ) : pd.alignedWithBias ? (
                     <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0" />
                   ) : (
                     <AlertTriangle className="w-4 h-4 text-[#F5B82E] shrink-0" />
                   )}
                   <span>
-                    {pd.alignedWithBias
+                    {analysis.tradeVerdict === 'No Trade'
+                      ? `Stand Aside · No Trade (${pd.currentZone})`
+                      : pd.alignedWithBias
                       ? `Aligned (${analysis.dailyBias} in ${pd.currentZone})`
-                      : `Extended (${analysis.dailyBias} Bias while in ${pd.currentZone})`}
+                      : `Wait · Limit Only (${analysis.dailyBias} Bias while in ${pd.currentZone})`}
                   </span>
                 </div>
               </div>
@@ -664,16 +835,18 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     Premium Zone (Sell PD Arrays)
                   </div>
 
-                  {/* OTE Sweet Spot Band (0.618 - 0.786 inside Discount for Longs, or inside Premium for Shorts) */}
-                  <div
-                    className="absolute top-0 bottom-0 bg-amber-400/25 border-x border-amber-500/60 pointer-events-none"
-                    style={
-                      analysis.dailyBias === 'Bullish'
-                        ? { left: '21.4%', width: '16.8%' }
-                        : { left: '61.8%', width: '16.8%' }
-                    }
-                    title={`OTE Sweet Spot (0.618 - 0.786 ${analysis.oteLevels.zone || ''})`}
-                  />
+                  {/* OTE Sweet Spot Band (shown when bias is active) */}
+                  {analysis.tradeVerdict !== 'No Trade' && (
+                    <div
+                      className="absolute top-0 bottom-0 bg-amber-400/25 border-x border-amber-500/60 pointer-events-none"
+                      style={
+                        analysis.oteLevels.zone === 'Discount'
+                          ? { left: '21.4%', width: '16.8%' }
+                          : { left: '61.8%', width: '16.8%' }
+                      }
+                      title={`OTE Reference (0.618 - 0.786 ${analysis.oteLevels.zone || ''})`}
+                    />
+                  )}
 
                   {/* Current Price Marker */}
                   <div
@@ -737,9 +910,29 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
 
             {/* Actionable ICT Setup Card */}
             <div className={chartViewMode === 'live' ? 'lg:col-span-12 space-y-4' : 'lg:col-span-4 space-y-4'}>
-              <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
+              <div
+                className={`rounded-xl p-5 border ${
+                  analysis.tradeVerdict === 'No Trade'
+                    ? 'bg-[#14090C] border-rose-500/35'
+                    : analysis.tradeVerdict === 'Wait for Setup'
+                    ? 'bg-[#120F07] border-amber-500/35'
+                    : 'bg-[#0B120E] border-emerald-500/25'
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2 mb-4">
-                  <h3 className="text-base font-bold text-white">Execution Parameters</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-white">Execution Parameters</h3>
+                    {analysis.tradeVerdict === 'Wait for Setup' && (
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-[#F5B82E] border border-amber-500/40">
+                        Limit Only
+                      </span>
+                    )}
+                    {analysis.tradeVerdict === 'No Trade' && (
+                      <span className="text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                        Locked
+                      </span>
+                    )}
+                  </div>
                   <a
                     href={
                       analysis.tradingViewUrl ||
@@ -753,6 +946,16 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     <ArrowUpRight className="w-3.5 h-3.5" />
                   </a>
                 </div>
+
+                {analysis.tradeVerdict === 'Wait for Setup' && (
+                  <div className="mb-3.5 p-3 rounded-lg bg-amber-500/10 border border-amber-500/35 text-xs text-amber-200 leading-relaxed flex items-start gap-2">
+                    <Clock className="w-4 h-4 text-[#F5B82E] shrink-0 mt-0.5" />
+                    <span>
+                      Do <strong>not</strong> market-enter now. Price is on the wrong side of 50% Equilibrium — wait for retracement into the mapped PD Array below.
+                    </span>
+                  </div>
+                )}
+
                 <div className="space-y-2.5 text-sm">
                   <div className="flex justify-between py-2 border-b border-emerald-500/10">
                     <span className="text-slate-400">Live Price</span>
@@ -779,51 +982,89 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </div>
                   )}
                   <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">Setup Bias</span>
+                    <span className="text-slate-400">Trade Verdict</span>
                     <span
                       className={`font-semibold ${
-                        analysis.dailyBias === 'Bullish' ? 'text-[#16E563]' : 'text-rose-400'
+                        analysis.tradeVerdict === 'No Trade'
+                          ? 'text-rose-400'
+                          : analysis.tradeVerdict === 'Wait for Setup'
+                          ? 'text-[#F5B82E]'
+                          : analysis.dailyBias === 'Bullish'
+                          ? 'text-[#16E563]'
+                          : 'text-rose-400'
                       }`}
                     >
-                      {analysis.setup.direction}
+                      {analysis.tradeVerdict === 'No Trade'
+                        ? 'No Trade (Stand Aside)'
+                        : analysis.tradeVerdict === 'Wait for Setup'
+                        ? `${analysis.setup.direction} · Limit Only`
+                        : analysis.setup.direction}
                     </span>
                   </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
-                    <span className="text-slate-400 shrink-0">Anchor PD Array</span>
-                    <span className="font-semibold text-white text-right truncate">
-                      {analysis.setup.entryArrayName || `${analysis.oteLevels.zone || ''} PD Array`}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">Entry Zone</span>
-                    <span className="font-mono tabular-nums font-semibold text-white">
-                      {analysis.setup.entryZone}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">50% Equilibrium</span>
-                    <span className="font-mono tabular-nums font-semibold text-slate-200">
-                      {pd ? pd.equilibrium : '-'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">Stop Loss</span>
-                    <span className="font-mono tabular-nums font-semibold text-rose-400">
-                      {analysis.setup.stopLoss}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">TP1 (2R / Equilibrium)</span>
-                    <span className="font-mono tabular-nums font-semibold text-[#16E563]">
-                      {analysis.setup.tp1}
-                    </span>
-                  </div>
-                  <div className="flex justify-between py-2 border-b border-emerald-500/10">
-                    <span className="text-slate-400">TP2 (Liquidity Draw)</span>
-                    <span className="font-mono tabular-nums font-semibold text-[#16E563]">
-                      {analysis.setup.tp2}
-                    </span>
-                  </div>
+
+                  {analysis.tradeVerdict === 'No Trade' ? (
+                    <div className="mt-3 p-4 rounded-lg bg-rose-950/40 border border-rose-500/35 space-y-3">
+                      <div className="flex items-center gap-2 text-rose-300 font-bold text-xs uppercase tracking-wider">
+                        <Lock className="w-4 h-4 text-rose-400 shrink-0" />
+                        <span>Execution Levels Hidden · Stand Aside</span>
+                      </div>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Entry, Stop Loss, and Take Profit coordinates are intentionally locked until all 4 required ICT confluence rules align:
+                      </p>
+                      <ul className="space-y-2 text-xs text-rose-200">
+                        {analysis.noTradeReasons.map((reason, idx) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
+                        <span className="text-slate-400 shrink-0">Anchor PD Array</span>
+                        <span className="font-semibold text-white text-right truncate">
+                          {analysis.setup.entryArrayName || 'Unmitigated PD Array'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                        <span className="text-slate-400">
+                          {analysis.tradeVerdict === 'Wait for Setup' ? 'Limit Entry Zone' : 'Entry Zone'}
+                        </span>
+                        <span className="font-mono tabular-nums font-semibold text-white">
+                          {analysis.setup.entryZone}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                        <span className="text-slate-400">50% Equilibrium</span>
+                        <span className="font-mono tabular-nums font-semibold text-slate-200">
+                          {pd ? pd.equilibrium : '-'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                        <span className="text-slate-400">Invalidation Stop Loss</span>
+                        <span className="font-mono tabular-nums font-semibold text-rose-400">
+                          {analysis.setup.stopLoss}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                        <span className="text-slate-400">TP1 (Partial / Equilibrium)</span>
+                        <span className="font-mono tabular-nums font-semibold text-[#16E563]">
+                          {analysis.setup.tp1}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-2 border-b border-emerald-500/10">
+                        <span className="text-slate-400">
+                          TP2 (External DOL · 1:{analysis.setup.rrRatio})
+                        </span>
+                        <span className="font-mono tabular-nums font-semibold text-[#16E563]">
+                          {analysis.setup.tp2}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
                   <div className="flex justify-between py-2 border-b border-emerald-500/10 gap-2">
                     <span className="text-slate-400 shrink-0">Power of 3 / Sweep</span>
                     <span className="text-xs font-medium text-slate-200 text-right">
@@ -843,16 +1084,24 @@ export const IctAnalyzerView: React.FC<IctAnalyzerViewProps> = ({
                     </div>
                   )}
                 </div>
-
               </div>
 
               <div className="bg-[#0B120E] border border-emerald-500/20 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-white mb-3">ICT Confluence Checklist</h3>
+                <h3 className="text-sm font-bold text-white mb-3">ICT Confluence Audit</h3>
                 <ul className="space-y-2.5 text-xs text-slate-200">
-                  {analysis.setup.confluences.map((item, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0 mt-0.5" />
-                      <span>{item}</span>
+                  {analysis.confluenceChecks.map((check) => (
+                    <li key={check.id} className="flex items-start gap-2">
+                      {check.passed ? (
+                        <CheckCircle2 className="w-4 h-4 text-[#16E563] shrink-0 mt-0.5" />
+                      ) : check.required ? (
+                        <XCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-[#F5B82E] shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <span className="font-semibold text-white">{check.label}: </span>
+                        <span className="text-slate-300">{check.detail}</span>
+                      </div>
                     </li>
                   ))}
                 </ul>

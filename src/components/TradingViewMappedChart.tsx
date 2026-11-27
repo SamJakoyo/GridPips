@@ -265,27 +265,42 @@ function buildPineScriptOverlay(analysis: IctAnalysisResult): string {
   const rLow = pd?.rangeLow ?? analysis.sslLevel;
   const bullFvgs = analysis.zones.filter((z) => z.type === 'Bullish FVG').slice(-2);
   const bearFvgs = analysis.zones.filter((z) => z.type === 'Bearish FVG').slice(-2);
+  const hasActiveExecution =
+    analysis.tradeVerdict !== 'No Trade' &&
+    analysis.setup.stopLoss != null &&
+    analysis.setup.tp1 != null &&
+    analysis.setup.tp2 != null;
+
   const lines = [
     `//@version=5`,
     `indicator("GRIDPIPs ICT PD Arrays (${analysis.symbol} ${analysis.timeframe})", overlay=true)`,
+    `// Verdict: ${analysis.verdictHeadline || analysis.tradeVerdict}`,
     `rangeHigh = ${rHigh}`,
     `rangeLow  = ${rLow}`,
     `eq50      = ${eq}`,
     `ote618    = ${analysis.oteLevels.fib618}`,
     `ote705    = ${analysis.oteLevels.fib705}`,
     `ote786    = ${analysis.oteLevels.fib786}`,
-    `slLevel   = ${analysis.setup.stopLoss}`,
-    `tp1Level  = ${analysis.setup.tp1}`,
-    `tp2Level  = ${analysis.setup.tp2}`,
+    ...(hasActiveExecution
+      ? [
+          `slLevel   = ${analysis.setup.stopLoss}`,
+          `tp1Level  = ${analysis.setup.tp1}`,
+          `tp2Level  = ${analysis.setup.tp2}`,
+        ]
+      : [`// Execution levels locked (No Trade — confluence gate failed)`]),
     `pHigh = plot(rangeHigh, "BSL / Premium High", color=color.new(color.aqua, 15), style=plot.style_linebr)`,
     `pEq   = plot(eq50,      "50% Equilibrium",    color=color.new(color.white, 20), style=plot.style_linebr)`,
     `pLow  = plot(rangeLow,  "SSL / Discount Low", color=color.new(color.aqua, 15), style=plot.style_linebr)`,
     `fill(pHigh, pEq, color=color.new(color.red, 92), title="Premium Zone")`,
     `fill(pEq, pLow,  color=color.new(color.green, 92), title="Discount Zone")`,
     `plot(ote705,   "OTE 0.705", color=color.amber, linewidth=2, style=plot.style_circles)`,
-    `plot(slLevel,  "Stop Loss", color=color.red,   linewidth=1, style=plot.style_linebr)`,
-    `plot(tp1Level, "TP1 (2R)",  color=color.green, linewidth=1, style=plot.style_linebr)`,
-    `plot(tp2Level, "TP2 (DOL)", color=color.teal,  linewidth=1, style=plot.style_linebr)`,
+    ...(hasActiveExecution
+      ? [
+          `plot(slLevel,  "Stop Loss", color=color.red,   linewidth=1, style=plot.style_linebr)`,
+          `plot(tp1Level, "TP1 (Partial)", color=color.green, linewidth=1, style=plot.style_linebr)`,
+          `plot(tp2Level, "TP2 (External DOL)", color=color.teal,  linewidth=1, style=plot.style_linebr)`,
+        ]
+      : []),
     ...bullFvgs.map(
       (z, i) =>
         `hline(${z.ceMid}, "Bullish FVG CE #${i + 1} (${z.bottom}-${z.top})", color=color.new(color.lime, 30), linestyle=hline.style_dashed)`
@@ -583,10 +598,17 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
       }
     }
 
-    if (showExecutionLevels) {
-      addLine(analysis.setup.stopLoss, 'SL', '#f43f5e', LineStyle.Solid, 1);
-      addLine(analysis.setup.tp1, 'TP1 (2R)', '#10b981', LineStyle.Dashed, 1);
-      addLine(analysis.setup.tp2, 'TP2 (DOL)', '#059669', LineStyle.Dotted, 1);
+    if (
+      showExecutionLevels &&
+      analysis.tradeVerdict !== 'No Trade' &&
+      analysis.setup.stopLoss != null &&
+      analysis.setup.tp1 != null &&
+      analysis.setup.tp2 != null
+    ) {
+      const isWait = analysis.tradeVerdict === 'Wait for Setup';
+      addLine(analysis.setup.stopLoss, isWait ? 'SL (Limit)' : 'SL', '#f43f5e', LineStyle.Solid, 1);
+      addLine(analysis.setup.tp1, isWait ? 'TP1 (Limit)' : 'TP1 (Partial)', '#10b981', LineStyle.Dashed, 1);
+      addLine(analysis.setup.tp2, isWait ? 'TP2 DOL (Limit)' : 'TP2 (DOL)', '#059669', LineStyle.Dotted, 1);
     }
 
     // Candle markers for MSS & Liquidity Sweep
@@ -686,6 +708,21 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
               ·
             </span>
             <span className="font-mono tabular-nums">{analysis.currentPrice}</span>
+            <span
+              className={`text-[11px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
+                analysis.tradeVerdict === 'Actionable Trade'
+                  ? 'border-emerald-500/40 bg-emerald-500/15 text-[#16E563]'
+                  : analysis.tradeVerdict === 'Wait for Setup'
+                  ? 'border-amber-500/40 bg-amber-500/15 text-[#F5B82E]'
+                  : 'border-rose-500/40 bg-rose-500/15 text-rose-400'
+              }`}
+            >
+              {analysis.tradeVerdict === 'Actionable Trade'
+                ? 'Actionable'
+                : analysis.tradeVerdict === 'Wait for Setup'
+                ? 'Wait / Limit Only'
+                : 'No Trade · Stand Aside'}
+            </span>
             {activeOhlc && (
               <span
                 className={`text-xs font-mono tabular-nums font-normal hidden sm:inline ${
@@ -697,7 +734,9 @@ export const TradingViewMappedChart: React.FC<TradingViewMappedChartProps> = ({
             )}
           </div>
           <div className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            Live TradingView OHLC with mapped Premium/Discount zones, 50% Equilibrium, FVGs, Order Blocks, Breakers, OTE &amp; SL/TP
+            {analysis.tradeVerdict === 'No Trade'
+              ? 'Live TradingView OHLC with Premium/Discount & PD Arrays mapped · Execution SL/TP lines hidden (No Trade)'
+              : 'Live TradingView OHLC with mapped Premium/Discount zones, 50% Equilibrium, FVGs, Order Blocks, Breakers & SL/TP'}
           </div>
         </div>
 

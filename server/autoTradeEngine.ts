@@ -87,6 +87,16 @@ function matchesStrategyFilter(
   activeBot: string,
   timeframe: '15M' | '1H'
 ): { matches: boolean; strategyLabel: string } {
+  if (
+    analysis.tradeVerdict !== 'Actionable Trade' ||
+    analysis.setup.direction === 'No Trade' ||
+    analysis.setup.stopLoss == null ||
+    analysis.setup.tp1 == null ||
+    analysis.setup.rrRatio == null
+  ) {
+    return { matches: false, strategyLabel: analysis.verdictHeadline || 'No Trade' };
+  }
+
   const isLong = analysis.setup.direction.startsWith('Long');
   const unmitigatedZones = analysis.zones.filter((z) => !z.mitigated);
 
@@ -99,22 +109,22 @@ function matchesStrategyFilter(
 
   if (activeBot === 'silverbullet') {
     return {
-      matches: timeframe === '15M' && hasFvg && analysis.setup.rrRatio >= 1.8,
+      matches: timeframe === '15M' && hasFvg && analysis.setup.rrRatio >= 2.5,
       strategyLabel: 'ICT Silver Bullet EA',
     };
   }
   if (activeBot === 'orderblock') {
     return {
-      matches: timeframe === '1H' && hasOb && analysis.setup.rrRatio >= 2.0,
+      matches: timeframe === '1H' && hasOb && analysis.setup.rrRatio >= 2.5,
       strategyLabel: 'SMC Order Block EA',
     };
   }
 
   // 'both'
-  if (timeframe === '15M' && hasFvg && analysis.setup.rrRatio >= 1.8) {
+  if (timeframe === '15M' && hasFvg && analysis.setup.rrRatio >= 2.5) {
     return { matches: true, strategyLabel: 'ICT Silver Bullet EA' };
   }
-  if (timeframe === '1H' && hasOb && analysis.setup.rrRatio >= 2.0) {
+  if (timeframe === '1H' && hasOb && analysis.setup.rrRatio >= 2.5) {
     return { matches: true, strategyLabel: 'SMC Order Block EA' };
   }
   return { matches: false, strategyLabel: 'No matching zone' };
@@ -247,28 +257,40 @@ export async function runCloudAutoTradePass(options?: {
 
         const { matches, strategyLabel } = matchesStrategyFilter(analysis, activeBot, tf);
         const side: 'BUY' | 'SELL' = analysis.setup.direction.startsWith('Long') ? 'BUY' : 'SELL';
-        const volume = computeRiskLotSize({
-          symbol: sym,
-          equity,
-          riskPercent,
-          entryPrice: analysis.currentPrice,
-          stopLoss: analysis.setup.stopLoss,
-        });
+        const stopLossVal = analysis.setup.stopLoss ?? 0;
+        const tp1Val = analysis.setup.tp1 ?? 0;
+        const rrVal = analysis.setup.rrRatio ?? 0;
 
-        if (!matches) {
+        const volume =
+          analysis.setup.stopLoss != null
+            ? computeRiskLotSize({
+                symbol: sym,
+                equity,
+                riskPercent,
+                entryPrice: analysis.currentPrice,
+                stopLoss: analysis.setup.stopLoss,
+              })
+            : 0;
+
+        if (!matches || analysis.setup.stopLoss == null || analysis.setup.tp1 == null || analysis.setup.rrRatio == null) {
           candidates.push({
             symbol: sym,
             timeframe: tf,
             strategy: strategyLabel,
             side,
             entryPrice: analysis.currentPrice,
-            stopLoss: analysis.setup.stopLoss,
-            tp1: analysis.setup.tp1,
-            rrRatio: analysis.setup.rrRatio,
+            stopLoss: stopLossVal,
+            tp1: tp1Val,
+            rrRatio: rrVal,
             volume,
             confluences: analysis.setup.confluences,
             status: 'skipped',
-            reason: `Awaiting clean unmitigated ${tf === '15M' ? 'FVG' : 'Order Block'} + R:R confluence.`,
+            reason:
+              analysis.tradeVerdict === 'No Trade'
+                ? analysis.noTradeReasons[0] || 'No Trade — confluence gates failed.'
+                : analysis.tradeVerdict === 'Wait for Setup'
+                ? analysis.verdictSummary
+                : `Awaiting clean unmitigated ${tf === '15M' ? 'FVG' : 'Order Block'} + R:R confluence.`,
           });
           continue;
         }

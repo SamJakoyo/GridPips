@@ -225,6 +225,16 @@ export interface PremiumDiscountProfile {
   guidance: string;
 }
 
+export type IctTradeVerdict = 'Actionable Trade' | 'Wait for Setup' | 'No Trade';
+
+export interface IctConfluenceCheck {
+  id: 'mss_displacement' | 'signal_alignment' | 'pd_array_in_zone' | 'min_rr_dol' | 'pd_equilibrium';
+  label: string;
+  passed: boolean;
+  required: boolean;
+  detail: string;
+}
+
 export interface IctAnalysisResult {
   symbol: string;
   tvSymbol?: string;
@@ -234,7 +244,12 @@ export interface IctAnalysisResult {
   bid?: number | null;
   ask?: number | null;
   changePct?: number | null;
-  dailyBias: 'Bullish' | 'Bearish';
+  dailyBias: 'Bullish' | 'Bearish' | 'Neutral';
+  tradeVerdict: IctTradeVerdict;
+  verdictHeadline: string;
+  verdictSummary: string;
+  noTradeReasons: string[];
+  confluenceChecks: IctConfluenceCheck[];
   po3Phase: string;
   activeKillzone: string;
   structureShift: string;
@@ -261,13 +276,14 @@ export interface IctAnalysisResult {
   };
   zones: IctZone[];
   setup: {
-    direction: 'Long (Buy)' | 'Short (Sell)';
-    entryZone: string;
-    entryArrayName?: string;
-    stopLoss: number;
-    tp1: number;
-    tp2: number;
-    rrRatio: number;
+    direction: 'Long (Buy)' | 'Short (Sell)' | 'No Trade';
+    entryZone: string | null;
+    entryArrayName?: string | null;
+    stopLoss: number | null;
+    tp1: number | null;
+    tp2: number | null;
+    rrRatio: number | null;
+    projectedRrToDol?: number | null;
     confluences: string[];
   };
   candles: Candle[];

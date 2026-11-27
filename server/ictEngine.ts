@@ -80,6 +80,16 @@ export interface PremiumDiscountProfile {
   guidance: string;
 }
 
+export type IctTradeVerdict = 'Actionable Trade' | 'Wait for Setup' | 'No Trade';
+
+export interface IctConfluenceCheck {
+  id: 'mss_displacement' | 'signal_alignment' | 'pd_array_in_zone' | 'min_rr_dol' | 'pd_equilibrium';
+  label: string;
+  passed: boolean;
+  required: boolean; // true = hard No-Trade gate; false = triggers Wait for Setup (Limit Only)
+  detail: string;
+}
+
 export interface IctAnalysisResult {
   symbol: string;
   tvSymbol: string;
@@ -89,7 +99,12 @@ export interface IctAnalysisResult {
   bid: number | null;
   ask: number | null;
   changePct: number | null;
-  dailyBias: 'Bullish' | 'Bearish';
+  dailyBias: 'Bullish' | 'Bearish' | 'Neutral';
+  tradeVerdict: IctTradeVerdict;
+  verdictHeadline: string;
+  verdictSummary: string;
+  noTradeReasons: string[];
+  confluenceChecks: IctConfluenceCheck[];
   po3Phase: 'Accumulation' | 'Manipulation (Judas Swing)' | 'Distribution';
   activeKillzone: string;
   structureShift: string;
@@ -116,13 +131,14 @@ export interface IctAnalysisResult {
   };
   zones: IctZone[];
   setup: {
-    direction: 'Long (Buy)' | 'Short (Sell)';
-    entryZone: string;
-    entryArrayName: string;
-    stopLoss: number;
-    tp1: number;
-    tp2: number;
-    rrRatio: number;
+    direction: 'Long (Buy)' | 'Short (Sell)' | 'No Trade';
+    entryZone: string | null;
+    entryArrayName: string | null;
+    stopLoss: number | null;
+    tp1: number | null;
+    tp2: number | null;
+    rrRatio: number | null;
+    projectedRrToDol?: number | null;
     confluences: string[];
   };
   candles: Candle[];
@@ -577,13 +593,21 @@ export async function runIctMarketAnalysis(
     }
   }
 
-  // Add top 2 most relevant Bullish FVGs & top 2 Bearish FVGs into PD Array Matrix
-  const pickBestFvgs = (list: IctZone[]) => {
-    const unmit = list.filter((f) => !f.mitigated).slice(-2);
-    if (unmit.length > 0) return unmit;
+  // Add most relevant unmitigated Bullish & Bearish FVGs into PD Array Matrix (preserving Discount Bullish & Premium Bearish FVGs)
+  const pickBestFvgs = (list: IctZone[], preferredZone: 'Discount' | 'Premium') => {
+    const unmit = list.filter((f) => !f.mitigated);
+    const inPreferredZone = unmit.filter((f) => f.pdZone === preferredZone).slice(-2);
+    const recentUnmit = unmit.slice(-2);
+    const merged: IctZone[] = [];
+    for (const item of [...inPreferredZone, ...recentUnmit]) {
+      if (!merged.some((m) => m.startIndex === item.startIndex)) {
+        merged.push(item);
+      }
+    }
+    if (merged.length > 0) return merged.slice(0, 3);
     return list.slice(-1);
   };
-  for (const fvg of pickBestFvgs(bullishFvgs)) {
+  for (const fvg of pickBestFvgs(bullishFvgs, 'Discount')) {
     pushPdArray({
       id: `bisi-${fvg.startIndex}`,
       name: `Bullish FVG (BISI) · 50% CE ${fvg.ceMid.toFixed(digits)}`,
@@ -599,7 +623,7 @@ export async function runIctMarketAnalysis(
       startIndex: fvg.startIndex,
     });
   }
-  for (const fvg of pickBestFvgs(bearishFvgs)) {
+  for (const fvg of pickBestFvgs(bearishFvgs, 'Premium')) {
     pushPdArray({
       id: `sibi-${fvg.startIndex}`,
       name: `Bearish FVG (SIBI) · 50% CE ${fvg.ceMid.toFixed(digits)}`,
@@ -616,9 +640,9 @@ export async function runIctMarketAnalysis(
     });
   }
 
-  // D. Bullish & Bearish Order Blocks (Priority 3)
-  let bullObCandle: Candle | null = null;
-  let bearObCandle: Candle | null = null;
+  // D. Bullish & Bearish Order Blocks (Priority 3 — STRICT displacement-backed only, no forced fallback)
+  const bullObCandidates: Candle[] = [];
+  const bearObCandidates: Candle[] = [];
 
   for (let i = candles.length - 3; i >= 2; i--) {
     const c = candles[i];
@@ -628,37 +652,45 @@ export async function runIctMarketAnalysis(
       Math.abs(next1.close - next1.open) >= atr * 0.7 ||
       Math.abs(next2.close - next2.open) >= atr * 0.7;
 
-    if (!bullObCandle && c.close < c.open && next1.close > c.high && nextDisplacement) {
-      bullObCandle = c;
+    if (c.close < c.open && next1.close > c.high && nextDisplacement) {
+      bullObCandidates.push(c);
     }
-    if (!bearObCandle && c.close > c.open && next1.close < c.low && nextDisplacement) {
-      bearObCandle = c;
-    }
-    if (bullObCandle && bearObCandle) break;
-  }
-
-  // Fallbacks so an OB is always located on active direction
-  if (!bullObCandle) {
-    const downCandles = candles.slice(2, -2).filter((c) => c.close < c.open);
-    if (downCandles.length > 0) {
-      bullObCandle = downCandles.reduce((best, cur) =>
-        cur.low < best.low ? cur : best
-      );
-    }
-  }
-  if (!bearObCandle) {
-    const upCandles = candles.slice(2, -2).filter((c) => c.close > c.open);
-    if (upCandles.length > 0) {
-      bearObCandle = upCandles.reduce((best, cur) =>
-        cur.high > best.high ? cur : best
-      );
+    if (c.close > c.open && next1.close < c.low && nextDisplacement) {
+      bearObCandidates.push(c);
     }
   }
 
-  if (bullObCandle) {
+  // Prefer keeping the most recent genuine OB plus the most recent unmitigated Discount Bullish / Premium Bearish OB
+  const selectedBullObs: Candle[] = [];
+  for (const ob of bullObCandidates) {
+    const mid = round((ob.high + ob.low) / 2);
+    const pdZone = classifyPdZone(mid, equilibrium, eqTolerance);
+    const mitigated = candles.slice(ob.index + 2).some((k) => k.close < ob.low);
+    if (selectedBullObs.length === 0 || (!mitigated && pdZone === 'Discount')) {
+      if (!selectedBullObs.some((x) => x.index === ob.index)) {
+        selectedBullObs.push(ob);
+      }
+    }
+    if (selectedBullObs.length >= 2) break;
+  }
+
+  const selectedBearObs: Candle[] = [];
+  for (const ob of bearObCandidates) {
+    const mid = round((ob.high + ob.low) / 2);
+    const pdZone = classifyPdZone(mid, equilibrium, eqTolerance);
+    const mitigated = candles.slice(ob.index + 2).some((k) => k.close > ob.high);
+    if (selectedBearObs.length === 0 || (!mitigated && pdZone === 'Premium')) {
+      if (!selectedBearObs.some((x) => x.index === ob.index)) {
+        selectedBearObs.push(ob);
+      }
+    }
+    if (selectedBearObs.length >= 2) break;
+  }
+
+  for (const bullObCandle of selectedBullObs) {
     const mid = round((bullObCandle.high + bullObCandle.low) / 2);
     const pdZone = classifyPdZone(mid, equilibrium, eqTolerance);
-    const mitigated = candles.slice(bullObCandle.index + 2).some((k) => k.close < bullObCandle!.low);
+    const mitigated = candles.slice(bullObCandle.index + 2).some((k) => k.close < bullObCandle.low);
     const obZone: IctZone = {
       type: 'Bullish OB',
       top: round(bullObCandle.high),
@@ -686,10 +718,10 @@ export async function runIctMarketAnalysis(
     });
   }
 
-  if (bearObCandle) {
+  for (const bearObCandle of selectedBearObs) {
     const mid = round((bearObCandle.high + bearObCandle.low) / 2);
     const pdZone = classifyPdZone(mid, equilibrium, eqTolerance);
-    const mitigated = candles.slice(bearObCandle.index + 2).some((k) => k.close > bearObCandle!.high);
+    const mitigated = candles.slice(bearObCandle.index + 2).some((k) => k.close > bearObCandle.high);
     const obZone: IctZone = {
       type: 'Bearish OB',
       top: round(bearObCandle.high),
@@ -970,43 +1002,64 @@ export async function runIctMarketAnalysis(
     }
   }
 
-  // 6. Optimal Trade Entry (OTE 0.618, 0.705, 0.786) strictly inside Discount (Long) or Premium (Short)
+  // 6. Optimal Trade Entry (OTE 0.618, 0.705, 0.786) reference inside Discount (Long) or Premium (Short)
   const fib618 = round(bullishBias ? rangeHigh - dealingSpan * 0.618 : rangeLow + dealingSpan * 0.618);
   const fib705 = round(bullishBias ? rangeHigh - dealingSpan * 0.705 : rangeLow + dealingSpan * 0.705);
   const fib786 = round(bullishBias ? rangeHigh - dealingSpan * 0.786 : rangeLow + dealingSpan * 0.786);
   const oteZone: 'Premium' | 'Discount' = bullishBias ? 'Discount' : 'Premium';
 
-  // 7. Strict Institutional Delivery Alignment & Entry Selection
-  // Bullish Bias MUST anchor entries in Discount (<50%); Bearish Bias MUST anchor entries in Premium (>50%).
-  const alignedWithBias =
-    currentZone === 'Equilibrium'
-      ? true
-      : bullishBias
-      ? currentZone === 'Discount'
-      : currentZone === 'Premium';
+  // 7. Strict Institutional Confluence Gate & 3-State Trade Verdict
+  // 4 Hard "No Trade" Blockers + 1 Positioning Gate (Wait for Setup vs Actionable Trade)
+  const MIN_REAL_RR_TO_DOL = 2.5;
 
-  const guidance = bullishBias
-    ? currentZone === 'Discount'
-      ? `Price is at ${currentPositionPct}% (Discount below 50% Equilibrium ${equilibrium.toFixed(digits)}) — prime institutional zone to execute Bullish PD Arrays targeting BSL.`
-      : `Price is at ${currentPositionPct}% (Premium above 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT chase longs in Premium; wait for retracement into Discount PD Arrays / OTE.`
-    : currentZone === 'Premium'
-    ? `Price is at ${currentPositionPct}% (Premium above 50% Equilibrium ${equilibrium.toFixed(digits)}) — prime institutional zone to execute Bearish PD Arrays targeting SSL.`
-    : `Price is at ${currentPositionPct}% (Discount below 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT chase shorts in Discount; wait for rally into Premium PD Arrays / OTE.`;
+  const hasMss = Boolean(mssBullishCandle || mssBearishCandle);
+  const mssDirection: 'Bullish' | 'Bearish' | null = mssBullishCandle
+    ? 'Bullish'
+    : mssBearishCandle
+    ? 'Bearish'
+    : null;
 
-  const preferredArrayZone = bullishBias ? 'Discount' : 'Premium';
-  const preferredDir = bullishBias ? 'Bullish' : 'Bearish';
+  // Hard Gate 1: Structure Shift (MSS) or Institutional Displacement
+  const passMssOrDisplacement = hasMss || displacementDetected;
 
-  // Pick best unmitigated PD Array strictly in the right Premium/Discount half (preferring FVG -> OB -> Breaker -> Rejection)
+  // Hard Gate 2: Conflicting Signals (Recent Liquidity Sweep vs MSS pointing opposite directions)
+  const signalsConflict = Boolean(mssDirection && recentSweepBias && mssDirection !== recentSweepBias);
+  const passSignalAlignment = !signalsConflict;
+
+  // Preferred directional zone
+  const preferredArrayZone: 'Discount' | 'Premium' = bullishBias ? 'Discount' : 'Premium';
+  const preferredDir: 'Bullish' | 'Bearish' = bullishBias ? 'Bullish' : 'Bearish';
+
+  // External Draw on Liquidity (real market liquidity pool — never artificially padded)
+  const drawOnLiquidity: IctAnalysisResult['drawOnLiquidity'] = bullishBias
+    ? {
+        label: equalHighsLevel ? 'Equal Highs / External BSL' : 'Old High / External BSL',
+        price: bslLevel,
+        side: 'BSL (Premium)',
+      }
+    : {
+        label: equalLowsLevel ? 'Equal Lows / External SSL' : 'Old Low / External SSL',
+        price: sslLevel,
+        side: 'SSL (Discount)',
+      };
+
+  // Hard Gate 3: Clean Unmitigated PD Array (FVG, OB, Breaker, or Rejection Block) strictly in Discount (Longs) or Premium (Shorts)
+  // NO fallback to 0.705 OTE fib when no genuine unmitigated array exists in zone.
+  const ALLOWED_ENTRY_CATEGORIES: ReadonlySet<PdArrayCategory> = new Set([
+    'Fair Value Gap (FVG)',
+    'Order Block (OB)',
+    'Breaker Block',
+    'Rejection Block',
+  ]);
+
   const candidateArrays = pdArrays
     .filter(
       (a) =>
         a.direction === preferredDir &&
-        (a.zone === preferredArrayZone || a.zone === 'Equilibrium') &&
-        a.category !== 'Old High / BSL' &&
-        a.category !== 'Old Low / SSL' &&
-        a.category !== 'Equal Highs (EQH)' &&
-        a.category !== 'Equal Lows (EQL)' &&
-        a.status !== 'Mitigated'
+        a.zone === preferredArrayZone &&
+        ALLOWED_ENTRY_CATEGORIES.has(a.category) &&
+        a.status !== 'Mitigated' &&
+        (bullishBias ? a.midpoint <= equilibrium : a.midpoint >= equilibrium)
     )
     .sort((a, b) => {
       const rankWeight = (cat: PdArrayCategory) => {
@@ -1016,59 +1069,211 @@ export async function runIctMarketAnalysis(
         if (cat === 'Rejection Block') return 4;
         return 5;
       };
-      return rankWeight(a.category) - rankWeight(b.category);
+      return rankWeight(a.category) - rankWeight(b.category) || b.startIndex - a.startIndex;
     });
 
-  const bestEntryArray =
-    candidateArrays.find((a) => (bullishBias ? a.midpoint <= equilibrium : a.midpoint >= equilibrium)) ||
-    candidateArrays[0];
+  const bestEntryArray = candidateArrays[0] ?? null;
+  const passPdArrayInZone = Boolean(bestEntryArray);
 
-  let entryMid = bestEntryArray ? bestEntryArray.midpoint : fib705;
-  let entryZoneStr = bestEntryArray
-    ? `${bestEntryArray.bottom.toFixed(digits)} - ${bestEntryArray.top.toFixed(digits)}`
-    : `${Math.min(fib786, fib618).toFixed(digits)} - ${Math.max(fib786, fib618).toFixed(digits)}`;
-  let entryArrayName = bestEntryArray
-    ? `${bestEntryArray.zone} ${bestEntryArray.category}`
-    : `${oteZone} OTE (0.618 - 0.786)`;
+  // Hard Gate 4: Real Risk:Reward to External Draw on Liquidity >= 1 : 2.5
+  let candidateEntryMid: number | null = null;
+  let candidateEntryZoneStr: string | null = null;
+  let candidateEntryArrayName: string | null = null;
+  let candidateStopLoss: number | null = null;
+  let candidateTp1: number | null = null;
+  let candidateTp2: number | null = null;
+  let realRrToDol: number | null = null;
 
-  // Guarantee institutional rule: Long entry sits <= equilibrium (or OTE in Discount); Short entry sits >= equilibrium (or OTE in Premium)
-  if (bullishBias && entryMid > equilibrium) {
-    entryMid = fib705;
-    entryZoneStr = `${Math.min(fib786, fib618).toFixed(digits)} - ${Math.max(fib786, fib618).toFixed(digits)}`;
-    entryArrayName = 'Discount OTE (0.618 - 0.786)';
-  } else if (!bullishBias && entryMid < equilibrium) {
-    entryMid = fib705;
-    entryZoneStr = `${Math.min(fib786, fib618).toFixed(digits)} - ${Math.max(fib786, fib618).toFixed(digits)}`;
-    entryArrayName = 'Premium OTE (0.618 - 0.786)';
+  if (bestEntryArray) {
+    candidateEntryMid = bestEntryArray.midpoint;
+    candidateEntryZoneStr = `${bestEntryArray.bottom.toFixed(digits)} - ${bestEntryArray.top.toFixed(digits)}`;
+    candidateEntryArrayName = `${bestEntryArray.zone} ${bestEntryArray.category}`;
+
+    // Anchor invalidation stop beyond the structural swing protecting the entry PD Array
+    // (never unrealistically tight inside normal volatility noise, and never beyond the opposite extreme unnecessarily)
+    const stopBuffer = Math.max(atr * 0.3, minStep * 0.25);
+    const minRiskFloor = Math.max(atr * 1.0, dealingSpan * 0.08, Math.pow(10, -digits) * 3);
+
+    const protectingSwing = bullishBias
+      ? swingLows
+          .filter((s) => s.price <= bestEntryArray.bottom)
+          .sort((a, b) => b.price - a.price)[0]
+      : swingHighs
+          .filter((s) => s.price >= bestEntryArray.top)
+          .sort((a, b) => a.price - b.price)[0];
+
+    const structuralAnchor = bullishBias
+      ? Math.min(bestEntryArray.bottom, protectingSwing ? protectingSwing.price : bestEntryArray.bottom) - stopBuffer
+      : Math.max(bestEntryArray.top, protectingSwing ? protectingSwing.price : bestEntryArray.top) + stopBuffer;
+
+    candidateStopLoss = round(
+      bullishBias
+        ? Math.min(structuralAnchor, candidateEntryMid - minRiskFloor)
+        : Math.max(structuralAnchor, candidateEntryMid + minRiskFloor)
+    );
+
+    const riskDist = Math.abs(candidateEntryMid - candidateStopLoss);
+    const realDolPrice = drawOnLiquidity.price;
+    const rewardDistToDol = bullishBias
+      ? realDolPrice - candidateEntryMid
+      : candidateEntryMid - realDolPrice;
+
+    if (riskDist > 0 && rewardDistToDol > 0) {
+      realRrToDol = Number((rewardDistToDol / riskDist).toFixed(2));
+      candidateTp2 = round(realDolPrice);
+
+      // Realistic partial TP1: Equilibrium if it sits cleanly between entry and external DOL with >= 1.0R; otherwise 55% of move to DOL
+      const eqReward = bullishBias ? equilibrium - candidateEntryMid : candidateEntryMid - equilibrium;
+      const eqIsCleanPartial =
+        eqReward >= riskDist * 1.0 &&
+        (bullishBias ? equilibrium < candidateTp2 - riskDist * 0.35 : equilibrium > candidateTp2 + riskDist * 0.35);
+
+      candidateTp1 = round(
+        eqIsCleanPartial
+          ? equilibrium
+          : candidateEntryMid + (candidateTp2 - candidateEntryMid) * 0.55
+      );
+    } else {
+      realRrToDol = 0;
+    }
   }
 
-  const obAnchor = bullishBias ? bullObCandle : bearObCandle;
-  const stopBuffer = Math.max(atr * 0.4, minStep * 0.35);
-  const stopLoss = round(
-    bullishBias
-      ? Math.min(obAnchor ? obAnchor.low : rangeLow, rangeLow, entryMid - atr) - stopBuffer
-      : Math.max(obAnchor ? obAnchor.high : rangeHigh, rangeHigh, entryMid + atr) + stopBuffer
-  );
+  const passMinRrToDol =
+    passPdArrayInZone && realRrToDol !== null && realRrToDol >= MIN_REAL_RR_TO_DOL;
 
-  const riskDist = Math.max(Math.abs(entryMid - stopLoss), atr * 0.5);
-  const tp1 = round(bullishBias ? Math.max(equilibrium, entryMid + riskDist * 2.0) : Math.min(equilibrium, entryMid - riskDist * 2.0));
-  const rawTp2 = bullishBias ? bslLevel : sslLevel;
-  const tp2 = round(
-    bullishBias ? Math.max(rawTp2, tp1 + riskDist * 0.65) : Math.min(rawTp2, tp1 - riskDist * 0.65)
-  );
-  const rrRatio = Number((Math.abs(tp1 - entryMid) / riskDist).toFixed(2));
+  // Soft Positioning Check (50% Equilibrium Alignment — determines Actionable Trade vs Wait for Setup)
+  const alignedWithBias =
+    currentZone === 'Equilibrium'
+      ? true
+      : bullishBias
+      ? currentZone === 'Discount'
+      : currentZone === 'Premium';
 
-  const drawOnLiquidity: IctAnalysisResult['drawOnLiquidity'] = bullishBias
-    ? {
-        label: equalHighsLevel ? `Equal Highs / BSL` : `Old High / BSL`,
-        price: equalHighsLevel && equalHighsLevel > currentPrice ? equalHighsLevel : bslLevel,
-        side: 'BSL (Premium)',
-      }
-    : {
-        label: equalLowsLevel ? `Equal Lows / SSL` : `Old Low / SSL`,
-        price: equalLowsLevel && equalLowsLevel < currentPrice ? equalLowsLevel : sslLevel,
-        side: 'SSL (Discount)',
-      };
+  // Assemble explicit Confluence Gate Checklist & Hard No-Trade Reasons
+  const noTradeReasons: string[] = [];
+
+  const mssDetail = hasMss && displacementDetected
+    ? `${structureShift} + institutional displacement confirmed.`
+    : hasMss
+    ? `${structureShift} confirmed.`
+    : displacementDetected
+    ? `Institutional displacement expansion detected on ${timeframe}.`
+    : `No Market Structure Shift (MSS) or institutional displacement detected — market is in consolidation / chop.`;
+
+  if (!passMssOrDisplacement) {
+    noTradeReasons.push(mssDetail);
+  }
+
+  const alignmentDetail = passSignalAlignment
+    ? mssDirection && recentSweepBias
+      ? `${recentSweepBias} liquidity sweep aligns cleanly with ${mssDirection} MSS.`
+      : mssDirection
+      ? `${mssDirection} MSS has no opposing liquidity sweep conflict.`
+      : recentSweepBias
+      ? `Recent ${recentSweepBias} liquidity sweep without conflicting counter-MSS.`
+      : `No conflicting MSS vs. liquidity sweep signals.`
+    : `Conflicting signals: recent ${recentSweepBias} liquidity sweep (${liquiditySweep}) opposes ${mssDirection} MSS.`;
+
+  if (!passSignalAlignment) {
+    noTradeReasons.push(alignmentDetail);
+  }
+
+  const pdArrayDetail = passPdArrayInZone && bestEntryArray
+    ? `Unmitigated ${bestEntryArray.zone} ${bestEntryArray.category} mapped at ${candidateEntryZoneStr}.`
+    : `No unmitigated ${preferredDir} PD Array (FVG, Order Block, Breaker, or Rejection Block) located in ${preferredArrayZone}.`;
+
+  if (!passPdArrayInZone) {
+    noTradeReasons.push(pdArrayDetail);
+  }
+
+  const rrDetail = !passPdArrayInZone
+    ? `Cannot validate real R:R without an unmitigated ${preferredArrayZone} PD Array.`
+    : realRrToDol !== null && realRrToDol >= MIN_REAL_RR_TO_DOL
+    ? `Real R:R from entry to ${drawOnLiquidity.label} (${drawOnLiquidity.price.toFixed(digits)}) is 1 : ${realRrToDol.toFixed(2)} (meets >= 1 : ${MIN_REAL_RR_TO_DOL}).`
+    : `Insufficient real R:R to ${drawOnLiquidity.label} (${drawOnLiquidity.price.toFixed(digits)}): 1 : ${(realRrToDol ?? 0).toFixed(2)} is below the 1 : ${MIN_REAL_RR_TO_DOL} minimum.`;
+
+  if (!passMinRrToDol) {
+    noTradeReasons.push(rrDetail);
+  }
+
+  const equilibriumDetail = alignedWithBias
+    ? `Price (${currentPositionPct}%) is positioned in ${currentZone}, aligned for ${preferredDir} execution.`
+    : `Price (${currentPositionPct}%) is in ${currentZone} (wrong side of 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT market-enter; wait for retracement into ${preferredArrayZone}.`;
+
+  const confluenceChecks: IctConfluenceCheck[] = [
+    {
+      id: 'mss_displacement',
+      label: 'Structure Shift (MSS) or Displacement',
+      passed: passMssOrDisplacement,
+      required: true,
+      detail: mssDetail,
+    },
+    {
+      id: 'signal_alignment',
+      label: 'Liquidity Sweep & MSS Alignment',
+      passed: passSignalAlignment,
+      required: true,
+      detail: alignmentDetail,
+    },
+    {
+      id: 'pd_array_in_zone',
+      label: `Unmitigated ${preferredArrayZone} PD Array`,
+      passed: passPdArrayInZone,
+      required: true,
+      detail: pdArrayDetail,
+    },
+    {
+      id: 'min_rr_dol',
+      label: `Real R:R to Draw on Liquidity (>= 1:${MIN_REAL_RR_TO_DOL})`,
+      passed: passMinRrToDol,
+      required: true,
+      detail: rrDetail,
+    },
+    {
+      id: 'pd_equilibrium',
+      label: '50% Equilibrium Positioning (Immediate vs Limit)',
+      passed: alignedWithBias,
+      required: false,
+      detail: equilibriumDetail,
+    },
+  ];
+
+  // Resolve 3-State Verdict
+  let tradeVerdict: IctTradeVerdict;
+  let verdictHeadline: string;
+  let verdictSummary: string;
+
+  if (noTradeReasons.length > 0) {
+    tradeVerdict = 'No Trade';
+    verdictHeadline = 'No Trade · Stand Aside';
+    verdictSummary = `${noTradeReasons.length} required confluence gate${noTradeReasons.length > 1 ? 's' : ''} failed — execution parameters are locked to protect capital.`;
+  } else if (!alignedWithBias) {
+    tradeVerdict = 'Wait for Setup';
+    verdictHeadline = `Wait for Setup · ${bullishBias ? 'Buy' : 'Sell'} Limit Only`;
+    verdictSummary = `Structure, PD Array, and 1:${realRrToDol?.toFixed(2)} R:R align, but price is in ${currentZone}. Do not market-enter — wait for retracement into ${candidateEntryArrayName} (${candidateEntryZoneStr}).`;
+  } else {
+    tradeVerdict = 'Actionable Trade';
+    verdictHeadline = `Actionable Trade · ${bullishBias ? 'Long (Buy)' : 'Short (Sell)'}`;
+    verdictSummary = `All 4 institutional confluence gates passed with price in ${currentZone} and 1:${realRrToDol?.toFixed(2)} real R:R to ${drawOnLiquidity.label}.`;
+  }
+
+  const effectiveDailyBias: 'Bullish' | 'Bearish' | 'Neutral' =
+    !passMssOrDisplacement || !passSignalAlignment
+      ? 'Neutral'
+      : bullishBias
+      ? 'Bullish'
+      : 'Bearish';
+
+  const guidance =
+    tradeVerdict === 'No Trade'
+      ? `Stand Aside — ${noTradeReasons[0]}`
+      : bullishBias
+      ? alignedWithBias
+        ? `Price is at ${currentPositionPct}% (${currentZone} vs 50% Equilibrium ${equilibrium.toFixed(digits)}) — aligned to execute ${candidateEntryArrayName} targeting BSL.`
+        : `Price is at ${currentPositionPct}% (Premium above 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT market-enter longs; wait for retracement into ${candidateEntryArrayName} (${candidateEntryZoneStr}).`
+      : alignedWithBias
+      ? `Price is at ${currentPositionPct}% (${currentZone} vs 50% Equilibrium ${equilibrium.toFixed(digits)}) — aligned to execute ${candidateEntryArrayName} targeting SSL.`
+      : `Price is at ${currentPositionPct}% (Discount below 50% Equilibrium ${equilibrium.toFixed(digits)}) — do NOT market-enter shorts; wait for rally into ${candidateEntryArrayName} (${candidateEntryZoneStr}).`;
 
   const prevClose = candles[candles.length - 2]?.close ?? currentPrice;
   const po3Phase: IctAnalysisResult['po3Phase'] =
@@ -1080,13 +1285,21 @@ export async function runIctMarketAnalysis(
 
   const kz = getNewYorkKillzone();
 
-  const confluences = [
-    `Dealing Range ${rangeLow.toFixed(digits)}–${rangeHigh.toFixed(digits)} · 50% Equilibrium at ${equilibrium.toFixed(digits)} (Price in ${currentZone} at ${currentPositionPct}%)`,
-    `Active Setup Array: ${entryArrayName} (${entryZoneStr}) aligned with ${bullishBias ? 'Discount Long' : 'Premium Short'} delivery rules`,
-    `${structureShift}${displacementDetected ? ' + energetic institutional displacement confirmed' : ''}`,
-    `${drawOnLiquidity.side} Draw on Liquidity targeting ${drawOnLiquidity.label} at ${drawOnLiquidity.price.toFixed(digits)}`,
-    `${kz.label} · Power of 3: ${po3Phase} · OTE 0.705 at ${fib705.toFixed(digits)}`,
-  ];
+  const confluences =
+    tradeVerdict === 'No Trade'
+      ? [
+          `Verdict: NO TRADE (Stand Aside) — ${noTradeReasons.length} required confluence gate${noTradeReasons.length > 1 ? 's' : ''} failed`,
+          ...noTradeReasons,
+          `Dealing Range ${rangeLow.toFixed(digits)}–${rangeHigh.toFixed(digits)} · 50% Equilibrium at ${equilibrium.toFixed(digits)} (Price at ${currentPositionPct}%)`,
+        ]
+      : [
+          `Verdict: ${verdictHeadline} — All 4 hard confluence gates passed`,
+          `Dealing Range ${rangeLow.toFixed(digits)}–${rangeHigh.toFixed(digits)} · 50% Equilibrium at ${equilibrium.toFixed(digits)} (Price in ${currentZone} at ${currentPositionPct}%)`,
+          `Active Setup Array: ${candidateEntryArrayName} (${candidateEntryZoneStr}) strictly in ${preferredArrayZone}`,
+          `${structureShift}${displacementDetected ? ' + energetic institutional displacement confirmed' : ''}`,
+          `${drawOnLiquidity.side} Draw on Liquidity at ${drawOnLiquidity.price.toFixed(digits)} (Real R:R 1 : ${realRrToDol?.toFixed(2)})`,
+          `${kz.label} · Power of 3: ${po3Phase}`,
+        ];
 
   // Sort PD Arrays: Premium highest-to-lowest, Discount lowest-to-highest, keeping top 16 clean entries
   const sortedPdArrays = pdArrays.sort((a, b) => a.priority - b.priority || b.midpoint - a.midpoint);
@@ -1112,6 +1325,8 @@ export async function runIctMarketAnalysis(
     }
   }
 
+  const isTradeLocked = tradeVerdict === 'No Trade';
+
   return {
     symbol: tvData.symbol,
     tvSymbol: tvData.tvSymbol,
@@ -1121,10 +1336,19 @@ export async function runIctMarketAnalysis(
     bid: tvData.bid,
     ask: tvData.ask,
     changePct: tvData.chgPct,
-    dailyBias: bullishBias ? 'Bullish' : 'Bearish',
+    dailyBias: effectiveDailyBias,
+    tradeVerdict,
+    verdictHeadline,
+    verdictSummary,
+    noTradeReasons,
+    confluenceChecks,
     po3Phase,
     activeKillzone: kz.label,
-    structureShift,
+    structureShift: hasMss
+      ? structureShift
+      : displacementDetected
+      ? `${bullishBias ? 'Bullish' : 'Bearish'} Displacement Expansion (${timeframe})`
+      : `Consolidation / No MSS (${timeframe})`,
     mssIndex: mssBullishCandle?.index ?? mssBearishCandle?.index ?? null,
     displacementDetected,
     liquiditySweep,
@@ -1155,13 +1379,14 @@ export async function runIctMarketAnalysis(
     },
     zones: chartZones,
     setup: {
-      direction: bullishBias ? 'Long (Buy)' : 'Short (Sell)',
-      entryZone: entryZoneStr,
-      entryArrayName,
-      stopLoss,
-      tp1,
-      tp2,
-      rrRatio,
+      direction: isTradeLocked ? 'No Trade' : bullishBias ? 'Long (Buy)' : 'Short (Sell)',
+      entryZone: isTradeLocked ? null : candidateEntryZoneStr,
+      entryArrayName: isTradeLocked ? null : candidateEntryArrayName,
+      stopLoss: isTradeLocked ? null : candidateStopLoss,
+      tp1: isTradeLocked ? null : candidateTp1,
+      tp2: isTradeLocked ? null : candidateTp2,
+      rrRatio: isTradeLocked ? null : realRrToDol,
+      projectedRrToDol: realRrToDol,
       confluences,
     },
     candles,
