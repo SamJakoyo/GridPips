@@ -859,8 +859,10 @@ export default function App() {
                 )}
                 {activeTab === 'analytics' && <AnalyticsView trades={journal} />}
                 {activeTab === 'calculators' && <CalculatorsView />}
-                {activeTab === 'paper' && <PaperTradingView quotes={quotes} />}
-                {activeTab === 'plan' && <TradingPlanView />}
+                {activeTab === 'paper' && (
+                  <PaperTradingView quotes={quotes} onJournalRefresh={loadUserWorkspaceData} />
+                )}
+                {activeTab === 'plan' && <TradingPlanView trades={journal} />}
                 {activeTab === 'calendar' && <CalendarAndNewsView />}
                 {activeTab === 'education' && <EducationView config={config} />}
                 {activeTab === 'account' && (

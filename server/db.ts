@@ -290,6 +290,36 @@ export function initDatabase(): void {
   if (!orderCols.includes('subscription_ends_at'))
     db.exec('ALTER TABLE orders ADD COLUMN subscription_ends_at TEXT');
 
+  const journalCols = (db.prepare('PRAGMA table_info(journal_trades)').all() as Array<{ name: string }>).map(
+    (c) => c.name
+  );
+  if (!journalCols.includes('exit_price')) db.exec('ALTER TABLE journal_trades ADD COLUMN exit_price REAL');
+  if (!journalCols.includes('entry_time')) db.exec('ALTER TABLE journal_trades ADD COLUMN entry_time TEXT');
+  if (!journalCols.includes('exit_time')) db.exec('ALTER TABLE journal_trades ADD COLUMN exit_time TEXT');
+  if (!journalCols.includes('duration_min')) db.exec('ALTER TABLE journal_trades ADD COLUMN duration_min INTEGER');
+  if (!journalCols.includes('fees')) db.exec('ALTER TABLE journal_trades ADD COLUMN fees REAL DEFAULT 0');
+  if (!journalCols.includes('r_multiple')) db.exec('ALTER TABLE journal_trades ADD COLUMN r_multiple REAL');
+  if (!journalCols.includes('mfe')) db.exec('ALTER TABLE journal_trades ADD COLUMN mfe REAL');
+  if (!journalCols.includes('mae')) db.exec('ALTER TABLE journal_trades ADD COLUMN mae REAL');
+  if (!journalCols.includes('setup_grade')) db.exec("ALTER TABLE journal_trades ADD COLUMN setup_grade TEXT DEFAULT 'A'");
+  if (!journalCols.includes('playbook')) db.exec('ALTER TABLE journal_trades ADD COLUMN playbook TEXT');
+  if (!journalCols.includes('mistakes_json'))
+    db.exec("ALTER TABLE journal_trades ADD COLUMN mistakes_json TEXT DEFAULT '[]'");
+  if (!journalCols.includes('confluences_json'))
+    db.exec("ALTER TABLE journal_trades ADD COLUMN confluences_json TEXT DEFAULT '[]'");
+  if (!journalCols.includes('emotions')) db.exec('ALTER TABLE journal_trades ADD COLUMN emotions TEXT');
+  if (!journalCols.includes('rule_adherence_pct'))
+    db.exec('ALTER TABLE journal_trades ADD COLUMN rule_adherence_pct INTEGER DEFAULT 100');
+  if (!journalCols.includes('account_label'))
+    db.exec("ALTER TABLE journal_trades ADD COLUMN account_label TEXT DEFAULT 'Live Account'");
+  if (!journalCols.includes('rating')) db.exec('ALTER TABLE journal_trades ADD COLUMN rating INTEGER DEFAULT 4');
+
+  const paperCols = (db.prepare('PRAGMA table_info(paper_accounts)').all() as Array<{ name: string }>).map(
+    (c) => c.name
+  );
+  if (!paperCols.includes('meta_json'))
+    db.exec("ALTER TABLE paper_accounts ADD COLUMN meta_json TEXT NOT NULL DEFAULT '{}'");
+
   const defaultSettings: Record<string, string> = {
     exness_ib_url: 'https://one.exnessonelink.com/a/0p67hxlswg?source=app',
     telegram_url: 'https://t.me/JakoyoFx',

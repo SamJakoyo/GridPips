@@ -471,15 +471,31 @@ export interface JournalTrade {
   instrument: string;
   side: 'Buy' | 'Sell';
   entry_price?: number | null;
+  exit_price?: number | null;
   sl?: number | null;
   tp?: number | null;
   size?: number | null;
   risk_pct?: number | null;
   rr?: number | null;
+  r_multiple?: number | null;
+  fees?: number | null;
+  mfe?: number | null;
+  mae?: number | null;
   pnl: number;
   trade_date: string;
+  entry_time?: string | null;
+  exit_time?: string | null;
+  duration_min?: number | null;
   session?: string | null;
   strategy?: string | null;
+  playbook?: string | null;
+  setup_grade?: 'A+' | 'A' | 'B' | 'C' | string | null;
+  mistakes_json?: string | null;
+  confluences_json?: string | null;
+  emotions?: string | null;
+  rule_adherence_pct?: number | null;
+  account_label?: string | null;
+  rating?: number | null;
   reason_entry?: string | null;
   reason_exit?: string | null;
   lessons?: string | null;
@@ -494,16 +510,85 @@ export interface PaperPosition {
   entry: number;
   sl?: number | null;
   tp?: number | null;
+  openedAt?: string;
+  playbook?: string;
+  note?: string;
+  riskUsd?: number | null;
+}
+
+export interface PaperPendingOrder {
+  id: string;
+  symbol: string;
+  side: 'Buy' | 'Sell';
+  orderType: 'Limit' | 'Stop';
+  triggerPrice: number;
+  size: number;
+  sl?: number | null;
+  tp?: number | null;
+  playbook?: string;
+  note?: string;
+  createdAt: string;
 }
 
 export interface PaperHistoryItem {
   id: string;
   symbol: string;
   side: 'Buy' | 'Sell';
+  size?: number;
   entry: number;
   exit: number;
+  sl?: number | null;
+  tp?: number | null;
   pnl: number;
+  rMultiple?: number | null;
+  playbook?: string;
+  note?: string;
   closedAt: string;
+  syncedToJournal?: boolean;
+}
+
+export interface TradingPlaybook {
+  id: string;
+  name: string;
+  category: string;
+  markets: string;
+  timeframes: string;
+  session: string;
+  minRr: number;
+  description: string;
+  entryRules: string[];
+  exitRules: string[];
+  invalidationRule: string;
+}
+
+export interface ChecklistStageItem {
+  id: string;
+  text: string;
+  checked: boolean;
+}
+
+export interface TradingPlanData {
+  goals: string;
+  entryRules: string;
+  riskRules: string;
+  preMarketRoutine?: string;
+  postLossProtocol?: string;
+  checked?: boolean[];
+  riskLimits?: {
+    maxRiskPerTradePct: number;
+    maxDailyLossPct: number;
+    maxWeeklyLossPct: number;
+    maxTradesPerDay: number;
+    dailyProfitTargetPct: number;
+    accountSizeUsd: number;
+  };
+  playbooks?: TradingPlaybook[];
+  checklists?: {
+    preMarket: ChecklistStageItem[];
+    preEntry: ChecklistStageItem[];
+    duringTrade: ChecklistStageItem[];
+    postSession: ChecklistStageItem[];
+  };
 }
 
 export interface EmailLogItem {

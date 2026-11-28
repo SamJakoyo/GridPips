@@ -4427,38 +4427,120 @@ app.get('/api/workspace/journal', requireAuth, (req: AuthedRequest, res) => {
   res.json({ trades });
 });
 
+function normalizeJournalPayload(b: Record<string, unknown>) {
+  const numOrNull = (val: unknown): number | null => {
+    if (val === null || val === undefined || val === '') return null;
+    const n = Number(val);
+    return Number.isFinite(n) ? n : null;
+  };
+  const clampInt = (val: unknown, min: number, max: number, fallback: number): number => {
+    const n = Number(val);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.max(min, Math.min(max, Math.round(n)));
+  };
+  const stringArray = (val: unknown, maxItems = 12): string[] => {
+    if (Array.isArray(val)) {
+      return val
+        .map((v) => sanitizeText(String(v ?? ''), 48))
+        .filter(Boolean)
+        .slice(0, maxItems);
+    }
+    return [];
+  };
+
+  const validGrades = new Set(['A+', 'A', 'B', 'C']);
+  const rawGrade = sanitizeText(String(b.setupGrade ?? b.setup_grade ?? 'A'), 4).toUpperCase();
+  const setupGrade = validGrades.has(rawGrade) ? rawGrade : 'A';
+
+  return {
+    instrument: sanitizeText(b.instrument, 20).toUpperCase(),
+    side: b.side === 'Sell' ? 'Sell' : 'Buy',
+    entryPrice: numOrNull(b.entryPrice ?? b.entry_price),
+    exitPrice: numOrNull(b.exitPrice ?? b.exit_price),
+    sl: numOrNull(b.sl),
+    tp: numOrNull(b.tp),
+    size: numOrNull(b.size),
+    riskPct: numOrNull(b.riskPct ?? b.risk_pct),
+    rr: numOrNull(b.rr),
+    rMultiple: numOrNull(b.rMultiple ?? b.r_multiple),
+    fees: numOrNull(b.fees) ?? 0,
+    mfe: numOrNull(b.mfe),
+    mae: numOrNull(b.mae),
+    pnl: Number(b.pnl),
+    tradeDate: sanitizeText(b.tradeDate ?? b.trade_date ?? new Date().toISOString().slice(0, 10), 20),
+    entryTime: sanitizeText(b.entryTime ?? b.entry_time ?? '', 12),
+    exitTime: sanitizeText(b.exitTime ?? b.exit_time ?? '', 12),
+    durationMin: numOrNull(b.durationMin ?? b.duration_min),
+    session: sanitizeText(b.session || 'New York', 30),
+    strategy: sanitizeText(b.strategy || b.playbook || 'ICT Silver Bullet FVG', 60),
+    playbook: sanitizeText(b.playbook || b.strategy || 'ICT Silver Bullet FVG', 60),
+    setupGrade,
+    mistakesJson: JSON.stringify(stringArray(b.mistakes ?? b.mistakes_json)),
+    confluencesJson: JSON.stringify(stringArray(b.confluences ?? b.confluences_json)),
+    emotions: sanitizeText(b.emotions || 'Calm & Disciplined', 40),
+    ruleAdherencePct: clampInt(b.ruleAdherencePct ?? b.rule_adherence_pct, 0, 100, 100),
+    accountLabel: sanitizeText(b.accountLabel ?? b.account_label ?? 'Live Account', 40) || 'Live Account',
+    rating: clampInt(b.rating, 1, 5, 4),
+    reasonEntry: sanitizeText(b.reasonEntry ?? b.reason_entry ?? '', 600),
+    reasonExit: sanitizeText(b.reasonExit ?? b.reason_exit ?? '', 600),
+    lessons: sanitizeText(b.lessons || '', 600),
+    imageData:
+      typeof (b.imageData ?? b.image_data) === 'string' &&
+      String(b.imageData ?? b.image_data).startsWith('data:image/')
+        ? String(b.imageData ?? b.image_data).slice(0, 1500000)
+        : null,
+  };
+}
+
 app.post('/api/workspace/journal', requireAuth, (req: AuthedRequest, res) => {
-  const b = req.body || {};
-  const instrument = sanitizeText(b.instrument, 20).toUpperCase();
-  const side = b.side === 'Sell' ? 'Sell' : 'Buy';
-  const pnl = Number(b.pnl);
-  if (!instrument || Number.isNaN(pnl)) {
+  const p = normalizeJournalPayload((req.body || {}) as Record<string, unknown>);
+  if (!p.instrument || Number.isNaN(p.pnl)) {
     res.status(400).json({ error: 'Instrument and valid P&L are required.' });
     return;
   }
   const info = db
     .prepare(
-      `INSERT INTO journal_trades (user_id, instrument, side, entry_price, sl, tp, size, risk_pct, rr, pnl, trade_date, session, strategy, reason_entry, reason_exit, lessons, image_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO journal_trades (
+        user_id, instrument, side, entry_price, exit_price, sl, tp, size, risk_pct, rr, r_multiple,
+        fees, mfe, mae, pnl, trade_date, entry_time, exit_time, duration_min, session, strategy, playbook,
+        setup_grade, mistakes_json, confluences_json, emotions, rule_adherence_pct, account_label, rating,
+        reason_entry, reason_exit, lessons, image_data
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       req.currentUser!.id,
-      instrument,
-      side,
-      b.entryPrice ? Number(b.entryPrice) : null,
-      b.sl ? Number(b.sl) : null,
-      b.tp ? Number(b.tp) : null,
-      b.size ? Number(b.size) : null,
-      b.riskPct ? Number(b.riskPct) : null,
-      b.rr ? Number(b.rr) : null,
-      pnl,
-      sanitizeText(b.tradeDate || new Date().toISOString().slice(0, 10), 20),
-      sanitizeText(b.session || 'New York', 30),
-      sanitizeText(b.strategy || 'ICT FVG', 60),
-      sanitizeText(b.reasonEntry || '', 400),
-      sanitizeText(b.reasonExit || '', 400),
-      sanitizeText(b.lessons || '', 400),
-      typeof b.imageData === 'string' && b.imageData.startsWith('data:image/') ? b.imageData.slice(0, 1500000) : null
+      p.instrument,
+      p.side,
+      p.entryPrice,
+      p.exitPrice,
+      p.sl,
+      p.tp,
+      p.size,
+      p.riskPct,
+      p.rr,
+      p.rMultiple,
+      p.fees,
+      p.mfe,
+      p.mae,
+      p.pnl,
+      p.tradeDate,
+      p.entryTime,
+      p.exitTime,
+      p.durationMin,
+      p.session,
+      p.strategy,
+      p.playbook,
+      p.setupGrade,
+      p.mistakesJson,
+      p.confluencesJson,
+      p.emotions,
+      p.ruleAdherencePct,
+      p.accountLabel,
+      p.rating,
+      p.reasonEntry,
+      p.reasonExit,
+      p.lessons,
+      p.imageData
     );
   const trade = db.prepare('SELECT * FROM journal_trades WHERE id = ?').get(info.lastInsertRowid) as {
     id: number;
@@ -4485,6 +4567,153 @@ app.post('/api/workspace/journal', requireAuth, (req: AuthedRequest, res) => {
   res.status(201).json({ trade });
 });
 
+app.put('/api/workspace/journal/:id', requireAuth, (req: AuthedRequest, res) => {
+  const tradeId = Number(req.params.id);
+  const existing = db
+    .prepare('SELECT id, image_data FROM journal_trades WHERE id = ? AND user_id = ?')
+    .get(tradeId, req.currentUser!.id) as { id: number; image_data: string | null } | undefined;
+  if (!existing) {
+    res.status(404).json({ error: 'Journal trade not found.' });
+    return;
+  }
+  const p = normalizeJournalPayload((req.body || {}) as Record<string, unknown>);
+  if (!p.instrument || Number.isNaN(p.pnl)) {
+    res.status(400).json({ error: 'Instrument and valid P&L are required.' });
+    return;
+  }
+  const nextImage =
+    req.body && Object.prototype.hasOwnProperty.call(req.body, 'imageData')
+      ? p.imageData
+      : existing.image_data;
+
+  db.prepare(
+    `UPDATE journal_trades SET
+      instrument = ?, side = ?, entry_price = ?, exit_price = ?, sl = ?, tp = ?, size = ?,
+      risk_pct = ?, rr = ?, r_multiple = ?, fees = ?, mfe = ?, mae = ?, pnl = ?,
+      trade_date = ?, entry_time = ?, exit_time = ?, duration_min = ?, session = ?,
+      strategy = ?, playbook = ?, setup_grade = ?, mistakes_json = ?, confluences_json = ?,
+      emotions = ?, rule_adherence_pct = ?, account_label = ?, rating = ?,
+      reason_entry = ?, reason_exit = ?, lessons = ?, image_data = ?
+     WHERE id = ? AND user_id = ?`
+  ).run(
+    p.instrument,
+    p.side,
+    p.entryPrice,
+    p.exitPrice,
+    p.sl,
+    p.tp,
+    p.size,
+    p.riskPct,
+    p.rr,
+    p.rMultiple,
+    p.fees,
+    p.mfe,
+    p.mae,
+    p.pnl,
+    p.tradeDate,
+    p.entryTime,
+    p.exitTime,
+    p.durationMin,
+    p.session,
+    p.strategy,
+    p.playbook,
+    p.setupGrade,
+    p.mistakesJson,
+    p.confluencesJson,
+    p.emotions,
+    p.ruleAdherencePct,
+    p.accountLabel,
+    p.rating,
+    p.reasonEntry,
+    p.reasonExit,
+    p.lessons,
+    nextImage,
+    tradeId,
+    req.currentUser!.id
+  );
+  const trade = db.prepare('SELECT * FROM journal_trades WHERE id = ?').get(tradeId) as {
+    id: number;
+    instrument: string;
+    side: string;
+    entry_price: number | null;
+    sl: number | null;
+    tp: number | null;
+    size: number | null;
+    risk_pct: number | null;
+    rr: number | null;
+    pnl: number;
+    trade_date: string;
+    session: string | null;
+    strategy: string | null;
+    reason_entry: string | null;
+    reason_exit: string | null;
+    lessons: string | null;
+    image_data: string | null;
+  } | undefined;
+  if (trade) {
+    void insertCloudJournalTrade(req.currentUser!.email, trade);
+  }
+  res.json({ trade });
+});
+
+app.post('/api/workspace/journal/import', requireAuth, (req: AuthedRequest, res) => {
+  const rows = Array.isArray(req.body?.trades) ? req.body.trades.slice(0, 200) : [];
+  if (!rows.length) {
+    res.status(400).json({ error: 'No valid trades provided for import.' });
+    return;
+  }
+  const stmt = db.prepare(
+    `INSERT INTO journal_trades (
+      user_id, instrument, side, entry_price, exit_price, sl, tp, size, risk_pct, rr, r_multiple,
+      fees, mfe, mae, pnl, trade_date, entry_time, exit_time, duration_min, session, strategy, playbook,
+      setup_grade, mistakes_json, confluences_json, emotions, rule_adherence_pct, account_label, rating,
+      reason_entry, reason_exit, lessons, image_data
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+  let imported = 0;
+  for (const raw of rows) {
+    const p = normalizeJournalPayload((raw || {}) as Record<string, unknown>);
+    if (!p.instrument || Number.isNaN(p.pnl)) continue;
+    stmt.run(
+      req.currentUser!.id,
+      p.instrument,
+      p.side,
+      p.entryPrice,
+      p.exitPrice,
+      p.sl,
+      p.tp,
+      p.size,
+      p.riskPct,
+      p.rr,
+      p.rMultiple,
+      p.fees,
+      p.mfe,
+      p.mae,
+      p.pnl,
+      p.tradeDate,
+      p.entryTime,
+      p.exitTime,
+      p.durationMin,
+      p.session,
+      p.strategy,
+      p.playbook,
+      p.setupGrade,
+      p.mistakesJson,
+      p.confluencesJson,
+      p.emotions,
+      p.ruleAdherencePct,
+      p.accountLabel,
+      p.rating,
+      p.reasonEntry,
+      p.reasonExit,
+      p.lessons,
+      null
+    );
+    imported += 1;
+  }
+  res.status(201).json({ imported });
+});
+
 app.delete('/api/workspace/journal/:id', requireAuth, (req: AuthedRequest, res) => {
   const existing = db
     .prepare('SELECT id, instrument, trade_date FROM journal_trades WHERE id = ? AND user_id = ?')
@@ -4500,16 +4729,25 @@ app.delete('/api/workspace/journal/:id', requireAuth, (req: AuthedRequest, res) 
 
 app.get('/api/workspace/paper', requireAuth, (req: AuthedRequest, res) => {
   let row = db.prepare('SELECT * FROM paper_accounts WHERE user_id = ?').get(req.currentUser!.id) as
-    | { balance: number; positions_json: string; history_json: string }
+    | { balance: number; positions_json: string; history_json: string; meta_json?: string }
     | undefined;
   if (!row) {
     db.prepare('INSERT INTO paper_accounts (user_id, balance) VALUES (?, 10000)').run(req.currentUser!.id);
-    row = { balance: 10000, positions_json: '[]', history_json: '[]' };
+    row = { balance: 10000, positions_json: '[]', history_json: '[]', meta_json: '{}' };
+  }
+  let meta: Record<string, unknown> = {};
+  try {
+    meta = row.meta_json ? (JSON.parse(row.meta_json) as Record<string, unknown>) : {};
+  } catch {
+    meta = {};
   }
   res.json({
     balance: row.balance,
     positions: JSON.parse(row.positions_json),
     history: JSON.parse(row.history_json),
+    pendingOrders: Array.isArray(meta.pendingOrders) ? meta.pendingOrders : [],
+    startingBalance: Number(meta.startingBalance) || 10000,
+    propConfig: meta.propConfig || null,
   });
 });
 
@@ -4517,11 +4755,16 @@ app.post('/api/workspace/paper', requireAuth, (req: AuthedRequest, res) => {
   const balance = Number(req.body?.balance ?? 10000);
   const positions = Array.isArray(req.body?.positions) ? req.body.positions : [];
   const history = Array.isArray(req.body?.history) ? req.body.history : [];
+  const metaPayload = {
+    pendingOrders: Array.isArray(req.body?.pendingOrders) ? req.body.pendingOrders : [],
+    startingBalance: Number(req.body?.startingBalance) || 10000,
+    propConfig: req.body?.propConfig || null,
+  };
   db.prepare(
-    `INSERT INTO paper_accounts (user_id, balance, positions_json, history_json, updated_at)
-     VALUES (?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, positions_json = excluded.positions_json, history_json = excluded.history_json, updated_at = datetime('now')`
-  ).run(req.currentUser!.id, balance, JSON.stringify(positions), JSON.stringify(history));
+    `INSERT INTO paper_accounts (user_id, balance, positions_json, history_json, meta_json, updated_at)
+     VALUES (?, ?, ?, ?, ?, datetime('now'))
+     ON CONFLICT(user_id) DO UPDATE SET balance = excluded.balance, positions_json = excluded.positions_json, history_json = excluded.history_json, meta_json = excluded.meta_json, updated_at = datetime('now')`
+  ).run(req.currentUser!.id, balance, JSON.stringify(positions), JSON.stringify(history), JSON.stringify(metaPayload));
   void syncUserStateToCloud(req.currentUser!.id);
   res.json({ ok: true });
 });
